@@ -17,6 +17,9 @@ API_VERSION = "5.199"
 FIREBASE_DB_URL = os.environ.get('FIREBASE_DB_URL', '')
 FIREBASE_API_KEY = os.environ.get('FIREBASE_API_KEY', '')
 
+# Persistent HTTP Session for fast connection pooling
+http_session = requests.Session()
+
 
 def firebase_get(path):
     """GET data from Firebase Realtime Database"""
@@ -24,7 +27,7 @@ def firebase_get(path):
         return None
     url = f"{FIREBASE_DB_URL}/{path}.json"
     try:
-        resp = requests.get(url, timeout=10)
+        resp = http_session.get(url, timeout=5)
         return resp.json()
     except Exception:
         return None
@@ -36,18 +39,18 @@ def firebase_put(path, data):
         return False
     url = f"{FIREBASE_DB_URL}/{path}.json"
     try:
-        resp = requests.put(url, json=data, timeout=10)
+        resp = http_session.put(url, json=data, timeout=5)
         return resp.status_code == 200
     except Exception:
         return False
 
 
 def vk_request(method, token, **params):
-    """Proxy request to VK API"""
+    """Fast proxy request to VK API with HTTP session reuse"""
     params['access_token'] = token
     params['v'] = API_VERSION
     try:
-        resp = requests.get(f"{VK_API}/{method}", params=params, timeout=30)
+        resp = http_session.get(f"{VK_API}/{method}", params=params, timeout=10)
         data = resp.json()
         return data.get('response', data.get('error'))
     except Exception as e:
@@ -67,15 +70,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .app{height:100vh;display:flex;flex-direction:column;position:relative;overflow:hidden}
 
 /* Login Screen */
-.login-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:100;animation:fadeIn 0.3s ease-out}
+.login-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:100;animation:fadeIn 0.2s ease-out}
 .login-screen h1{font-size:26px;margin-bottom:6px;font-weight:700;color:#fff}
 .login-screen p{color:#888;margin-bottom:24px;font-size:13px;text-align:center;max-width:320px}
-.badge-e2e{background:#1c1c1e;color:#8e8e93;border:1px solid #2c2c2e;padding:6px 12px;border-radius:14px;font-size:12px;font-weight:600;margin-bottom:20px;display:inline-flex;align-items:center;gap:6px;transition:transform 0.2s}
-.badge-e2e:hover{transform:scale(1.02)}
-.token-input,.pass-input{width:100%;max-width:360px;padding:14px 16px;border:none;border-radius:14px;background:#161616;color:#fff;font-size:15px;margin-bottom:12px;outline:none;border:1px solid #2c2c2c;transition:border-color 0.2s, box-shadow 0.2s}
-.token-input:focus,.pass-input:focus{border-color:#555;box-shadow:0 0 8px rgba(255,255,255,0.1)}
+.badge-e2e{background:#1c1c1e;color:#8e8e93;border:1px solid #2c2c2e;padding:6px 12px;border-radius:14px;font-size:12px;font-weight:600;margin-bottom:20px;display:inline-flex;align-items:center;gap:6px}
+.token-input,.pass-input{width:100%;max-width:360px;padding:14px 16px;border:none;border-radius:14px;background:#161616;color:#fff;font-size:15px;margin-bottom:12px;outline:none;border:1px solid #2c2c2c;transition:border-color 0.2s}
+.token-input:focus,.pass-input:focus{border-color:#555}
 .token-input::placeholder,.pass-input::placeholder{color:#666}
-.btn{width:100%;max-width:360px;padding:14px;border:none;border-radius:14px;background:#fff;color:#000;font-size:16px;font-weight:600;cursor:pointer;margin-bottom:8px;transition:all 0.15s active}
+.btn{width:100%;max-width:360px;padding:14px;border:none;border-radius:14px;background:#fff;color:#000;font-size:16px;font-weight:600;cursor:pointer;margin-bottom:8px;transition:all 0.1s active}
 .btn:active{transform:scale(0.97);opacity:.85}
 .btn-secondary{background:transparent;color:#fff;border:1px solid #333}
 .btn-green{background:#2c2c2e;color:#fff;border:1px solid #3a3a3c}
@@ -83,21 +85,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 /* Header */
 .header{height:56px;background:#0d0d0d;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #1c1c1c;flex-shrink:0;z-index:20}
-.header-back{width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;margin-right:6px;background:rgba(255,255,255,0.08);color:#fff;transition:background 0.2s;flex-shrink:0}
-.header-back:active{background:rgba(255,255,255,0.2)}
-.header-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;margin-right:10px;background:#222;transition:transform 0.2s;cursor:pointer}
-.header-avatar:active{transform:scale(0.95)}
+.header-back{width:42px;height:42px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;margin-right:8px;background:rgba(255,255,255,0.12);color:#fff;flex-shrink:0;transition:background 0.15s}
+.header-back:active{background:rgba(255,255,255,0.25)}
+.header-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;margin-right:10px;background:#222;cursor:pointer;flex-shrink:0}
 .header-info{flex:1;min-width:0;cursor:pointer}
 .header-title{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .header-subtitle{font-size:12px;color:#888;display:flex;align-items:center;gap:4px}
-.header-subtitle.e2e-on{color:#8e8e93}
 .header-actions{display:flex;gap:6px;align-items:center}
-.header-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;color:#aaa;background:rgba(255,255,255,0.05);transition:all 0.2s}
-.header-btn:active{transform:scale(0.9);background:rgba(255,255,255,0.15)}
-.header-btn.active{color:#fff;background:rgba(255,255,255,0.15)}
+.header-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;color:#aaa;background:rgba(255,255,255,0.06);transition:all 0.15s}
+.header-btn:active{transform:scale(0.9);background:rgba(255,255,255,0.2)}
+.header-btn.active{color:#fff;background:rgba(255,255,255,0.2)}
 
 /* Dialogs */
-.dialogs-screen{flex:1;display:flex;flex-direction:column;overflow:hidden;animation:fadeIn 0.25s ease-out}
+.dialogs-screen{flex:1;display:flex;flex-direction:column;overflow:hidden}
 .dialogs-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .dialog{display:flex;align-items:center;padding:12px 14px;cursor:pointer;border-bottom:1px solid #111;transition:background 0.15s}
 .dialog:active{background:#111}
@@ -111,129 +111,145 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .dialog-unread{min-width:18px;height:18px;border-radius:50%;background:#fff;color:#000;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0}
 
 /* Chat Screen */
-.chat-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;z-index:10;transform:translateX(100%);transition:transform 0.28s cubic-bezier(0.1, 0.9, 0.2, 1)}
+.chat-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;z-index:10;transform:translateX(100%);transition:transform 0.22s cubic-bezier(0.1, 0.9, 0.2, 1)}
 .chat-screen.active{transform:translateX(0)}
 .messages-wrapper{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column}
 .messages{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
 
-/* Message styling - STRICTLY NO GREEN COLOR FOR ENCRYPTED */
+/* Message styling */
 .msg-container{position:relative;display:flex;width:100%;align-items:center;touch-action:pan-y;margin-bottom:2px}
 .msg-swipe-bg{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;width:40px;opacity:0;transition:opacity 0.15s;color:#8e8e93;z-index:1}
 .msg-swipe-right{right:-40px}
 
-.msg{max-width:82%;padding:8px 12px;border-radius:18px;font-size:14px;line-height:1.4;word-wrap:break-word;position:relative;transition:transform 0.2s cubic-bezier(0.1, 0.8, 0.3, 1), background-color 0.2s;will-change:transform;animation:msgAppear 0.25s ease-out}
-@keyframes msgAppear{from{opacity:0;transform:translateY(8px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}
-
+.msg{max-width:82%;padding:8px 12px;border-radius:18px;font-size:14px;line-height:1.4;word-wrap:break-word;position:relative;transition:transform 0.15s, background-color 0.15s;will-change:transform}
 .msg-in{align-self:flex-start;background:#1c1c1e;border-bottom-left-radius:4px;color:#fff}
 .msg-out{align-self:flex-end;background:#2c2c2e;border-bottom-right-radius:4px;color:#fff}
-.msg-encrypted{}
 
 .msg-reply-quote{background:rgba(255,255,255,0.08);border-left:3px solid #8e8e93;padding:4px 8px;border-radius:4px;margin-bottom:6px;font-size:12px;cursor:pointer}
 .msg-reply-name{font-weight:600;color:#aaa;margin-bottom:2px;font-size:11px}
 .msg-reply-text{color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 .msg-author{font-size:11px;color:#aaa;font-weight:600;margin-bottom:2px}
-.msg-text{color:#fff;transition:opacity 0.2s}
+.msg-text{color:#fff}
 .msg-time{font-size:10px;color:#888;margin-top:4px;text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:3px}
 
-/* Decryption Shimmer Animation */
-.decrypting-shimmer{position:relative;color:transparent!important;overflow:hidden;background:linear-gradient(90deg, #3a3a3c 25%, #666 50%, #3a3a3c 75%);background-size:200% 100%;-webkit-background-clip:text;animation:shimmer 1.2s infinite linear;border-radius:4px;display:inline-block;min-width:70px;min-height:16px}
-@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-
-.decrypted-pop{animation:decryptedPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)}
-@keyframes decryptedPop{0%{opacity:0.4;transform:scale(0.97)}100%{opacity:1;transform:scale(1)}}
-
-.msg-status{font-size:10px;margin-left:3px}
+.decrypting-shimmer{color:#888!important;font-style:italic}
 
 /* Media Attachments */
-.msg-photo{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;object-fit:cover;cursor:pointer;background:#111;transition:transform 0.2s}
-.msg-photo:active{transform:scale(0.98)}
+.msg-photo{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;object-fit:cover;cursor:pointer;background:transparent}
 .msg-video{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;background:#000}
-.msg-file{background:rgba(255,255,255,.05);padding:10px;border-radius:12px;margin-top:6px;display:flex;align-items:center;gap:10px;transition:background 0.2s;cursor:pointer}
-.msg-file:active{background:rgba(255,255,255,.1)}
+.msg-file{background:rgba(255,255,255,.05);padding:10px;border-radius:12px;margin-top:6px;display:flex;align-items:center;gap:10px;cursor:pointer}
 .msg-file-icon{font-size:20px;display:flex;align-items:center;justify-content:center;width:32px;height:32px;background:rgba(255,255,255,0.1);border-radius:50%}
 .msg-file-info{flex:1;min-width:0}
 .msg-file-name{font-size:13px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .msg-file-size{font-size:11px;color:#888}
 
-/* TG Circle Video Message (.mec) */
-.tg-circle-container{width:200px;height:200px;position:relative;border-radius:50%;overflow:hidden;margin-top:6px;background:#111;box-shadow:0 4px 15px rgba(0,0,0,0.5);transform:translateZ(0)}
-.tg-circle-video{width:100%;height:100%;object-fit:cover;border-radius:50%;cursor:pointer;display:block}
-.tg-circle-overlay{position:absolute;top:0;left:0;width:100%;height:100%;border-radius:50%;pointer-events:none;box-shadow:inset 0 0 0 2px rgba(255,255,255,0.15)}
+/* TG Circle Video Message (.mec) STRICTLY PURE ROUND CIRCLE */
+.tg-circle-container{
+    width: 200px;
+    height: 200px;
+    position: relative;
+    border-radius: 50% !important;
+    overflow: hidden !important;
+    margin: 6px 0;
+    background: transparent !important;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    clip-path: circle(50% at 50% 50%);
+    -webkit-clip-path: circle(50% at 50% 50%);
+    transform: translateZ(0);
+    flex-shrink: 0;
+}
+.tg-circle-video{
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    border-radius: 50% !important;
+    background: transparent !important;
+    cursor: pointer;
+    display: block;
+}
+.tg-circle-overlay{
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 50% !important;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.2);
+}
 
 /* TG Voice Message (.meg) */
 .tg-voice-container{display:flex;align-items:center;gap:10px;padding:6px 0;width:220px;user-select:none}
-.tg-voice-play-btn{width:38px;height:38px;border-radius:50%;background:#fff;color:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:transform 0.15s, background 0.15s}
-.tg-voice-play-btn:active{transform:scale(0.92)}
+.tg-voice-play-btn{width:38px;height:38px;border-radius:50%;background:#fff;color:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
 .tg-voice-wave-wrap{flex:1;display:flex;flex-direction:column;gap:4px}
 .tg-voice-waveform{display:flex;align-items:center;gap:2px;height:24px;cursor:pointer}
-.tg-voice-bar{flex:1;background:rgba(255,255,255,0.3);border-radius:2px;min-height:3px;transition:height 0.1s, background 0.15s}
+.tg-voice-bar{flex:1;background:rgba(255,255,255,0.3);border-radius:2px;min-height:3px}
 .tg-voice-bar.active{background:#fff}
 .tg-voice-info{display:flex;justify-content:space-between;font-size:10px;color:#aaa}
 
 /* Input Bar & Actions */
 .input-area-wrapper{background:#0d0d0d;border-top:1px solid #1a1a1a;display:flex;flex-direction:column;flex-shrink:0;z-index:15}
 
-/* Reply & Edit Bar Above Input */
-.reply-preview-bar{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#141416;border-bottom:1px solid #222;animation:slideDown 0.2s ease-out}
-@keyframes slideDown{from{transform:translateY(-10px);opacity:0}to{transform:translateY(0);opacity:1}}
+.reply-preview-bar{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#141416;border-bottom:1px solid #222}
 .reply-preview-info{flex:1;min-width:0;border-left:2px solid #8e8e93;padding-left:8px}
 .reply-preview-title{font-size:12px;font-weight:600;color:#aaa}
 .reply-preview-text{font-size:12px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .reply-preview-close{width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#888;border-radius:50%}
-.reply-preview-close:active{background:#222}
 
 .input-area{min-height:54px;display:flex;align-items:flex-end;padding:8px;gap:6px;position:relative}
-.input-attach{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;flex-shrink:0;color:#aaa;transition:transform 0.15s, color 0.15s}
-.input-attach:active{transform:scale(0.9);background:#222;color:#fff}
-.message-input{flex:1;padding:10px 14px;border:none;border-radius:20px;background:#1c1c1e;color:#fff;font-size:14px;outline:none;resize:none;max-height:100px;font-family:inherit;line-height:1.4;border:1px solid #2a2a2c;transition:border-color 0.2s}
-.message-input:focus{border-color:#444}
-.send-btn,.media-rec-btn{width:38px;height:38px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;border:none;color:#000;transition:transform 0.15s, background 0.2s}
-.send-btn:active,.media-rec-btn:active{transform:scale(0.92)}
-.send-btn:disabled{background:#222;color:#555}
+.input-attach{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;flex-shrink:0;color:#aaa}
+.message-input{flex:1;padding:10px 14px;border:none;border-radius:20px;background:#1c1c1e;color:#fff;font-size:14px;outline:none;resize:none;max-height:100px;font-family:inherit;line-height:1.4;border:1px solid #2a2a2c}
+.send-btn,.media-rec-btn{width:38px;height:38px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;border:none;color:#000}
 
-/* Voice / Circle Recording UI Bar */
-.recording-bar{display:flex;align-items:center;flex:1;padding:0 12px;height:38px;background:#1c1c1e;border-radius:20px;gap:10px;animation:fadeIn 0.2s ease-out}
-.recording-dot{width:10px;height:10px;border-radius:50%;background:#ff3b30;animation:pulseDot 1s infinite alternate}
-@keyframes pulseDot{from{opacity:0.3}to{opacity:1}}
+/* Voice Bar */
+.recording-bar{display:flex;align-items:center;flex:1;padding:0 12px;height:38px;background:#1c1c1e;border-radius:20px;gap:10px}
+.recording-dot{width:10px;height:10px;border-radius:50%;background:#ff3b30}
 .recording-timer{font-size:13px;font-weight:600;color:#fff;min-width:40px}
 .recording-waves{flex:1;display:flex;align-items:center;gap:3px;height:18px;overflow:hidden}
-.recording-wave-bar{flex:1;background:#555;border-radius:2px;height:4px;transition:height 0.1s}
+.recording-wave-bar{flex:1;background:#555;border-radius:2px;height:4px}
 .recording-cancel{font-size:13px;color:#ff3b30;cursor:pointer;font-weight:500;padding:4px 8px;border-radius:12px}
-.recording-cancel:active{background:rgba(255,59,48,0.1)}
 
-/* TG Circle Camera Modal / Floating Video Preview */
-.circle-recorder-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;animation:fadeIn 0.2s ease-out}
-.circle-preview-box{width:260px;height:260px;border-radius:50%;overflow:hidden;position:relative;box-shadow:0 0 30px rgba(0,0,0,0.8);border:4px solid #fff;background:#000}
-.circle-preview-video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
-.circle-rec-controls{margin-top:24px;display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap}
-.circle-btn-action{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform 0.15s, background 0.2s;user-select:none}
-.circle-btn-action:active{transform:scale(0.9)}
+/* TG Circle Camera Modal */
+.circle-recorder-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.circle-preview-box{
+    width: 260px;
+    height: 260px;
+    border-radius: 50% !important;
+    overflow: hidden !important;
+    position: relative;
+    box-shadow: 0 0 30px rgba(0,0,0,0.8);
+    border: 4px solid #fff;
+    background: #000;
+    clip-path: circle(50% at 50% 50%);
+    -webkit-clip-path: circle(50% at 50% 50%);
+}
+.circle-preview-video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);border-radius:50%!important}
+.circle-rec-controls{margin-top:24px;display:flex;align-items:center;justify-content:center;gap:16px}
+.circle-btn-action{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none}
 .circle-btn-sec{background:#2c2c2e;color:#fff;border:1px solid #3a3a3c}
 .circle-btn-sec.active{background:#fff;color:#000}
 .circle-btn-stop{background:#ff3b30;color:#fff;box-shadow:0 0 15px rgba(255,59,48,0.5)}
 .circle-btn-cancel{background:#3a3a3c;color:#fff}
 
-/* Global Upload Progress Banner / Toast */
-.upload-toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(28,28,30,0.95);border:1px solid #3a3a3c;color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:500;z-index:500;display:flex;align-items:center;gap:10px;box-shadow:0 4px 16px rgba(0,0,0,0.5);animation:fadeIn 0.2s ease-out}
+/* Non-blocking Upload Progress Toast Banner */
+.upload-toast{position:fixed;top:62px;left:50%;transform:translateX(-50%);background:rgba(28,28,30,0.95);border:1px solid #3a3a3c;color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;z-index:500;display:flex;align-items:center;gap:8px;box-shadow:0 4px 16px rgba(0,0,0,0.5);pointer-events:none}
 
 /* Bottom Nav */
 .bottom-nav{height:50px;background:#0d0d0d;border-top:1px solid #1a1a1a;display:flex;justify-content:space-around;align-items:center;flex-shrink:0}
-.nav-item{flex:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;color:#666;transition:color 0.2s}
+.nav-item{flex:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;color:#666}
 .nav-item.active{color:#fff}
 .nav-item span{font-size:10px}
 
-/* Context Menu / Message Actions Sheet */
-.action-sheet{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:250;display:flex;flex-direction:column;justify-content:flex-end;animation:fadeIn 0.2s ease-out}
-.action-sheet-content{background:#1c1c1e;border-top-left-radius:20px;border-top-right-radius:20px;padding:16px;display:flex;flex-direction:column;gap:8px;animation:slideUp 0.25s cubic-bezier(0.1, 0.9, 0.2, 1)}
-@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-.action-sheet-item{padding:14px 16px;border-radius:12px;background:#2c2c2e;color:#fff;font-size:15px;font-weight:500;display:flex;align-items:center;gap:12px;cursor:pointer;transition:background 0.15s}
-.action-sheet-item:active{background:#3a3a3c}
+/* Context Menu */
+.action-sheet{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:250;display:flex;flex-direction:column;justify-content:flex-end}
+.action-sheet-content{background:#1c1c1e;border-top-left-radius:20px;border-top-right-radius:20px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.action-sheet-item{padding:14px 16px;border-radius:12px;background:#2c2c2e;color:#fff;font-size:15px;font-weight:500;display:flex;align-items:center;gap:12px;cursor:pointer}
 .action-sheet-item.danger{color:#ff3b30}
 
 /* Modals */
-.modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px;animation:fadeIn 0.2s ease-out}
-.modal-content{background:#161616;border-radius:20px;padding:24px;width:100%;max-width:380px;border:1px solid #282828;box-shadow:0 10px 30px rgba(0,0,0,0.5)}
+.modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px}
+.modal-content{background:#161616;border-radius:20px;padding:24px;width:100%;max-width:380px;border:1px solid #282828}
 .modal-title{font-size:18px;font-weight:600;margin-bottom:10px;color:#fff}
 .modal-text{font-size:13px;color:#aaa;margin-bottom:20px;line-height:1.5}
 .modal-checkbox{display:flex;align-items:center;gap:10px;margin-bottom:20px;font-size:14px;color:#ddd;cursor:pointer}
@@ -241,7 +257,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 .file-input{display:none}
 .hidden{display:none!important}
-.loader{border:2px solid #333;border-top:2px solid #fff;border-radius:50%;width:16px;height:16px;animation:spin 0.8s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
+.loader{border:2px solid #333;border-top:2px solid #fff;border-radius:50%;width:14px;height:14px;animation:spin 0.6s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
 @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 </style>
@@ -249,7 +265,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <body>
 <div class="app">
 
-<!-- Global Progress Toast Banner -->
+<!-- Non-blocking Progress Banner -->
 <div class="upload-toast hidden" id="uploadToast">
 <span class="loader"></span>
 <span id="uploadToastText">Загрузка...</span>
@@ -269,12 +285,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <button class="btn" onclick="login()">Войти</button>
 </div>
 
-<!-- Setup Encryption Modal -->
+<!-- Setup Encryption Modal (First-time key generation only) -->
 <div class="modal hidden" id="setupModal">
 <div class="modal-content">
 <div class="modal-title">Генерация RSA/AES ключей</div>
-<div class="modal-text" id="setupText">Генерируем уникальную пару ключей в вашем браузере... Приватный ключ шифруется локально с помощью Web Crypto API.</div>
-<button class="btn btn-green" id="setupBtn" onclick="setupEncryption()">Создать ключи на телефоне</button>
+<div class="modal-text" id="setupText">Генерируем уникальную пару ключей для нового аккаунта... Приватный ключ зашифруется с вашим паролем и сохранится в облачной базе.</div>
+<button class="btn btn-green" id="setupBtn" onclick="setupEncryption()">Создать ключи в облаке</button>
 </div>
 </div>
 
@@ -300,7 +316,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <img class="header-avatar" id="headerAvatar" src="" alt="">
 <div class="header-info">
 <div class="header-title" id="headerTitle">VK</div>
-<div class="header-subtitle e2e-on">
+<div class="header-subtitle">
 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
 Локальная защита
 </div>
@@ -329,11 +345,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <!-- Chat Screen -->
 <div class="chat-screen" id="chatScreen">
 <div class="header">
-<div class="header-back" onclick="backToDialogs()" title="Выйти из чата">
-<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+<!-- EXPLICIT VISIBLE BACK BUTTON TO EXIT CHAT -->
+<div class="header-back" onclick="backToDialogs()" title="Выйти в список диалогов">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
 </div>
-<img class="header-avatar" id="chatAvatar" src="" alt="" onclick="backToDialogs()" title="Выйти из чата">
-<div class="header-info" onclick="backToDialogs()" title="Выйти из чата">
+<img class="header-avatar" id="chatAvatar" src="" alt="" onclick="backToDialogs()">
+<div class="header-info" onclick="backToDialogs()">
 <div class="header-title" id="chatTitle"></div>
 <div class="header-subtitle" id="chatEncryptStatus">E2EE Ready</div>
 </div>
@@ -349,7 +366,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </div>
 
 <div class="input-area-wrapper">
-<!-- Reply / Edit Preview Bar -->
 <div class="reply-preview-bar hidden" id="replyPreviewBar">
 <div class="reply-preview-info">
 <div class="reply-preview-title" id="replyPreviewTitle">Ответ на сообщение</div>
@@ -360,7 +376,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </div>
 </div>
 
-<!-- Normal Input Bar -->
 <div class="input-area" id="inputAreaNormal">
 <div class="input-attach" onclick="document.getElementById('fileInput').click()">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
@@ -369,7 +384,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 <textarea class="message-input" id="msgInput" placeholder="Сообщение..." rows="1" oninput="handleInputTyping()"></textarea>
 
-<!-- Media Record Buttons -->
 <button class="media-rec-btn" id="voiceRecBtn" onclick="startVoiceRecording()" title="Голосовое сообщение (.meg)">
 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
 </button>
@@ -383,7 +397,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </button>
 </div>
 
-<!-- Voice Recording Bar -->
 <div class="input-area hidden" id="inputAreaVoice">
 <div class="recording-bar">
 <div class="recording-dot"></div>
@@ -394,8 +407,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <div class="recording-wave-bar" style="height:90%"></div>
 <div class="recording-wave-bar" style="height:40%"></div>
 <div class="recording-wave-bar" style="height:70%"></div>
-<div class="recording-wave-bar" style="height:50%"></div>
-<div class="recording-wave-bar" style="height:80%"></div>
 </div>
 <div class="recording-cancel" onclick="cancelVoiceRecording()">Отмена</div>
 </div>
@@ -407,7 +418,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </div>
 </div>
 
-<!-- Circle Video Camera Preview Modal -->
+<!-- Circle Video Camera Modal -->
 <div class="circle-recorder-modal hidden" id="circleModal">
 <div class="circle-preview-box">
 <video class="circle-preview-video" id="circleVideoPreview" autoplay muted playsinline></video>
@@ -438,7 +449,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </div>
 </div>
 
-<!-- Action Sheet for Message Options -->
+<!-- Message Actions Sheet -->
 <div class="action-sheet hidden" id="actionSheet" onclick="closeActionSheet(event)">
 <div class="action-sheet-content" onclick="event.stopPropagation()">
 <div class="action-sheet-item" onclick="triggerReplyFromSheet()">
@@ -463,7 +474,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 <script>
 /* =========================================================================
-   PURE CLIENT-SIDE E2EE ENGINE USING WEB CRYPTO API (subtle.crypto)
+   PURE CLIENT-SIDE CLOUD E2EE ENGINE (PBKDF2 + RSA-OAEP + AES-GCM)
    ========================================================================= */
 
 const ENCRYPT_PREFIX = "ENC2:";
@@ -477,15 +488,9 @@ let encryptionEnabled = true;
 let myVkId = null;
 
 let localKeyPair = null; // { publicKey, privateKey, pubJwkStr }
-let peerKeysCache = {}; // peer_id -> public JWK string
-let decryptedCache = {}; // message/doc id -> blob URL / text
+let peerKeysCache = {}; // peer_id -> public JWK
+let decryptedCache = {}; // id -> content
 
-// State for Reply / Edit / Message Action
-let replyToMsg = null;
-let editMsg = null;
-let selectedMsgForAction = null;
-
-// Progress Indicator Helper
 function showUploadProgress(text) {
     const toast = document.getElementById('uploadToast');
     const toastText = document.getElementById('uploadToastText');
@@ -500,7 +505,6 @@ function hideUploadProgress() {
     if (toast) toast.classList.add('hidden');
 }
 
-// Convert Buffers
 function bufToB64(buf) {
     let binary = '';
     const bytes = new Uint8Array(buf);
@@ -515,7 +519,7 @@ function b64ToBuf(b64) {
     return bytes.buffer;
 }
 
-// PBKDF2 Master Key derivation from User Password + Token
+// PBKDF2 Key Derivation
 async function deriveMasterKey(pass, saltStr) {
     const enc = new TextEncoder();
     const keyMaterial = await window.crypto.subtle.importKey(
@@ -535,7 +539,6 @@ async function deriveMasterKey(pass, saltStr) {
     );
 }
 
-// AES-GCM Encrypt Buffer
 async function encryptAESGCM(key, plainBuf) {
     const iv = window.crypto.getRandomValues(new Uint8Array(12));
     const ciphertext = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plainBuf);
@@ -545,7 +548,6 @@ async function encryptAESGCM(key, plainBuf) {
     return combined.buffer;
 }
 
-// AES-GCM Decrypt Buffer
 async function decryptAESGCM(key, combinedBuf) {
     const bytes = new Uint8Array(combinedBuf);
     const iv = bytes.slice(0, 12);
@@ -553,19 +555,19 @@ async function decryptAESGCM(key, combinedBuf) {
     return await window.crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
 }
 
-// Initialize Local Client Crypto Keys
+// SMART CLOUD ENCRYPTION KEY INITIALIZATION
 async function initClientCrypto() {
     if (!myVkId || !password || !token) return false;
     
     const masterKey = await deriveMasterKey(password, myVkId + "_vk_e2ee_salt");
     
-    // Check if keypair exists in Firebase via API
+    // Check keypair in Firebase Cloud
     const res = await fetch(`/api/keys/${myVkId}`);
     const stored = await res.json();
     
     if (stored && stored.public_key && stored.private_key_enc) {
         try {
-            // Decrypt private key locally on device
+            // Decrypt private key stored in Firebase Cloud
             const privEncBuf = b64ToBuf(stored.private_key_enc);
             const privDecBuf = await decryptAESGCM(masterKey, privEncBuf);
             const privJwk = JSON.parse(new TextDecoder().decode(privDecBuf));
@@ -581,48 +583,46 @@ async function initClientCrypto() {
             localKeyPair = { publicKey, privateKey, pubJwkStr: stored.public_key };
             return true;
         } catch(e) {
-            console.error("Local Key Decryption Failed:", e);
-            alert("Неверный пароль шифрования!");
+            console.error("Cloud Key Decryption Error:", e);
+            alert("Неверный пароль шифрования для этого аккаунта!");
             return false;
         }
     } else {
-        // Generate new RSA keypair locally on device
-        const keyPair = await window.crypto.subtle.generateKey(
-            { name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
-            true, ["encrypt", "decrypt"]
-        );
-
-        const pubJwk = await window.crypto.subtle.exportKey("jwk", keyPair.publicKey);
-        const privJwk = await window.crypto.subtle.exportKey("jwk", keyPair.privateKey);
-        const pubJwkStr = JSON.stringify(pubJwk);
-
-        // Encrypt private key locally before uploading backup to Firebase
-        const privEncBuf = await encryptAESGCM(masterKey, new TextEncoder().encode(JSON.stringify(privJwk)));
-        const privEncB64 = bufToB64(privEncBuf);
-
-        await fetch(`/api/keys/${myVkId}`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ public_key: pubJwkStr, private_key_enc: privEncB64 })
-        });
-
-        localKeyPair = { publicKey: keyPair.publicKey, privateKey: keyPair.privateKey, pubJwkStr };
-        return true;
+        // No keys in Firebase -> Generate once
+        return null; // Signals setup needed
     }
 }
 
-// Fetch Peer Public Key
+async function generateAndStoreKeys() {
+    const masterKey = await deriveMasterKey(password, myVkId + "_vk_e2ee_salt");
+    const keyPair = await window.crypto.subtle.generateKey(
+        { name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
+        true, ["encrypt", "decrypt"]
+    );
+
+    const pubJwk = await window.crypto.subtle.exportKey("jwk", keyPair.publicKey);
+    const privJwk = await window.crypto.subtle.exportKey("jwk", keyPair.privateKey);
+    const pubJwkStr = JSON.stringify(pubJwk);
+
+    const privEncBuf = await encryptAESGCM(masterKey, new TextEncoder().encode(JSON.stringify(privJwk)));
+    const privEncB64 = bufToB64(privEncBuf);
+
+    await fetch(`/api/keys/${myVkId}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ public_key: pubJwkStr, private_key_enc: privEncB64 })
+    });
+
+    localKeyPair = { publicKey: keyPair.publicKey, privateKey: keyPair.privateKey, pubJwkStr };
+    return true;
+}
+
 async function getPeerPubKey(peerId) {
     if (peerKeysCache[peerId]) return peerKeysCache[peerId];
-    
-    // If peer is self
-    if (String(peerId) === String(myVkId)) {
-        if (localKeyPair) {
-            peerKeysCache[peerId] = localKeyPair.publicKey;
-            return localKeyPair.publicKey;
-        }
+    if (String(peerId) === String(myVkId) && localKeyPair) {
+        peerKeysCache[peerId] = localKeyPair.publicKey;
+        return localKeyPair.publicKey;
     }
-    
     const res = await fetch(`/api/keys/${peerId}`);
     const stored = await res.json();
     if (stored && stored.public_key) {
@@ -636,7 +636,6 @@ async function getPeerPubKey(peerId) {
     return null;
 }
 
-// Encrypt payload buffer for Peer & Self locally on client
 async function clientEncryptData(peerKey, plainBuf) {
     const sessionKey = await window.crypto.subtle.generateKey(
         { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]
@@ -655,7 +654,6 @@ async function clientEncryptData(peerKey, plainBuf) {
     };
 }
 
-// Decrypt payload locally on client
 async function clientDecryptData(encObj) {
     if (!localKeyPair) return null;
     let rawSession = null;
@@ -674,8 +672,7 @@ async function clientDecryptData(encObj) {
         "raw", rawSession, { name: "AES-GCM" }, false, ["decrypt"]
     );
 
-    const decrypted = await decryptAESGCM(sessionKey, b64ToBuf(encObj.payload));
-    return decrypted;
+    return await decryptAESGCM(sessionKey, b64ToBuf(encObj.payload));
 }
 
 /* =========================================================================
@@ -684,13 +681,17 @@ async function clientDecryptData(encObj) {
 
 const AUTH_URL = 'https://oauth.vk.com/authorize?client_id=2685278&scope=messages,audio,photos,video,docs,notes,pages,status,wall,groups,email,stats,notifications,offline&redirect_uri=https://oauth.vk.com/blank.html&response_type=token';
 
+let replyToMsg = null;
+let editMsg = null;
+let selectedMsgForAction = null;
+
 function getToken() { window.open(AUTH_URL, '_blank'); }
 
 async function login() {
     const url = document.getElementById('tokenUrl').value.trim();
     const pass = document.getElementById('password').value.trim();
-    if (!url) { alert('Вставишь ссылку с токеном'); return; }
-    if (!pass) { alert('Придумай пароль для шифрования'); return; }
+    if (!url) { alert('Вставь ссылку с токеном'); return; }
+    if (!pass) { alert('Введи пароль для шифрования'); return; }
 
     showUploadProgress('Авторизация...');
     try {
@@ -703,22 +704,34 @@ async function login() {
         myVkId = data.user.id;
         password = pass;
 
+        // Save session locally so user NEVER gets logged out on refresh
         localStorage.setItem('vk_token', token);
         localStorage.setItem('vk_pass', pass);
         localStorage.setItem('vk_user', JSON.stringify(data.user));
 
         document.getElementById('loginScreen').classList.add('hidden');
-        document.getElementById('setupModal').classList.remove('hidden');
+
+        // Check if user already has keys in Firebase Cloud
+        const hasKeys = await initClientCrypto();
+        if (hasKeys === true) {
+            // Keys exist and decrypted successfully -> direct login!
+            showDialogsScreen();
+            loadDialogs();
+            startPolling();
+        } else if (hasKeys === null) {
+            // First time login -> generate keys once
+            document.getElementById('setupModal').classList.remove('hidden');
+        }
     } finally {
         hideUploadProgress();
     }
 }
 
 async function setupEncryption() {
-    document.getElementById('setupText').innerHTML = '<span class="loader"></span>Создание ключей на вашем смартфоне...';
+    document.getElementById('setupText').innerHTML = '<span class="loader"></span>Генерация ключей...';
     document.getElementById('setupBtn').disabled = true;
 
-    const ok = await initClientCrypto();
+    const ok = await generateAndStoreKeys();
     if (ok) {
         document.getElementById('setupModal').classList.add('hidden');
         showDialogsScreen();
@@ -768,14 +781,13 @@ async function openChat(index) {
     document.getElementById('chatAvatar').src = d.photo || 'https://vk.com/images/camera_100.png';
     document.getElementById('chatScreen').classList.add('active');
 
-    // Check peer key
     const peerKey = await getPeerPubKey(currentPeer);
     const status = document.getElementById('chatEncryptStatus');
     if (peerKey) {
         status.textContent = '🔒 Защищено (E2EE)';
         status.style.color = '#8e8e93';
     } else {
-        status.textContent = 'Обычный чат (нет ключа у собеседника)';
+        status.textContent = 'Обычный чат';
         status.style.color = '#888';
     }
 
@@ -811,7 +823,6 @@ async function loadMessages() {
     }
 }
 
-// RENDER MESSAGE ITEM WITH TELEGRAM-STYLE DESIGNS & SWIPE TO REPLY
 async function renderMessageItem(container, msg) {
     const containerDiv = document.createElement('div');
     containerDiv.className = 'msg-container';
@@ -823,7 +834,7 @@ async function renderMessageItem(container, msg) {
     swipeBgRight.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>`;
 
     const div = document.createElement('div');
-    div.className = 'msg ' + (msg.out ? 'msg-out' : 'msg-in') + (isEncrypted ? ' msg-encrypted' : '');
+    div.className = 'msg ' + (msg.out ? 'msg-out' : 'msg-in');
     div.id = 'msg-' + msg.id;
 
     div.oncontextmenu = (e) => {
@@ -867,20 +878,19 @@ async function renderMessageItem(container, msg) {
                         const textElem = document.getElementById('msg-' + msg.id)?.querySelector('.msg-text');
                         if (textElem) {
                             textElem.innerHTML = escapeHtml(plainText);
-                            textElem.classList.add('decrypted-pop');
                         }
                     }
                 } catch(e) {
                     const textElem = document.getElementById('msg-' + msg.id)?.querySelector('.msg-text');
-                    if (textElem) textElem.textContent = '🔒 Не удалось расшифровать';
+                    if (textElem) textElem.textContent = '🔒 Ошибка расшифровки';
                 }
-            }, 30);
+            }, 10);
         }
     } else {
         html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
     }
 
-    // Process attachments
+    // Attachments
     if (msg.attachments) {
         for (const a of msg.attachments) {
             if (a.type === 'photo') {
@@ -892,14 +902,12 @@ async function renderMessageItem(container, msg) {
                 const title = (doc.title || '').toLowerCase();
                 const ext = (doc.ext || '').toLowerCase();
 
-                // Check if encrypted doc, circle (.mec) or voice (.meg)
                 if (title.startsWith('enc_') || ext === 'meow' || ext === 'mur' || ext === 'enc' || ext === 'mec' || ext === 'meg' || title.endsWith('.mec') || title.endsWith('.meg')) {
                     const docId = `doc_${doc.owner_id}_${doc.id}`;
                     
                     if (ext === 'mec' || title.endsWith('.mec')) {
-                        html += `<div class="tg-circle-container" id="${docId}">
-                            <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#888;font-size:12px"><span class="loader"></span>Загрузка кружочка...</div>
-                        </div>`;
+                        // STRICT PURE ROUND CIRCLE - NO GRAY BOXES
+                        html += `<div class="tg-circle-container" id="${docId}"></div>`;
                     } else if (ext === 'meg' || title.endsWith('.meg')) {
                         html += `<div class="tg-voice-container" id="${docId}">
                             <div class="tg-voice-play-btn"><span class="loader"></span></div>
@@ -909,10 +917,10 @@ async function renderMessageItem(container, msg) {
                             </div>
                         </div>`;
                     } else {
-                        html += `<div class="msg-file" id="${docId}"><span class="msg-file-icon">🔒</span><div class="msg-file-info"><div class="msg-file-name">Зашифрованный файл</div><div class="msg-file-size">Локальная расшифровка...</div></div></div>`;
+                        html += `<div class="msg-file" id="${docId}"><span class="msg-file-icon">🔒</span><div class="msg-file-info"><div class="msg-file-name">Зашифрованный файл</div><div class="msg-file-size">Расшифровка...</div></div></div>`;
                     }
 
-                    setTimeout(() => processEncryptedAttachment(docId, doc.url, ext || title), 30);
+                    setTimeout(() => processEncryptedAttachment(docId, doc.url, ext || title), 10);
 
                 } else {
                     html += `<div class="msg-file"><span class="msg-file-icon">📎</span><div class="msg-file-info"><div class="msg-file-name">${escapeHtml(doc.title || 'Файл')}</div><div class="msg-file-size">${(doc.size / 1024).toFixed(1)} KB</div></div></div>`;
@@ -930,7 +938,6 @@ async function renderMessageItem(container, msg) {
     container.appendChild(containerDiv);
 }
 
-// SWIPE TO REPLY GESTURE
 function attachSwipeToReply(container, elem, msg) {
     let startX = 0;
     let currentX = 0;
@@ -945,43 +952,34 @@ function attachSwipeToReply(container, elem, msg) {
     elem.addEventListener('touchmove', (e) => {
         if (!isDragging) return;
         currentX = e.touches[0].clientX - startX;
-        
         if (currentX < 0 && currentX > -100) {
             elem.style.transform = `translateX(${currentX}px)`;
-            if (swipeBg) {
-                swipeBg.style.opacity = Math.min(1, Math.abs(currentX) / 50);
-            }
+            if (swipeBg) swipeBg.style.opacity = Math.min(1, Math.abs(currentX) / 50);
         }
     }, { passive: true });
 
     elem.addEventListener('touchend', () => {
         if (!isDragging) return;
         isDragging = false;
-        
         if (currentX < -50) {
             if (navigator.vibrate) navigator.vibrate(15);
             setReplyToMessage(msg);
         }
-        
         elem.style.transform = 'translateX(0px)';
         if (swipeBg) swipeBg.style.opacity = '0';
         currentX = 0;
     });
 }
 
-// ACTION SHEET FOR MESSAGES
 function openActionSheet(msg) {
     selectedMsgForAction = msg;
     const editBtn = document.getElementById('editSheetItem');
-    if (msg.out) {
-        editBtn.classList.remove('hidden');
-    } else {
-        editBtn.classList.add('hidden');
-    }
+    if (msg.out) editBtn.classList.remove('hidden');
+    else editBtn.classList.add('hidden');
     document.getElementById('actionSheet').classList.remove('hidden');
 }
 
-function closeActionSheet(e) {
+function closeActionSheet() {
     document.getElementById('actionSheet').classList.add('hidden');
 }
 
@@ -992,49 +990,46 @@ function triggerReplyFromSheet() {
 
 function triggerEditFromSheet() {
     closeActionSheet();
-    if (selectedMsgForAction && selectedMsgForAction.out) {
-        startEditingMessage(selectedMsgForAction);
-    }
+    if (selectedMsgForAction && selectedMsgForAction.out) startEditingMessage(selectedMsgForAction);
 }
 
 function triggerDeleteFromSheet() {
     closeActionSheet();
-    if (selectedMsgForAction) {
-        document.getElementById('deleteModal').classList.remove('hidden');
-    }
+    if (selectedMsgForAction) document.getElementById('deleteModal').classList.remove('hidden');
 }
 
 function closeDeleteModal() {
     document.getElementById('deleteModal').classList.add('hidden');
 }
 
+// INSTANT OPTIMISTIC DELETE
 async function confirmDeleteMessage() {
     if (!selectedMsgForAction) return;
+    const targetId = selectedMsgForAction.id;
     const deleteForAll = document.getElementById('deleteForAllCheck').checked ? 1 : 0;
     
     closeDeleteModal();
-    showUploadProgress('Удаление...');
-    
-    try {
-        await fetch('/api/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                token: token,
-                message_ids: selectedMsgForAction.id,
-                delete_for_all: deleteForAll
-            })
-        });
 
-        const elem = document.getElementById(`msg-${selectedMsgForAction.id}`);
-        if (elem) elem.closest('.msg-container').remove();
-        selectedMsgForAction = null;
-    } finally {
+    // OPTIMISTIC: Immediately remove element from DOM for instant feedback
+    const elem = document.getElementById(`msg-${targetId}`);
+    if (elem) elem.closest('.msg-container')?.remove();
+
+    showUploadProgress('Удаление...');
+
+    fetch('/api/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            token: token,
+            message_ids: targetId,
+            delete_for_all: deleteForAll
+        })
+    }).finally(() => {
         hideUploadProgress();
-    }
+        selectedMsgForAction = null;
+    });
 }
 
-// REPLY & EDIT PREVIEW BAR CONTROLS
 function setReplyToMessage(msg) {
     cancelReplyOrEdit();
     replyToMsg = msg;
@@ -1083,7 +1078,6 @@ function scrollToMsg(msgId) {
     }
 }
 
-// DECRYPT & RENDER ATTACHMENT MEDIA (PHOTOS, VIDEOS, .MEC CIRCLE, .MEG VOICE)
 async function processEncryptedAttachment(elemId, url, extInfo) {
     const elem = document.getElementById(elemId);
     if (!elem) return;
@@ -1175,7 +1169,6 @@ function renderDecryptedMedia(elem, data) {
                     <div class="tg-voice-bar" style="height:80%"></div>
                     <div class="tg-voice-bar" style="height:50%"></div>
                     <div class="tg-voice-bar" style="height:90%"></div>
-                    <div class="tg-voice-bar" style="height:30%"></div>
                 </div>
                 <div class="tg-voice-info">
                     <span class="v-time">0:00</span>
@@ -1242,7 +1235,6 @@ function renderDecryptedMedia(elem, data) {
 
 function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 
-// INPUT TYPING TOGGLE MEDIA / SEND BUTTONS
 function handleInputTyping() {
     const val = document.getElementById('msgInput').value.trim();
     const sendBtn = document.getElementById('sendBtn');
@@ -1260,13 +1252,16 @@ function handleInputTyping() {
     }
 }
 
-// SEND / EDIT MESSAGE LOGIC
+// INSTANT FAST SEND MESSAGE
 async function sendMessage() {
     const input = document.getElementById('msgInput');
     const text = input.value.trim();
     if (!text || !currentPeer) return;
 
     const btn = document.getElementById('sendBtn'); btn.disabled = true;
+    input.value = '';
+    handleInputTyping();
+
     showUploadProgress('Отправка...');
 
     try {
@@ -1289,9 +1284,6 @@ async function sendMessage() {
 
             decryptedCache[editMsg.id] = text;
             cancelReplyOrEdit();
-            input.value = '';
-            btn.disabled = false;
-            handleInputTyping();
             loadMessages();
             return;
         }
@@ -1306,15 +1298,8 @@ async function sendMessage() {
             }
         }
 
-        const payload = {
-            token,
-            peer_id: currentPeer,
-            text: sendText
-        };
-
-        if (replyToMsg) {
-            payload.reply_to = replyToMsg.id;
-        }
+        const payload = { token, peer_id: currentPeer, text: sendText };
+        if (replyToMsg) payload.reply_to = replyToMsg.id;
 
         await fetch('/api/send', {
             method: 'POST',
@@ -1322,37 +1307,23 @@ async function sendMessage() {
             body: JSON.stringify(payload)
         });
 
-        input.value = '';
-        btn.disabled = false;
         cancelReplyOrEdit();
-        handleInputTyping();
         loadMessages();
     } finally {
+        btn.disabled = false;
         hideUploadProgress();
     }
 }
 
-// SUPPORTED MEDIA RECORDER MIME TYPES FOR ANDROID CHROME
 function getSupportedMimeType(kind) {
     if (kind === 'video') {
-        const types = [
-            'video/webm;codecs=vp8,opus',
-            'video/webm',
-            'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
-            'video/mp4'
-        ];
+        const types = ['video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4'];
         for (let t of types) {
             if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
         }
         return '';
     } else {
-        const types = [
-            'audio/webm;codecs=opus',
-            'audio/webm',
-            'audio/mp4',
-            'audio/aac',
-            'audio/ogg'
-        ];
+        const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac', 'audio/ogg'];
         for (let t of types) {
             if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
         }
@@ -1360,12 +1331,8 @@ function getSupportedMimeType(kind) {
     }
 }
 
-// GENERAL MEDIA BLOB UPLOAD (HANDLES ENCRYPTED & UNENCRYPTED MODES)
 async function sendMediaBlob(blob, filename, mimeType) {
-    if (!currentPeer) {
-        hideUploadProgress();
-        return;
-    }
+    if (!currentPeer) { hideUploadProgress(); return; }
 
     try {
         let sent = false;
@@ -1386,20 +1353,18 @@ async function sendMediaBlob(blob, filename, mimeType) {
 
             const res = await fetch('/api/upload_normal', { method: 'POST', body: formData });
             const data = await res.json();
-            if (data.error) {
-                alert('Ошибка отправки: ' + (data.error.error_msg || data.error));
-            }
+            if (data.error) alert('Ошибка отправки: ' + (data.error.error_msg || data.error));
         }
     } catch(e) {
         console.error('Upload error:', e);
-        alert('Ошибка при отправке: ' + (e.message || e));
+        alert('Ошибка отправки: ' + (e.message || e));
     } finally {
         hideUploadProgress();
         loadMessages();
     }
 }
 
-// RECORDING VOICE MESSAGES (.MEG)
+// RECORDING VOICE
 let voiceRecorder = null;
 let voiceChunks = [];
 let voiceTimerInterval = null;
@@ -1413,9 +1378,7 @@ async function startVoiceRecording() {
         const options = mimeType ? { mimeType } : {};
         voiceRecorder = new MediaRecorder(stream, options);
 
-        voiceRecorder.ondataavailable = e => {
-            if (e.data && e.data.size > 0) voiceChunks.push(e.data);
-        };
+        voiceRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) voiceChunks.push(e.data); };
         voiceRecorder.start(100);
 
         document.getElementById('inputAreaNormal').classList.add('hidden');
@@ -1432,7 +1395,6 @@ async function startVoiceRecording() {
         }, 1000);
 
     } catch(e) {
-        console.error(e);
         alert("Ошибка доступа к микрофону");
     }
 }
@@ -1446,8 +1408,7 @@ function cancelVoiceRecording() {
 
 async function stopAndSendVoiceRecording() {
     if (!voiceRecorder || voiceRecorder.state === 'inactive') return;
-
-    showUploadProgress('Подготовка голосового...');
+    showUploadProgress('Отправка голосового...');
 
     voiceRecorder.onstop = async () => {
         if (voiceTimerInterval) clearInterval(voiceTimerInterval);
@@ -1455,13 +1416,8 @@ async function stopAndSendVoiceRecording() {
         document.getElementById('inputAreaNormal').classList.remove('hidden');
 
         const blob = new Blob(voiceChunks, { type: voiceRecorder.mimeType || 'audio/webm' });
-        if (blob.size === 0) {
-            hideUploadProgress();
-            alert('Голосовое сообщение получилось пустым.');
-            return;
-        }
+        if (blob.size === 0) { hideUploadProgress(); alert('Пустая запись'); return; }
 
-        showUploadProgress('Отправка голосового...');
         await sendMediaBlob(blob, `voice_${Date.now()}.meg`, blob.type || 'audio/webm');
     };
 
@@ -1471,13 +1427,13 @@ async function stopAndSendVoiceRecording() {
     }
 }
 
-// RECORDING CIRCLE VIDEO MESSAGES (.MEC) WITH CAMERA TOGGLE & TORCH
+// RECORDING CIRCLE (.MEC)
 let circleRecorder = null;
 let circleChunks = [];
 let circleStream = null;
 let circleTimerInterval = null;
 let circleSeconds = 0;
-let currentFacingMode = 'user'; // 'user' (front) or 'environment' (back)
+let currentFacingMode = 'user';
 let isTorchOn = false;
 
 async function startCircleRecording() {
@@ -1487,18 +1443,16 @@ async function startCircleRecording() {
         const torchBtn = document.getElementById('circleTorchBtn');
         if (torchBtn) torchBtn.classList.remove('active');
 
-        // Android Chrome compatibility constraints
         try {
             circleStream = await navigator.mediaDevices.getUserMedia({ 
                 video: { facingMode: currentFacingMode, width: { ideal: 480 }, height: { ideal: 480 } }, 
                 audio: true 
             });
-        } catch(errFallback) {
+        } catch(err) {
             circleStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         }
 
         circleChunks = [];
-        
         const videoElem = document.getElementById('circleVideoPreview');
         videoElem.srcObject = circleStream;
         videoElem.style.transform = (currentFacingMode === 'user') ? 'scaleX(-1)' : 'scaleX(1)';
@@ -1510,9 +1464,7 @@ async function startCircleRecording() {
         const options = mimeType ? { mimeType } : {};
 
         circleRecorder = new MediaRecorder(circleStream, options);
-        circleRecorder.ondataavailable = e => {
-            if (e.data && e.data.size > 0) circleChunks.push(e.data);
-        };
+        circleRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) circleChunks.push(e.data); };
         circleRecorder.start(100);
 
         circleSeconds = 0;
@@ -1526,17 +1478,14 @@ async function startCircleRecording() {
         }, 1000);
 
     } catch(e) {
-        console.error("Circle error:", e);
-        alert("Ошибка доступа к камере или микрофону. Разрешите доступ в браузере!");
+        alert("Разрешите доступ к камере и микрофону в браузере!");
     }
 }
 
-// TOGGLE FRONT / BACK CAMERA DURING CIRCLE RECORDING
 async function toggleCircleCamera() {
     currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
     isTorchOn = false;
-    const torchBtn = document.getElementById('circleTorchBtn');
-    if (torchBtn) torchBtn.classList.remove('active');
+    document.getElementById('circleTorchBtn')?.classList.remove('active');
 
     if (!circleStream) return;
 
@@ -1547,87 +1496,60 @@ async function toggleCircleCamera() {
                 video: { facingMode: currentFacingMode, width: { ideal: 480 }, height: { ideal: 480 } }
             });
         } catch(e) {
-            newVideoStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: currentFacingMode }
-            });
+            newVideoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode } });
         }
 
         const newVideoTrack = newVideoStream.getVideoTracks()[0];
         const oldVideoTrack = circleStream.getVideoTracks()[0];
-
-        if (oldVideoTrack) {
-            oldVideoTrack.stop();
-            circleStream.removeTrack(oldVideoTrack);
-        }
-
+        if (oldVideoTrack) { oldVideoTrack.stop(); circleStream.removeTrack(oldVideoTrack); }
         circleStream.addTrack(newVideoTrack);
 
         const videoElem = document.getElementById('circleVideoPreview');
         videoElem.srcObject = circleStream;
         videoElem.style.transform = (currentFacingMode === 'user') ? 'scaleX(-1)' : 'scaleX(1)';
     } catch(err) {
-        console.error("Failed to switch camera:", err);
         alert("Не удалось переключить камеру");
     }
 }
 
-// TOGGLE FLASHLIGHT / TORCH
 async function toggleCircleTorch() {
     if (!circleStream) return;
     const videoTrack = circleStream.getVideoTracks()[0];
     if (!videoTrack) return;
 
     try {
-        const capabilities = (typeof videoTrack.getCapabilities === 'function') ? videoTrack.getCapabilities() : {};
-        
         isTorchOn = !isTorchOn;
-        await videoTrack.applyConstraints({
-            advanced: [{ torch: isTorchOn }]
-        }).then(() => {
+        await videoTrack.applyConstraints({ advanced: [{ torch: isTorchOn }] }).then(() => {
             document.getElementById('circleTorchBtn')?.classList.toggle('active', isTorchOn);
         }).catch(() => {
             isTorchOn = false;
             document.getElementById('circleTorchBtn')?.classList.remove('active');
-            alert("Фонарик не поддерживается на этой камере / устройстве");
+            alert("Фонарик не поддерживается на этой камере");
         });
     } catch (e) {
-        console.error("Torch error:", e);
         alert("Фонарик не поддерживается на данном устройстве");
     }
 }
 
 function cancelCircleRecording() {
     if (circleRecorder && circleRecorder.state !== 'inactive') circleRecorder.stop();
-    if (circleStream) {
-        circleStream.getTracks().forEach(t => t.stop());
-        circleStream = null;
-    }
+    if (circleStream) { circleStream.getTracks().forEach(t => t.stop()); circleStream = null; }
     if (circleTimerInterval) clearInterval(circleTimerInterval);
     document.getElementById('circleModal').classList.add('hidden');
 }
 
 async function stopAndSendCircleRecording() {
     if (!circleRecorder || circleRecorder.state === 'inactive') return;
-
-    showUploadProgress('Подготовка кружочка...');
+    showUploadProgress('Отправка кружочка...');
 
     circleRecorder.onstop = async () => {
         if (circleTimerInterval) clearInterval(circleTimerInterval);
-        if (circleStream) {
-            circleStream.getTracks().forEach(t => t.stop());
-            circleStream = null;
-        }
+        if (circleStream) { circleStream.getTracks().forEach(t => t.stop()); circleStream = null; }
         document.getElementById('circleModal').classList.add('hidden');
 
         const blob = new Blob(circleChunks, { type: circleRecorder.mimeType || 'video/webm' });
-        
-        if (blob.size === 0) {
-            hideUploadProgress();
-            alert('Запись кружочка оказалась пустой. Попробуйте еще раз.');
-            return;
-        }
+        if (blob.size === 0) { hideUploadProgress(); alert('Пустая запись'); return; }
 
-        showUploadProgress('Отправка кружочка...');
         await sendMediaBlob(blob, `circle_${Date.now()}.mec`, blob.type || 'video/webm');
     };
 
@@ -1637,36 +1559,23 @@ async function stopAndSendCircleRecording() {
     }
 }
 
-// HELPER: ENCRYPT & UPLOAD MEDIA BINARY (.MEC, .MEG, PHOTOS, FILES)
 async function uploadEncryptedMedia(blob, filename, mimeType) {
     if (!currentPeer) return;
-
     showUploadProgress('Шифрование и отправка...');
 
     const peerKey = await getPeerPubKey(currentPeer);
-    if (!peerKey) {
-        throw new Error("У собеседника нет публичного ключа шифрования!");
-    }
+    if (!peerKey) throw new Error("У собеседника нет публичного ключа!");
 
     const fileArrayBuf = await blob.arrayBuffer();
-
-    // Encrypt payload locally
     const encObj = await clientEncryptData(peerKey, fileArrayBuf);
     const payloadBuf = b64ToBuf(encObj.payload);
 
-    // Envelope Header JSON
-    const headerStr = JSON.stringify({
-        k1: encObj.k1,
-        k2: encObj.k2,
-        mime: mimeType,
-        name: filename
-    });
+    const headerStr = JSON.stringify({ k1: encObj.k1, k2: encObj.k2, mime: mimeType, name: filename });
     const headerBytes = new TextEncoder().encode(headerStr);
 
     const totalLen = 4 + headerBytes.byteLength + payloadBuf.byteLength;
     const resultBuf = new ArrayBuffer(totalLen);
     const view = new DataView(resultBuf);
-    
     view.setUint32(0, headerBytes.byteLength);
 
     const u8 = new Uint8Array(resultBuf);
@@ -1675,7 +1584,6 @@ async function uploadEncryptedMedia(blob, filename, mimeType) {
 
     const encBlob = new Blob([resultBuf], { type: 'application/octet-stream' });
 
-    // DETERMINE THE EXTENSION FOR VK ENCRYPTED DOC TITLE
     let ext = 'enc';
     if (filename.endsWith('.mec') || mimeType.includes('mec')) ext = 'mec';
     else if (filename.endsWith('.meg') || mimeType.includes('meg')) ext = 'meg';
@@ -1691,23 +1599,16 @@ async function uploadEncryptedMedia(blob, filename, mimeType) {
 
     const resp = await fetch('/api/upload_encrypted_doc', { method: 'POST', body: formData });
     const resJson = await resp.json();
-    if (resJson.error) {
-        alert("Ошибка загрузки: " + (resJson.error.error_msg || resJson.error));
-    }
+    if (resJson.error) alert("Ошибка: " + (resJson.error.error_msg || resJson.error));
 }
 
-// HANDLE GENERAL FILE / PHOTO UPLOAD
 async function handleFile(e) {
     const file = e.target.files[0];
     if (!file || !currentPeer) return;
 
     showUploadProgress('Отправка файла...');
-
     try {
         await sendMediaBlob(file, file.name, file.type || 'application/octet-stream');
-    } catch(err) {
-        console.error(err);
-        alert('Ошибка отправки файла');
     } finally {
         hideUploadProgress();
         e.target.value = '';
@@ -1716,12 +1617,7 @@ async function handleFile(e) {
 
 function toggleEncrypt() {
     encryptionEnabled = !encryptionEnabled;
-    const btn = document.getElementById('encryptBtn');
-    if (encryptionEnabled) {
-        btn.classList.add('active');
-    } else {
-        btn.classList.remove('active');
-    }
+    document.getElementById('encryptBtn')?.classList.toggle('active', encryptionEnabled);
 }
 
 function startPolling() {
@@ -1743,16 +1639,26 @@ document.getElementById('msgInput').addEventListener('keypress', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
 
-// Auto Login & Initialize Client Keys
+// AUTO LOGIN & CLOUD KEY RESTORE ON PAGE RELOAD
 (async () => {
     if (token && password && localStorage.getItem('vk_user')) {
         currentUser = JSON.parse(localStorage.getItem('vk_user'));
         myVkId = currentUser.id;
+        
+        document.getElementById('loginScreen').classList.add('hidden');
         showDialogsScreen();
+
         const ok = await initClientCrypto();
-        if (ok) {
+        if (ok === true) {
             loadDialogs();
             startPolling();
+        } else if (ok === null) {
+            // First time key gen required
+            document.getElementById('setupModal').classList.remove('hidden');
+        } else {
+            // Wrong password stored
+            localStorage.clear();
+            location.reload();
         }
     }
 })();
@@ -1791,7 +1697,7 @@ def auth():
 
 @app.route('/api/keys/<vk_id>', methods=['GET'])
 def get_key(vk_id):
-    """Retrieve public key and encrypted private key for user from Firebase"""
+    """Retrieve public key and encrypted private key for user from Firebase Cloud"""
     stored = firebase_get(f"keys/{vk_id}")
     if stored:
         return jsonify(stored)
@@ -1800,7 +1706,7 @@ def get_key(vk_id):
 
 @app.route('/api/keys/<vk_id>', methods=['POST'])
 def save_key(vk_id):
-    """Store public key and locally-encrypted private key in Firebase"""
+    """Store public key and locally-encrypted private key in Firebase Cloud"""
     data = request.json
     data['created_at'] = datetime.now().isoformat()
     firebase_put(f"keys/{vk_id}", data)
@@ -1924,7 +1830,7 @@ def upload_encrypted_doc():
 
     upload_url = upload_server.get('upload_url')
     files = {'file': (file.filename, file.read(), 'application/octet-stream')}
-    upload_resp = requests.post(upload_url, files=files, timeout=30).json()
+    upload_resp = http_session.post(upload_url, files=files, timeout=15).json()
 
     save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=file.filename)
     if isinstance(save_result, dict) and 'doc' in save_result:
@@ -1956,7 +1862,7 @@ def upload_normal():
 
         upload_url = upload_server.get('upload_url')
         files = {'photo': (filename, BytesIO(file_bytes), file.content_type or 'image/jpeg')}
-        upload_resp = requests.post(upload_url, files=files, timeout=30).json()
+        upload_resp = http_session.post(upload_url, files=files, timeout=15).json()
 
         save_result = vk_request('photos.saveMessagesPhoto', token,
             photo=upload_resp.get('photo'),
@@ -1976,7 +1882,7 @@ def upload_normal():
 
     upload_url = upload_server.get('upload_url')
     files = {'file': (filename, BytesIO(file_bytes), file.content_type or 'application/octet-stream')}
-    upload_resp = requests.post(upload_url, files=files, timeout=30).json()
+    upload_resp = http_session.post(upload_url, files=files, timeout=15).json()
 
     save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=filename)
     if isinstance(save_result, dict) and 'doc' in save_result:
@@ -1995,7 +1901,7 @@ def proxy_file():
     if not url:
         return jsonify({'error': 'No URL'}), 400
     try:
-        resp = requests.get(url, timeout=30)
+        resp = http_session.get(url, timeout=15)
         return Response(resp.content, mimetype='application/octet-stream')
     except Exception as e:
         return jsonify({'error': str(e)}), 500
