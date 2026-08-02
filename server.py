@@ -158,8 +158,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 /* Header */
 .header{height:56px;background:#0d0d0d;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #1c1c1c;flex-shrink:0;z-index:20}
-.header-back{width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;margin-right:8px;background:rgba(255,255,255,0.08);color:#fff;flex-shrink:0;transition:background 0.15s}
-.header-back:active{background:rgba(255,255,255,0.25)}
+.header-back{width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;margin-right:8px;background:rgba(255,255,255,0.12);color:#fff;flex-shrink:0;-webkit-tap-highlight-color:rgba(255,255,255,0.3)}
+.header-back svg{width:26px;height:26px;stroke:#fff;stroke-width:2.8px;fill:none}
+.header-back:active{background:rgba(255,255,255,0.3)}
 .header-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;margin-right:10px;background:#222;flex-shrink:0;cursor:pointer}
 .header-info{flex:1;min-width:0;cursor:pointer}
 .header-title{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -188,7 +189,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 /* Navigation Drawer (Swipeable Side Menu) */
 .drawer-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:200;opacity:0;pointer-events:none;transition:opacity 0.25s ease}
 .drawer-overlay.active{opacity:1;pointer-events:auto}
-.drawer{position:fixed;top:0;left:0;width:80%;max-width:310px;height:100%;background:#141416;z-index:201;transform:translateX(-100%);transition:transform 0.25s cubic-bezier(0.1,0.9,0.2,1);display:flex;flex-direction:column;box-shadow:5px 0 25px rgba(0,0,0,0.8);border-right:1px solid #222}
+.drawer{position:fixed;top:0;left:0;width:82%;max-width:320px;height:100%;background:#141416;z-index:201;transform:translateX(-100%);transition:transform 0.25s cubic-bezier(0.1,0.9,0.2,1);display:flex;flex-direction:column;box-shadow:5px 0 25px rgba(0,0,0,0.8);border-right:1px solid #222}
 .drawer.active{transform:translateX(0)}
 
 .drawer-header{padding:24px 18px;background:#1c1c1e;border-bottom:1px solid #28282a;display:flex;flex-direction:column;gap:12px;position:relative}
@@ -443,9 +444,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <!-- Chat Screen -->
 <div class="chat-screen" id="chatScreen">
 <div class="header">
-<!-- VISIBLE SVG ARROW BACK BUTTON TO RETURN TO DIALOGS -->
-<div class="header-back" onclick="backToDialogs()" title="Выйти из переписки">
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+<!-- EXPLICIT VISIBLE SVG ARROW BACK BUTTON BEFORE AVATAR -->
+<div class="header-back" onclick="backToDialogs()" title="Назад к диалогам">
+<svg viewBox="0 0 24 24">
 <line x1="19" y1="12" x2="5" y2="12"></line>
 <polyline points="12 19 5 12 12 5"></polyline>
 </svg>
@@ -641,10 +642,6 @@ async function decryptAESGCM(key, combinedBuf) {
     return await window.crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
 }
 
-/* 
-   PERMANENT KEY RESTORATION & CREATION PER VK USER ID
-   Stores & loads from persistent Firebase DB / Railway server storage.
-*/
 async function initClientCrypto() {
     if (!myVkId || !password) return false;
     showUploadProgress('Синхронизация ключей...');
@@ -676,7 +673,6 @@ async function initClientCrypto() {
                 return false;
             }
         } else {
-            // Generate deterministic RSA-OAEP keypair for user once and store permanently
             const keyPair = await window.crypto.subtle.generateKey(
                 { name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
                 true, ["encrypt", "decrypt"]
@@ -829,7 +825,6 @@ function updateDrawerProfile() {
     }
 }
 
-/* DRAWER (SWIPEABLE SIDE MENU) LOGIC */
 let touchStartX = 0;
 let touchStartY = 0;
 
@@ -843,7 +838,6 @@ function closeDrawer() {
     document.getElementById('drawer').classList.remove('active');
 }
 
-// Attach swipe gesture listeners for Drawer
 document.addEventListener('touchstart', (e) => {
     touchStartX = e.touches[0].clientX;
     touchStartY = e.touches[0].clientY;
@@ -854,18 +848,15 @@ document.addEventListener('touchend', (e) => {
     const diffY = Math.abs(e.changedTouches[0].clientY - touchStartY);
 
     if (diffY < 60) {
-        // Swipe Right from left edge opens drawer
-        if (touchStartX < 40 && diffX > 60) {
+        if (touchStartX < 50 && diffX > 60) {
             openDrawer();
         }
-        // Swipe Left closes drawer
         if (diffX < -60 && document.getElementById('drawer').classList.contains('active')) {
             closeDrawer();
         }
     }
 }, { passive: true });
 
-/* PROFILE EDITING MODALS & API CALLS */
 function openProfileEditModal() {
     closeDrawer();
     const nameParts = (currentUser.name || '').split(' ');
@@ -985,7 +976,6 @@ function backToDialogs() {
     cancelReplyOrEdit();
 }
 
-/* PEER STATUS & TELEGRAM-LIKE TYPING INDICATOR */
 async function fetchPeerStatus() {
     if (!currentPeer) return;
     try {
@@ -1050,7 +1040,6 @@ async function loadMessages() {
     } catch(e){}
 }
 
-/* RENDER MESSAGE ITEM */
 function renderMessageItem(container, msg) {
     const containerDiv = document.createElement('div');
     containerDiv.className = 'msg-container';
@@ -1116,7 +1105,6 @@ function renderMessageItem(container, msg) {
         if (displayText) html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
     }
 
-    // Attachments Processing
     if (msg.attachments) {
         for (const a of msg.attachments) {
             if (a.type === 'photo') {
@@ -1957,7 +1945,7 @@ def peer_status():
     if isinstance(user_info, list) and len(user_info) > 0:
         u = user_info[0]
         online = u.get('online', 0)
-        sex = u.get('sex', 1)  # 1 = female, 2 = male
+        sex = u.get('sex', 1)
         
         if online == 1:
             return jsonify({'status_text': 'в сети', 'online': True})
@@ -1976,8 +1964,8 @@ def peer_status():
                 formatted_time = dt.strftime('%H:%M')
                 return jsonify({'status_text': f'{verb} в сети вчера в {formatted_time}', 'online': False})
             else:
-                formatted_date = dt.strftime('%d.%m в %H:%M')
-                return jsonify({'status_text': f'{verb} в сети {formatted_date}', 'online': False})
+                        formatted_date = dt.strftime('%d.%m в %H:%M')
+                        return jsonify({'status_text': f'{verb} в сети {formatted_date}', 'online': False})
 
     return jsonify({'status_text': 'офлайн', 'online': False})
 
@@ -1998,7 +1986,7 @@ def update_profile():
     last_name = request.json.get('last_name')
     status_text = request.json.get('status', '')
 
-    res_info = vk_request('account.saveProfileInfo', token, first_name=first_name, last_name=last_name)
+    vk_request('account.saveProfileInfo', token, first_name=first_name, last_name=last_name)
     vk_request('status.set', token, text=status_text)
     
     return jsonify({'ok': True})
@@ -2027,7 +2015,6 @@ def upload_avatar():
     )
 
     if isinstance(save_result, dict) and 'photo_hash' in save_result:
-        # Get updated user profile photo
         u_info = vk_request('users.get', token, fields='photo_100')
         if isinstance(u_info, list) and len(u_info) > 0:
             return jsonify({'ok': True, 'photo_url': u_info[0].get('photo_100')})
@@ -2130,7 +2117,7 @@ def upload_normal():
             return jsonify({'ok': True})
 
     upload_server = vk_request('docs.getMessagesUploadServer', token, type='doc', peer_id=peer_id)
-    if isinstance(upload_server, dict) and 'error' in upload_server:
+    if isinstance(upload_server, dict) and 'error_link' in upload_server or (isinstance(upload_server, dict) and 'error' in upload_server):
         return jsonify(upload_server), 400
 
     upload_url = upload_server.get('upload_url')
