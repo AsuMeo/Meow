@@ -66,7 +66,7 @@ HTML = """
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#000;color:#fff;height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
 .app{height:100vh;display:flex;flex-direction:column;position:relative;overflow:hidden}
 
-/* Login */
+/* Login Screen */
 .login-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:100;animation:fadeIn 0.3s ease-out}
 .login-screen h1{font-size:26px;margin-bottom:6px;font-weight:700;color:#fff}
 .login-screen p{color:#888;margin-bottom:24px;font-size:13px;text-align:center;max-width:320px}
@@ -109,7 +109,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .dialog-bottom{display:flex;align-items:center;gap:6px}
 .dialog-preview{font-size:13px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
 .dialog-unread{min-width:18px;height:18px;border-radius:50%;background:#fff;color:#000;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0}
-.dialog-lock{color:#888;font-size:13px}
 
 /* Chat Screen */
 .chat-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;z-index:10;transform:translateX(100%);transition:transform 0.28s cubic-bezier(0.1, 0.9, 0.2, 1)}
@@ -117,19 +116,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .messages-wrapper{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column}
 .messages{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
 
-/* Message styling - ENCRYPTED REMAIN NORMAL COLORS */
-.msg-container{position:relative;display:flex;width:100%;align-items:center;touch-action:pan-y}
+/* Message styling - STRICTLY NO GREEN COLOR FOR ENCRYPTED */
+.msg-container{position:relative;display:flex;width:100%;align-items:center;touch-action:pan-y;margin-bottom:2px}
 .msg-swipe-bg{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;width:40px;opacity:0;transition:opacity 0.15s;color:#8e8e93;z-index:1}
-.msg-swipe-left{left:-40px}
 .msg-swipe-right{right:-40px}
 
 .msg{max-width:82%;padding:8px 12px;border-radius:18px;font-size:14px;line-height:1.4;word-wrap:break-word;position:relative;transition:transform 0.2s cubic-bezier(0.1, 0.8, 0.3, 1), background-color 0.2s;will-change:transform;animation:msgAppear 0.25s ease-out}
 @keyframes msgAppear{from{opacity:0;transform:translateY(8px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}
 
+/* NORMAL COLORS FOR ALL MESSAGES - ENCRYPTED USES THE SAME EXACT COLOR */
 .msg-in{align-self:flex-start;background:#1c1c1e;border-bottom-left-radius:4px;color:#fff}
 .msg-out{align-self:flex-end;background:#2c2c2e;border-bottom-right-radius:4px;color:#fff}
-
-/* NO GREEN COLOR FOR ENCRYPTED MESSAGES - MATCH NORMAL COLOR */
 .msg-encrypted{/* strictly identical to normal message bubbles */}
 
 /* Reply quote inside message */
@@ -142,31 +139,29 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .msg-time{font-size:10px;color:#888;margin-top:4px;text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:3px}
 
 /* Decryption Shimmer Animation */
-.decrypting-shimmer{position:relative;color:transparent!important;overflow:hidden;background:linear-gradient(90deg, #3a3a3c 25%, #555 50%, #3a3a3c 75%);background-size:200% 100%;-webkit-background-clip:text;animation:shimmer 1.2s infinite linear;border-radius:4px;display:inline-block;min-width:60px;min-height:16px}
+.decrypting-shimmer{position:relative;color:transparent!important;overflow:hidden;background:linear-gradient(90deg, #3a3a3c 25%, #666 50%, #3a3a3c 75%);background-size:200% 100%;-webkit-background-clip:text;animation:shimmer 1.2s infinite linear;border-radius:4px;display:inline-block;min-width:70px;min-height:16px}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
 .decrypted-pop{animation:decryptedPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)}
 @keyframes decryptedPop{0%{opacity:0.4;transform:scale(0.97)}100%{opacity:1;transform:scale(1)}}
 
-/* Send status indicators */
 .msg-status{font-size:10px;margin-left:3px}
 
 /* Media Attachments */
 .msg-photo{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;object-fit:cover;cursor:pointer;background:#111;transition:transform 0.2s}
 .msg-photo:active{transform:scale(0.98)}
 .msg-video{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;background:#000}
-.msg-file{background:rgba(255,255,255,.05);padding:10px;border-radius:12px;margin-top:6px;display:flex;align-items:center;gap:10px;transition:background 0.2s}
+.msg-file{background:rgba(255,255,255,.05);padding:10px;border-radius:12px;margin-top:6px;display:flex;align-items:center;gap:10px;transition:background 0.2s;cursor:pointer}
 .msg-file:active{background:rgba(255,255,255,.1)}
 .msg-file-icon{font-size:20px;display:flex;align-items:center;justify-content:center;width:32px;height:32px;background:rgba(255,255,255,0.1);border-radius:50%}
 .msg-file-info{flex:1;min-width:0}
 .msg-file-name{font-size:13px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .msg-file-size{font-size:11px;color:#888}
 
-/* TG Round Video Message (.mec) */
+/* TG Circle Video Message (.mec) */
 .tg-circle-container{width:200px;height:200px;position:relative;border-radius:50%;overflow:hidden;margin-top:6px;background:#111;box-shadow:0 4px 15px rgba(0,0,0,0.5);transform:translateZ(0)}
 .tg-circle-video{width:100%;height:100%;object-fit:cover;border-radius:50%;cursor:pointer;display:block}
 .tg-circle-overlay{position:absolute;top:0;left:0;width:100%;height:100%;border-radius:50%;pointer-events:none;box-shadow:inset 0 0 0 2px rgba(255,255,255,0.15)}
-.tg-circle-play-btn{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;background:rgba(0,0,0,0.5);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;cursor:pointer;backdrop-filter:blur(4px);transition:opacity 0.2s, transform 0.2s}
 
 /* TG Voice Message (.meg) */
 .tg-voice-container{display:flex;align-items:center;gap:10px;padding:6px 0;width:220px;user-select:none}
@@ -198,8 +193,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .send-btn,.media-rec-btn{width:38px;height:38px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;border:none;color:#000;transition:transform 0.15s, background 0.2s}
 .send-btn:active,.media-rec-btn:active{transform:scale(0.92)}
 .send-btn:disabled{background:#222;color:#555}
-.media-rec-btn.recording{background:#ff3b30;color:#fff;animation:pulseRed 1.2s infinite}
-@keyframes pulseRed{0%{box-shadow:0 0 0 0 rgba(255,59,48,0.6)}70%{box-shadow:0 0 0 10px rgba(255,59,48,0)}100%{box-shadow:0 0 0 0 rgba(255,59,48,0)}}
 
 /* Voice / Circle Recording UI Bar */
 .recording-bar{display:flex;align-items:center;flex:1;padding:0 12px;height:38px;background:#1c1c1e;border-radius:20px;gap:10px;animation:fadeIn 0.2s ease-out}
@@ -747,8 +740,6 @@ function backToDialogs() {
     cancelReplyOrEdit();
 }
 
-let cachedMessages = [];
-
 async function loadMessages() {
     if (!currentPeer) return;
     const res = await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, peer_id: currentPeer }) });
@@ -757,14 +748,12 @@ async function loadMessages() {
     
     if (data.messages) {
         const msgs = data.messages.reverse();
-        // Check if messages list changed to avoid re-rendering entire list
         const msgIds = msgs.map(m => m.id).join(',');
         if (container.getAttribute('data-msg-hash') === msgIds) {
             return;
         }
         container.setAttribute('data-msg-hash', msgIds);
         container.innerHTML = '';
-        cachedMessages = msgs;
         
         for (const m of msgs) {
             await renderMessageItem(container, m);
@@ -780,28 +769,24 @@ async function renderMessageItem(container, msg) {
     
     const isEncrypted = msg.text && msg.text.startsWith(ENCRYPT_PREFIX);
     
-    // Swipe hint icons
     const swipeBgRight = document.createElement('div');
     swipeBgRight.className = 'msg-swipe-bg msg-swipe-right';
     swipeBgRight.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>`;
 
     const div = document.createElement('div');
-    // REMOVED GREEN BACKGROUND - USE STANDARD msg-in / msg-out
+    // NORMAL COLORS FOR ENCRYPTED AND UNENCRYPTED MESSAGES
     div.className = 'msg ' + (msg.out ? 'msg-out' : 'msg-in') + (isEncrypted ? ' msg-encrypted' : '');
     div.id = 'msg-' + msg.id;
 
-    // Attach Context Menu / Long Press / Click Action
     div.oncontextmenu = (e) => {
         e.preventDefault();
         openActionSheet(msg);
     };
 
-    // Attach Swipe Gesture Handler
     attachSwipeToReply(containerDiv, div, msg);
 
     let html = '';
     
-    // Reply quote inside message
     if (msg.reply_message) {
         const rMsg = msg.reply_message;
         const rAuthor = rMsg.name || (rMsg.from_id === myVkId ? 'Вы' : 'Собеседник');
@@ -820,12 +805,10 @@ async function renderMessageItem(container, msg) {
     if (isEncrypted) {
         if (decryptedCache[msg.id]) {
             displayText = decryptedCache[msg.id];
-            html += `<div class="msg-text decrypted-pop">${escapeHtml(displayText)}</div>`;
+            html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
         } else {
-            // Decryption shimmer animation placeholder
             html += `<div class="msg-text"><span class="decrypting-shimmer">🔐 Расшифровка...</span></div>`;
             
-            // Async local client decryption
             setTimeout(async () => {
                 try {
                     const encObj = JSON.parse(msg.text.substring(ENCRYPT_PREFIX.length));
@@ -833,23 +816,23 @@ async function renderMessageItem(container, msg) {
                     if (decBuf) {
                         const plainText = new TextDecoder().decode(decBuf);
                         decryptedCache[msg.id] = plainText;
-                        const textElem = document.querySelector(`#msg-${msg.id} .msg-text`);
+                        const textElem = document.getElementById('msg-' + msg.id)?.querySelector('.msg-text');
                         if (textElem) {
                             textElem.innerHTML = escapeHtml(plainText);
                             textElem.classList.add('decrypted-pop');
                         }
                     }
                 } catch(e) {
-                    const textElem = document.querySelector(`#msg-${msg.id} .msg-text`);
+                    const textElem = document.getElementById('msg-' + msg.id)?.querySelector('.msg-text');
                     if (textElem) textElem.textContent = '🔒 Не удалось расшифровать';
                 }
-            }, 50);
+            }, 30);
         }
     } else {
         html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
     }
 
-    // Process attachments (Images, Docs, Circles .mec, Voice .meg)
+    // Process attachments
     if (msg.attachments) {
         for (const a of msg.attachments) {
             if (a.type === 'photo') {
@@ -861,17 +844,15 @@ async function renderMessageItem(container, msg) {
                 const title = (doc.title || '').toLowerCase();
                 const ext = (doc.ext || '').toLowerCase();
 
-                // Check if encrypted doc or circle .mec or voice .meg
+                // Check if encrypted doc, circle (.mec) or voice (.meg)
                 if (title.startsWith('enc_') || ext === 'meow' || ext === 'mur' || ext === 'enc' || ext === 'mec' || ext === 'meg' || title.endsWith('.mec') || title.endsWith('.meg')) {
                     const docId = `doc_${doc.owner_id}_${doc.id}`;
                     
                     if (ext === 'mec' || title.endsWith('.mec')) {
-                        // TG Circle Player Placeholder
                         html += `<div class="tg-circle-container" id="${docId}">
                             <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#888;font-size:12px"><span class="loader"></span>Загрузка кружочка...</div>
                         </div>`;
                     } else if (ext === 'meg' || title.endsWith('.meg')) {
-                        // TG Voice Player Placeholder
                         html += `<div class="tg-voice-container" id="${docId}">
                             <div class="tg-voice-play-btn"><span class="loader"></span></div>
                             <div class="tg-voice-wave-wrap">
@@ -880,11 +861,10 @@ async function renderMessageItem(container, msg) {
                             </div>
                         </div>`;
                     } else {
-                        html += `<div class="msg-file" id="${docId}"><span class="msg-file-icon">🔒</span><div class="msg-file-info"><div class="msg-file-name">Зашифрованный медиафайл</div><div class="msg-file-size">Локальная расшифровка...</div></div></div>`;
+                        html += `<div class="msg-file" id="${docId}"><span class="msg-file-icon">🔒</span><div class="msg-file-info"><div class="msg-file-name">Зашифрованный файл</div><div class="msg-file-size">Локальная расшифровка...</div></div></div>`;
                     }
 
-                    // Async Decrypt Media
-                    setTimeout(() => processEncryptedAttachment(docId, doc.url, ext || title), 20);
+                    setTimeout(() => processEncryptedAttachment(docId, doc.url, ext || title), 30);
 
                 } else {
                     html += `<div class="msg-file"><span class="msg-file-icon">📎</span><div class="msg-file-info"><div class="msg-file-name">${escapeHtml(doc.title || 'Файл')}</div><div class="msg-file-size">${(doc.size / 1024).toFixed(1)} KB</div></div></div>`;
@@ -902,7 +882,7 @@ async function renderMessageItem(container, msg) {
     container.appendChild(containerDiv);
 }
 
-// SWIPE TO REPLY GESTURE (TELEGRAM-STYLE)
+// SWIPE TO REPLY GESTURE
 function attachSwipeToReply(container, elem, msg) {
     let startX = 0;
     let currentX = 0;
@@ -918,7 +898,6 @@ function attachSwipeToReply(container, elem, msg) {
         if (!isDragging) return;
         currentX = e.touches[0].clientX - startX;
         
-        // Swipe left threshold limit
         if (currentX < 0 && currentX > -100) {
             elem.style.transform = `translateX(${currentX}px)`;
             if (swipeBg) {
@@ -932,19 +911,17 @@ function attachSwipeToReply(container, elem, msg) {
         isDragging = false;
         
         if (currentX < -50) {
-            // Trigger haptic vibrate if supported
             if (navigator.vibrate) navigator.vibrate(15);
             setReplyToMessage(msg);
         }
         
-        // Spring animation back
         elem.style.transform = 'translateX(0px)';
         if (swipeBg) swipeBg.style.opacity = '0';
         currentX = 0;
     });
 }
 
-// ACTION SHEET / CONTEXT MENU FOR MESSAGES
+// ACTION SHEET FOR MESSAGES
 function openActionSheet(msg) {
     selectedMsgForAction = msg;
     const editBtn = document.getElementById('editSheetItem');
@@ -999,7 +976,6 @@ async function confirmDeleteMessage() {
         })
     });
 
-    // Remove locally
     const elem = document.getElementById(`msg-${selectedMsgForAction.id}`);
     if (elem) elem.closest('.msg-container').remove();
     selectedMsgForAction = null;
@@ -1098,11 +1074,10 @@ async function processEncryptedAttachment(elemId, url, extInfo) {
 }
 
 function renderDecryptedMedia(elem, data) {
-    const isCircle = data.name.endsWith('.mec') || data.mime.includes('mec') || data.extInfo.includes('mec');
-    const isVoice = data.name.endsWith('.meg') || data.mime.includes('meg') || data.extInfo.includes('meg');
+    const isCircle = (data.name && data.name.endsWith('.mec')) || data.mime.includes('mec') || (data.extInfo && data.extInfo.includes('mec'));
+    const isVoice = (data.name && data.name.endsWith('.meg')) || data.mime.includes('meg') || (data.extInfo && data.extInfo.includes('meg'));
 
     if (isCircle) {
-        // TG-Style Circle Video
         const container = document.createElement('div');
         container.className = 'tg-circle-container';
         
@@ -1110,9 +1085,10 @@ function renderDecryptedMedia(elem, data) {
         video.className = 'tg-circle-video';
         video.src = data.blobUrl;
         video.loop = true;
-        video.muted = true;
-        video.autoplay = true;
         video.playsInline = true;
+        video.setAttribute('playsinline', '');
+        video.setAttribute('webkit-playsinline', '');
+        video.autoplay = true;
 
         const overlay = document.createElement('div');
         overlay.className = 'tg-circle-overlay';
@@ -1128,7 +1104,6 @@ function renderDecryptedMedia(elem, data) {
         elem.replaceWith(container);
 
     } else if (isVoice) {
-        // TG-Style Voice Audio Player
         const container = document.createElement('div');
         container.className = 'tg-voice-container';
 
@@ -1240,7 +1215,6 @@ async function sendMessage() {
 
     const btn = document.getElementById('sendBtn'); btn.disabled = true;
 
-    // Handle Edit Mode
     if (editMsg) {
         let sendText = text;
         if (encryptionEnabled) {
@@ -1267,7 +1241,6 @@ async function sendMessage() {
         return;
     }
 
-    // Handle Normal Send Mode
     let sendText = text;
     if (encryptionEnabled) {
         const peerKey = await getPeerPubKey(currentPeer);
@@ -1301,6 +1274,23 @@ async function sendMessage() {
     loadMessages();
 }
 
+// SUPPORTED MEDIA RECORDER MIME TYPES
+function getSupportedMimeType(kind) {
+    if (kind === 'video') {
+        const types = ['video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'];
+        for (let t of types) {
+            if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
+        }
+        return '';
+    } else {
+        const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac', 'audio/ogg'];
+        for (let t of types) {
+            if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
+        }
+        return '';
+    }
+}
+
 // RECORDING VOICE MESSAGES (.MEG)
 let voiceRecorder = null;
 let voiceChunks = [];
@@ -1309,12 +1299,16 @@ let voiceSeconds = 0;
 
 async function startVoiceRecording() {
     try {
+        const mimeType = getSupportedMimeType('audio');
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         voiceChunks = [];
-        voiceRecorder = new MediaRecorder(stream);
+        const options = mimeType ? { mimeType } : {};
+        voiceRecorder = new MediaRecorder(stream, options);
 
-        voiceRecorder.ondataavailable = e => voiceChunks.push(e.data);
-        voiceRecorder.start();
+        voiceRecorder.ondataavailable = e => {
+            if (e.data && e.data.size > 0) voiceChunks.push(e.data);
+        };
+        voiceRecorder.start(100);
 
         document.getElementById('inputAreaNormal').classList.add('hidden');
         document.getElementById('inputAreaVoice').classList.remove('hidden');
@@ -1329,6 +1323,7 @@ async function startVoiceRecording() {
         }, 1000);
 
     } catch(e) {
+        console.error(e);
         alert("Ошибка доступа к микрофону");
     }
 }
@@ -1348,8 +1343,8 @@ async function stopAndSendVoiceRecording() {
         document.getElementById('inputAreaVoice').classList.add('hidden');
         document.getElementById('inputAreaNormal').classList.remove('hidden');
 
-        const blob = new Blob(voiceChunks, { type: 'audio/webm' });
-        await uploadEncryptedMedia(blob, `voice_${Date.now()}.meg`, 'audio/webm');
+        const blob = new Blob(voiceChunks, { type: voiceRecorder.mimeType || 'audio/webm' });
+        await uploadEncryptedMedia(blob, `voice_${Date.now()}.meg`, blob.type || 'audio/webm');
     };
 
     voiceRecorder.stop();
@@ -1364,17 +1359,25 @@ let circleSeconds = 0;
 
 async function startCircleRecording() {
     try {
-        circleStream = await navigator.mediaDevices.getUserMedia({ video: { width: 400, height: 400, facingMode: 'user' }, audio: true });
+        const mimeType = getSupportedMimeType('video');
+        circleStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { width: { ideal: 400 }, height: { ideal: 400 }, facingMode: 'user' }, 
+            audio: true 
+        });
         circleChunks = [];
         
         const videoElem = document.getElementById('circleVideoPreview');
         videoElem.srcObject = circleStream;
+        videoElem.play();
 
         document.getElementById('circleModal').classList.remove('hidden');
 
-        circleRecorder = new MediaRecorder(circleStream, { mimeType: 'video/webm' });
-        circleRecorder.ondataavailable = e => circleChunks.push(e.data);
-        circleRecorder.start();
+        const options = mimeType ? { mimeType } : {};
+        circleRecorder = new MediaRecorder(circleStream, options);
+        circleRecorder.ondataavailable = e => {
+            if (e.data && e.data.size > 0) circleChunks.push(e.data);
+        };
+        circleRecorder.start(100);
 
         circleSeconds = 0;
         document.getElementById('circleTimer').textContent = '0:00';
@@ -1386,7 +1389,8 @@ async function startCircleRecording() {
         }, 1000);
 
     } catch(e) {
-        alert("Ошибка доступа к камере");
+        console.error(e);
+        alert("Ошибка доступа к камере или микрофону");
     }
 }
 
@@ -1405,20 +1409,20 @@ async function stopAndSendCircleRecording() {
         if (circleTimerInterval) clearInterval(circleTimerInterval);
         document.getElementById('circleModal').classList.add('hidden');
 
-        const blob = new Blob(circleChunks, { type: 'video/webm' });
-        await uploadEncryptedMedia(blob, `circle_${Date.now()}.mec`, 'video/webm');
+        const blob = new Blob(circleChunks, { type: circleRecorder.mimeType || 'video/webm' });
+        await uploadEncryptedMedia(blob, `circle_${Date.now()}.mec`, blob.type || 'video/webm');
     };
 
     circleRecorder.stop();
 }
 
-// HELPER: ENCRYPT & UPLOAD MEDIA BINARY (.MEC, .MEG, FILES)
+// HELPER: ENCRYPT & UPLOAD MEDIA BINARY (.MEC, .MEG, PHOTOS, FILES)
 async function uploadEncryptedMedia(blob, filename, mimeType) {
     if (!currentPeer) return;
 
     const peerKey = await getPeerPubKey(currentPeer);
     if (!peerKey) {
-        alert("Не удалось получить ключ шифрования получателя");
+        alert("У собеседника нет публичного ключа шифрования!");
         return;
     }
 
@@ -1428,7 +1432,7 @@ async function uploadEncryptedMedia(blob, filename, mimeType) {
     const encObj = await clientEncryptData(peerKey, fileArrayBuf);
     const payloadBuf = b64ToBuf(encObj.payload);
 
-    // Construct Binary Envelope with 4-byte header length + JSON header
+    // Envelope Header JSON
     const headerStr = JSON.stringify({
         k1: encObj.k1,
         k2: encObj.k2,
@@ -1449,27 +1453,37 @@ async function uploadEncryptedMedia(blob, filename, mimeType) {
 
     const encBlob = new Blob([resultBuf], { type: 'application/octet-stream' });
 
+    // DETERMINE THE EXTENSION FOR VK ENCRYPTED DOC TITLE
+    let ext = 'enc';
+    if (filename.endsWith('.mec') || mimeType.includes('mec')) ext = 'mec';
+    else if (filename.endsWith('.meg') || mimeType.includes('meg')) ext = 'meg';
+    else if (mimeType.startsWith('image/')) ext = 'meow';
+    else if (mimeType.startsWith('video/')) ext = 'mur';
+
+    const vkFileName = `enc_${Date.now()}.${ext}`;
+
     const formData = new FormData();
     formData.append('token', token);
     formData.append('peer_id', currentPeer);
-    formData.append('file', encBlob, filename);
+    formData.append('file', encBlob, vkFileName);
 
     await fetch('/api/upload_encrypted_doc', { method: 'POST', body: formData });
     loadMessages();
 }
 
-// HANDLE GENERAL FILE UPLOAD
+// HANDLE GENERAL FILE / PHOTO UPLOAD
 async function handleFile(e) {
     const file = e.target.files[0];
     if (!file || !currentPeer) return;
 
-    const btn = document.getElementById('sendBtn'); btn.disabled = true;
+    const btn = document.getElementById('sendBtn'); if (btn) btn.disabled = true;
 
     if (encryptionEnabled) {
         const peerKey = await getPeerPubKey(currentPeer);
         if (peerKey) {
             await uploadEncryptedMedia(file, file.name, file.type || 'application/octet-stream');
-            btn.disabled = false;
+            if (btn) btn.disabled = false;
+            e.target.value = '';
             return;
         }
     }
@@ -1481,7 +1495,8 @@ async function handleFile(e) {
     formData.append('file', file);
     await fetch('/api/upload_normal', { method: 'POST', body: formData });
 
-    btn.disabled = false;
+    if (btn) btn.disabled = false;
+    e.target.value = '';
     loadMessages();
 }
 
@@ -1675,7 +1690,7 @@ def delete_message():
     token = request.json.get('token')
     message_ids = request.json.get('message_ids')
     delete_for_all = request.json.get('delete_for_all', 1)
-    result = vk_request('messages.delete', token, message_ids=message_ids, delete_for_all=delete_for_all)
+    result = vk_request('messages.delete', token, message_ids=str(message_ids), delete_for_all=delete_for_all)
     return jsonify({'result': result})
 
 
