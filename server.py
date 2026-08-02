@@ -3,16 +3,10 @@ import re
 import json
 import base64
 import hashlib
-import secrets
 import requests
 from io import BytesIO
 from datetime import datetime
-from functools import wraps
-from flask import Flask, render_template_string, request, jsonify, session
-from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from flask import Flask, render_template_string, request, jsonify, Response
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET', os.urandom(32).hex())
@@ -20,201 +14,36 @@ app.secret_key = os.environ.get('FLASK_SECRET', os.urandom(32).hex())
 VK_API = "https://api.vk.com/method"
 API_VERSION = "5.199"
 
-# Firebase config from env
 FIREBASE_DB_URL = os.environ.get('FIREBASE_DB_URL', '')
 FIREBASE_API_KEY = os.environ.get('FIREBASE_API_KEY', '')
 
 
 def firebase_get(path):
-    """GET from Firebase Realtime Database"""
+    """GET data from Firebase Realtime Database"""
     if not FIREBASE_DB_URL:
         return None
     url = f"{FIREBASE_DB_URL}/{path}.json"
     try:
         resp = requests.get(url, timeout=10)
         return resp.json()
-    except:
+    except Exception:
         return None
 
 
 def firebase_put(path, data):
-    """PUT to Firebase Realtime Database"""
+    """PUT data to Firebase Realtime Database"""
     if not FIREBASE_DB_URL:
         return False
     url = f"{FIREBASE_DB_URL}/{path}.json"
     try:
         resp = requests.put(url, json=data, timeout=10)
         return resp.status_code == 200
-    except:
+    except Exception:
         return False
 
 
-def derive_key(password, token):
-    """Derive encryption key from password + VK token"""
-    salt = hashlib.sha256(token.encode()).digest()[:16]
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=salt,
-        iterations=100000,
-    )
-    key = base64.urlsafe_b64encode(kdf.derive(password.encode()))
-    return key
-
-
-def encrypt_data(key, data):
-    """Encrypt data with AES-GCM"""
-    aesgcm = AESGCM(base64.urlsafe_b64decode(key))
-    nonce = secrets.token_bytes(12)
-    ciphertext = aesgcm.encrypt(nonce, data.encode('utf-8'), None)
-    return base64.b64encode(nonce + ciphertext).decode('utf-8')
-
-
-def decrypt_data(key, encrypted_data):
-    """Decrypt data with AES-GCM"""
-    try:
-        raw = base64.b64decode(encrypted_data)
-        nonce = raw[:12]
-        ciphertext = raw[12:]
-        aesgcm = AESGCM(base64.urlsafe_b64decode(key))
-        plaintext = aesgcm.decrypt(nonce, ciphertext, None)
-        return plaintext.decode('utf-8')
-    except:
-        return None
-
-
-def get_or_create_keys(vk_id, token, password):
-    """Get or create encryption keys for user"""
-    key = derive_key(password, token)
-
-    # Check if keys exist in Firebase
-    stored = firebase_get(f"keys/{vk_id}")
-    if stored and stored.get('public_key'):
-        return {
-            'key': key,
-            'public_key': stored['public_key'],
-            'private_key_enc': stored.get('private_key_enc')
-        }
-
-    # Generate new key pair
-    from cryptography.hazmat.primitives.asymmetric import rsa, padding
-    from cryptography.hazmat.primitives import serialization
-
-    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    public_key = private_key.public_key()
-
-    private_pem = private_key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption()
-    ).decode('utf-8')
-
-    public_pem = public_key.public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo
-    ).decode('utf-8')
-
-    # Encrypt private key with derived key
-    private_key_enc = encrypt_data(key, private_pem)
-
-    # Store in Firebase
-    firebase_put(f"keys/{vk_id}", {
-        'public_key': public_pem,
-        'private_key_enc': private_key_enc,
-        'created_at': datetime.now().isoformat()
-    })
-
-    return {
-        'key': key,
-        'public_key': public_pem,
-        'private_key_enc': private_key_enc
-    }
-
-
-def get_peer_public_key(peer_vk_id):
-    """Get peer's public key from Firebase"""
-    stored = firebase_get(f"keys/{peer_vk_id}")
-    if stored:
-        return stored.get('public_key')
-    return None
-
-
-def encrypt_for_peer(public_key_pem, message):
-    """Encrypt message for peer using their public key + AES session key"""
-    from cryptography.hazmat.primitives.asymmetric import rsa, padding
-    from cryptography.hazmat.primitives import serialization, hashes
-
-    public_key = serialization.load_pem_public_key(public_key_pem.encode())
-
-    # Generate AES session key
-    session_key = secrets.token_bytes(32)
-    aesgcm = AESGCM(session_key)
-    nonce = secrets.token_bytes(12)
-    ciphertext = aesgcm.encrypt(nonce, message.encode('utf-8'), None)
-
-    # Encrypt session key with RSA
-    encrypted_key = public_key.encrypt(
-        session_key,
-        padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
-    )
-
-    # Package: encrypted_key + nonce + ciphertext
-    package = base64.b64encode(encrypted_key).decode() + ":" + base64.b64encode(nonce + ciphertext).decode()
-    return package
-
-
-def decrypt_from_peer(private_key_pem, package):
-    """Decrypt message using private key"""
-    from cryptography.hazmat.primitives.asymmetric import padding
-    from cryptography.hazmat.primitives import serialization, hashes
-
-    try:
-        parts = package.split(":")
-        if len(parts) != 2:
-            return None
-
-        encrypted_key = base64.b64decode(parts[0])
-        encrypted_data = base64.b64decode(parts[1])
-
-        private_key = serialization.load_pem_private_key(private_key_pem.encode(), password=None)
-
-        # Decrypt session key
-        session_key = private_key.decrypt(
-            encrypted_key,
-            padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
-        )
-
-        # Decrypt message
-        nonce = encrypted_data[:12]
-        ciphertext = encrypted_data[12:]
-        aesgcm = AESGCM(session_key)
-        plaintext = aesgcm.decrypt(nonce, ciphertext, None)
-
-        return plaintext.decode('utf-8')
-    except:
-        return None
-
-
-def encrypt_file(key, file_bytes):
-    """Encrypt file bytes"""
-    aesgcm = AESGCM(base64.urlsafe_b64decode(key))
-    nonce = secrets.token_bytes(12)
-    ciphertext = aesgcm.encrypt(nonce, file_bytes, None)
-    return nonce + ciphertext
-
-
-def decrypt_file(key, encrypted_bytes):
-    """Decrypt file bytes"""
-    try:
-        nonce = encrypted_bytes[:12]
-        ciphertext = encrypted_bytes[12:]
-        aesgcm = AESGCM(base64.urlsafe_b64decode(key))
-        return aesgcm.decrypt(nonce, ciphertext, None)
-    except:
-        return None
-
-
 def vk_request(method, token, **params):
+    """Proxy request to VK API"""
     params['access_token'] = token
     params['v'] = API_VERSION
     try:
@@ -231,7 +60,7 @@ HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>VK Client E2EE</title>
+<title>VK Client - 100% Client-Side E2EE</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#000;color:#fff;height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
@@ -239,137 +68,141 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 /* Login */
 .login-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:100}
-.login-screen h1{font-size:28px;margin-bottom:8px;font-weight:700}
-.login-screen p{color:#666;margin-bottom:30px;font-size:14px}
-.token-input,.pass-input{width:100%;max-width:360px;padding:14px 16px;border:none;border-radius:14px;background:#1a1a1a;color:#fff;font-size:15px;margin-bottom:10px;outline:none;border:1px solid #333}
-.token-input::placeholder,.pass-input::placeholder{color:#555}
+.login-screen h1{font-size:26px;margin-bottom:6px;font-weight:700;color:#fff}
+.login-screen p{color:#888;margin-bottom:24px;font-size:13px;text-align:center;max-width:320px}
+.badge-e2e{background:#1b381e;color:#4caf50;border:1px solid #2e7d32;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:600;margin-bottom:20px;display:inline-flex;align-items:center;gap:6px}
+.token-input,.pass-input{width:100%;max-width:360px;padding:14px 16px;border:none;border-radius:14px;background:#161616;color:#fff;font-size:15px;margin-bottom:12px;outline:none;border:1px solid #2c2c2c}
+.token-input::placeholder,.pass-input::placeholder{color:#666}
 .btn{width:100%;max-width:360px;padding:14px;border:none;border-radius:14px;background:#fff;color:#000;font-size:16px;font-weight:600;cursor:pointer;margin-bottom:8px}
-.btn:active{opacity:.7}
-.btn-secondary{background:transparent;color:#fff;border:1px solid #444}
+.btn:active{opacity:.8}
+.btn-secondary{background:transparent;color:#fff;border:1px solid #333}
 .btn-green{background:#4caf50;color:#fff}
 
 /* Header */
-.header{height:52px;background:#000;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #1a1a1a;flex-shrink:0}
+.header{height:52px;background:#0d0d0d;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #1c1c1c;flex-shrink:0}
 .header-back{width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%}
-.header-back:active{background:#1a1a1a}
-.header-avatar{width:32px;height:32px;border-radius:50%;object-fit:cover;margin-right:10px;background:#1a1a1a}
+.header-back:active{background:#222}
+.header-avatar{width:34px;height:34px;border-radius:50%;object-fit:cover;margin-right:10px;background:#222}
 .header-info{flex:1;min-width:0}
 .header-title{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.header-subtitle{font-size:12px;color:#666}
+.header-subtitle{font-size:12px;color:#888;display:flex;align-items:center;gap:4px}
+.header-subtitle.e2e-on{color:#4caf50}
 .header-actions{display:flex;gap:4px}
-.header-btn{width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;color:#fff}
-.header-btn:active{background:#1a1a1a}
+.header-btn{width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;color:#777}
 .header-btn.active{color:#4caf50}
 
 /* Dialogs */
 .dialogs-screen{flex:1;display:flex;flex-direction:column;overflow:hidden}
 .dialogs-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
-.dialog{display:flex;align-items:center;padding:10px 14px;cursor:pointer}
-.dialog:active{background:#0d0d0d}
-.dialog-avatar{width:50px;height:50px;border-radius:50%;object-fit:cover;margin-right:12px;flex-shrink:0;background:#1a1a1a}
+.dialog{display:flex;align-items:center;padding:12px 14px;cursor:pointer;border-bottom:1px solid #111}
+.dialog:active{background:#111}
+.dialog-avatar{width:50px;height:50px;border-radius:50%;object-fit:cover;margin-right:12px;flex-shrink:0;background:#222}
 .dialog-info{flex:1;min-width:0}
-.dialog-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px}
-.dialog-name{font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;margin-right:8px}
-.dialog-time{font-size:11px;color:#555;flex-shrink:0}
+.dialog-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+.dialog-name{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;margin-right:8px}
+.dialog-time{font-size:11px;color:#666;flex-shrink:0}
 .dialog-bottom{display:flex;align-items:center;gap:6px}
 .dialog-preview{font-size:13px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
 .dialog-unread{min-width:18px;height:18px;border-radius:50%;background:#fff;color:#000;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0}
-.dialog-lock{color:#4caf50;font-size:12px}
+.dialog-lock{color:#4caf50;font-size:13px}
 
 /* Chat */
 .chat-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;z-index:10;transform:translateX(100%);transition:transform .2s ease}
 .chat-screen.active{transform:translateX(0)}
-.messages{flex:1;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:3px;-webkit-overflow-scrolling:touch}
-.msg{max-width:82%;padding:7px 11px;border-radius:16px;font-size:14px;line-height:1.4;word-wrap:break-word;animation:msgIn .15s ease}
-@keyframes msgIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
-.msg-in{align-self:flex-start;background:#1a1a1a;border-bottom-left-radius:4px}
-.msg-out{align-self:flex-end;background:#333;border-bottom-right-radius:4px}
-.msg-encrypted{border:1px solid #4caf50}
-.msg-author{font-size:11px;color:#ff6b6b;font-weight:600;margin-bottom:2px}
+.messages{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:6px;-webkit-overflow-scrolling:touch}
+.msg{max-width:82%;padding:8px 12px;border-radius:16px;font-size:14px;line-height:1.4;word-wrap:break-word;position:relative}
+.msg-in{align-self:flex-start;background:#1c1c1e;border-bottom-left-radius:4px}
+.msg-out{align-self:flex-end;background:#2c2c2e;border-bottom-right-radius:4px}
+.msg-encrypted{border:1px solid #2e7d32;background:#0d2610}
+.msg-out.msg-encrypted{background:#113815}
+.msg-author{font-size:11px;color:#4caf50;font-weight:600;margin-bottom:2px}
 .msg-text{color:#fff}
-.msg-time{font-size:10px;color:#666;margin-top:2px;text-align:right}
-.msg-photo{max-width:100%;border-radius:12px;margin-top:4px;display:block;max-height:250px;object-fit:cover}
-.msg-file{background:#1a1a1a;padding:10px 14px;border-radius:12px;margin-top:4px;display:flex;align-items:center;gap:10px}
-.msg-file-icon{font-size:24px}
-.msg-file-info{flex:1}
-.msg-file-name{font-size:13px;color:#fff}
-.msg-file-size{font-size:11px;color:#666}
+.msg-time{font-size:10px;color:#888;margin-top:4px;text-align:right}
+.msg-photo{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;object-fit:cover;cursor:pointer;background:#111}
+.msg-video{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;background:#000}
+.msg-file{background:rgba(255,255,255,.05);padding:10px;border-radius:10px;margin-top:6px;display:flex;align-items:center;gap:10px}
+.msg-file-icon{font-size:22px}
+.msg-file-info{flex:1;min-width:0}
+.msg-file-name{font-size:13px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msg-file-size{font-size:11px;color:#888}
 
 /* Input */
-.input-area{min-height:52px;background:#000;border-top:1px solid #1a1a1a;display:flex;align-items:flex-end;padding:6px 8px;gap:4px}
-.input-attach{width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;flex-shrink:0;color:#666}
-.input-attach:active{background:#1a1a1a}
-.message-input{flex:1;padding:9px 14px;border:none;border-radius:18px;background:#1a1a1a;color:#fff;font-size:14px;outline:none;resize:none;max-height:100px;font-family:inherit;line-height:1.4;border:1px solid #222}
-.send-btn{width:40px;height:40px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;border:none;color:#000}
-.send-btn:active{transform:scale(.9)}
+.input-area{min-height:54px;background:#0d0d0d;border-top:1px solid #1a1a1a;display:flex;align-items:flex-end;padding:8px;gap:6px}
+.input-attach{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;flex-shrink:0;color:#aaa}
+.input-attach:active{background:#222}
+.message-input{flex:1;padding:10px 14px;border:none;border-radius:20px;background:#1c1c1e;color:#fff;font-size:14px;outline:none;resize:none;max-height:100px;font-family:inherit;line-height:1.4;border:1px solid #2a2a2c}
+.send-btn{width:38px;height:38px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;border:none;color:#000}
+.send-btn:active{transform:scale(.92)}
 .send-btn:disabled{background:#222;color:#555}
 
 /* Bottom nav */
-.bottom-nav{height:50px;background:#000;border-top:1px solid #1a1a1a;display:flex;justify-content:space-around;align-items:center;flex-shrink:0}
-.nav-item{flex:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;color:#555}
+.bottom-nav{height:50px;background:#0d0d0d;border-top:1px solid #1a1a1a;display:flex;justify-content:space-around;align-items:center;flex-shrink:0}
+.nav-item{flex:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;color:#666}
 .nav-item.active{color:#fff}
 .nav-item span{font-size:10px}
 
-/* Encryption toggle */
-.encrypt-toggle{position:fixed;bottom:70px;right:16px;width:48px;height:48px;border-radius:50%;background:#4caf50;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:50;box-shadow:0 4px 12px rgba(76,175,80,.4);font-size:20px;transition:all .2s}
-.encrypt-toggle.off{background:#666;box-shadow:0 4px 12px rgba(102,102,102,.4)}
-.encrypt-toggle:active{transform:scale(.9)}
-
-/* Setup encryption modal */
-.modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px}
-.modal-content{background:#1a1a1a;border-radius:20px;padding:24px;width:100%;max-width:380px}
-.modal-title{font-size:18px;font-weight:600;margin-bottom:12px}
-.modal-text{font-size:14px;color:#aaa;margin-bottom:20px;line-height:1.5}
+/* Modal */
+.modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px}
+.modal-content{background:#161616;border-radius:20px;padding:24px;width:100%;max-width:380px;border:1px solid #282828}
+.modal-title{font-size:18px;font-weight:600;margin-bottom:10px;color:#fff}
+.modal-text{font-size:13px;color:#aaa;margin-bottom:20px;line-height:1.5}
 
 .file-input{display:none}
 .hidden{display:none!important}
+.loader{border:2px solid #333;border-top:2px solid #4caf50;border-radius:50%;width:16px;height:16px;animation:spin 1s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
 <div class="app">
 
-<!-- Login -->
+<!-- Login Screen -->
 <div class="login-screen" id="loginScreen">
-<h1>VK Client</h1>
-<p>Шифрованные сообщения</p>
-<button class="btn btn-secondary" onclick="getToken()">Получить токен VK</button>
-<input type="text" class="token-input" id="tokenUrl" placeholder="Вставь ссылку с токеном...">
-<input type="password" class="pass-input" id="password" placeholder="Придумай пароль для шифрования...">
+<h1>VK Client E2EE</h1>
+<div class="badge-e2e">
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+100% Client-Side Encryption
+</div>
+<p>Шифрование происходит прямо на твоём телефоне. Сервер не имеет доступа к фото и сообщениям.</p>
+<button class="btn btn-secondary" onclick="getToken()">1. Получить токен VK</button>
+<input type="text" class="token-input" id="tokenUrl" placeholder="Вставь ссылку с токеном из адресной строки...">
+<input type="password" class="pass-input" id="password" placeholder="Пароль для защиты ключей...">
 <button class="btn" onclick="login()">Войти</button>
 </div>
 
-<!-- Setup Encryption -->
+<!-- Setup Encryption Modal -->
 <div class="modal hidden" id="setupModal">
 <div class="modal-content">
-<div class="modal-title">Настройка шифрования</div>
-<div class="modal-text">Создаём ключи шифрования. Это займёт секунду. Пароль + токен = ваш уникальный ключ. Ключи хранятся в облаке, переписка защищена.</div>
-<button class="btn btn-green" onclick="setupEncryption()">Создать ключи</button>
+<div class="modal-title">Генерация RSA/AES ключей</div>
+<div class="modal-text" id="setupText">Генерируем уникальную пару ключей в вашем браузере... Приватный ключ шифруется локально с помощью Web Crypto API.</div>
+<button class="btn btn-green" id="setupBtn" onclick="setupEncryption()">Создать ключи на телефоне</button>
 </div>
 </div>
 
-<!-- Dialogs -->
+<!-- Dialogs Screen -->
 <div class="dialogs-screen hidden" id="dialogsScreen">
 <div class="header">
 <img class="header-avatar" id="headerAvatar" src="" alt="">
 <div class="header-info">
 <div class="header-title" id="headerTitle">VK</div>
-<div class="header-subtitle" id="headerStatus">онлайн</div>
+<div class="header-subtitle e2e-on">
+<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+Локальная защита
+</div>
 </div>
 <div class="header-actions">
-<div class="header-btn" id="encryptBtn" onclick="toggleEncrypt()" title="Шифрование">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+<div class="header-btn active" id="encryptBtn" onclick="toggleEncrypt()" title="Локальное шифрование">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
 </div>
 </div>
 </div>
+
 <div class="dialogs-list" id="dialogsList"></div>
+
 <div class="bottom-nav">
 <div class="nav-item active" onclick="showDialogs()">
 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
 <span>Чаты</span>
-</div>
-<div class="nav-item">
-<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-<span>Поиск</span>
 </div>
 <div class="nav-item" onclick="logout()">
 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -378,7 +211,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </div>
 </div>
 
-<!-- Chat -->
+<!-- Chat Screen -->
 <div class="chat-screen" id="chatScreen">
 <div class="header">
 <div class="header-back" onclick="backToDialogs()">
@@ -387,16 +220,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <img class="header-avatar" id="chatAvatar" src="" alt="">
 <div class="header-info">
 <div class="header-title" id="chatTitle"></div>
-<div class="header-subtitle" id="chatEncryptStatus">Обычный чат</div>
+<div class="header-subtitle" id="chatEncryptStatus">E2EE Ready</div>
 </div>
 </div>
+
 <div class="messages" id="messages"></div>
+
 <div class="input-area">
 <div class="input-attach" onclick="document.getElementById('fileInput').click()">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
 </div>
-<input type="file" class="file-input" id="fileInput" accept="image/*,video/*" onchange="handleFile(event)">
-<textarea class="message-input" id="msgInput" placeholder="Сообщение" rows="1"></textarea>
+<input type="file" class="file-input" id="fileInput" accept="image/*,video/*,*/*" onchange="handleFile(event)">
+<textarea class="message-input" id="msgInput" placeholder="Сообщение..." rows="1"></textarea>
 <button class="send-btn" id="sendBtn" onclick="sendMessage()">
 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
 </button>
@@ -406,234 +241,608 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </div>
 
 <script>
-let token=localStorage.getItem('vk_token');
-let password=localStorage.getItem('vk_pass');
-let currentPeer=null;
-let currentUser=null;
-let dialogsData=[];
-let pollInterval=null;
-let encryptionEnabled=false;
-let myVkId=null;
-let peerKeys={}; // cached peer public keys
+/* =========================================================================
+   PURE CLIENT-SIDE E2EE ENGINE USING WEB CRYPTO API (subtle.crypto)
+   ========================================================================= */
 
-const AUTH_URL='https://oauth.vk.com/authorize?client_id=2685278&scope=messages,audio,photos,video,docs,notes,pages,status,wall,groups,email,stats,notifications,offline&redirect_uri=https://oauth.vk.com/blank.html&display=page&response_type=token';
+const ENCRYPT_PREFIX = "ENC2:";
+let token = localStorage.getItem('vk_token');
+let password = localStorage.getItem('vk_pass');
+let currentPeer = null;
+let currentUser = null;
+let dialogsData = [];
+let pollInterval = null;
+let encryptionEnabled = true;
+let myVkId = null;
 
-function getToken(){window.open(AUTH_URL,'_blank')}
+let localKeyPair = null; // { publicKey, privateKey, pubJwkStr }
+let peerKeysCache = {}; // peer_id -> public JWK string
+let decryptedCache = {}; // message/doc id -> blob URL / text
 
-async function login(){
-const url=document.getElementById('tokenUrl').value.trim();
-const pass=document.getElementById('password').value.trim();
-if(!url){alert('Вставь ссылку с токеном');return}
-if(!pass){alert('Придумай пароль для шифрования');return}
-
-const res=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
-const data=await res.json();
-if(data.error){alert(data.error);return}
-
-token=data.token;
-currentUser=data.user;
-myVkId=data.user.id;
-password=pass;
-localStorage.setItem('vk_token',token);
-localStorage.setItem('vk_pass',pass);
-localStorage.setItem('vk_user',JSON.stringify(data.user));
-
-// Show setup encryption modal
-document.getElementById('loginScreen').classList.add('hidden');
-document.getElementById('setupModal').classList.remove('hidden');
+// Convert Buffers
+function bufToB64(buf) {
+    let binary = '';
+    const bytes = new Uint8Array(buf);
+    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
 }
 
-async function setupEncryption(){
-document.querySelector('#setupModal .modal-text').textContent='Создание ключей...';
-const res=await fetch('/api/setup_keys',{
-method:'POST',
-headers:{'Content-Type':'application/json'},
-body:JSON.stringify({token:token,vk_id:myVkId,password:password})
+function b64ToBuf(b64) {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes.buffer;
+}
+
+// PBKDF2 Master Key derivation from User Password + Token
+async function deriveMasterKey(pass, saltStr) {
+    const enc = new TextEncoder();
+    const keyMaterial = await window.crypto.subtle.importKey(
+        "raw", enc.encode(pass), "PBKDF2", false, ["deriveKey"]
+    );
+    return await window.crypto.subtle.deriveKey(
+        {
+            name: "PBKDF2",
+            salt: enc.encode(saltStr),
+            iterations: 100000,
+            hash: "SHA-256"
+        },
+        keyMaterial,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt", "decrypt"]
+    );
+}
+
+// AES-GCM Encrypt Buffer
+async function encryptAESGCM(key, plainBuf) {
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plainBuf);
+    const combined = new Uint8Array(iv.byteLength + ciphertext.byteLength);
+    combined.set(iv, 0);
+    combined.set(new Uint8Array(ciphertext), iv.byteLength);
+    return combined.buffer;
+}
+
+// AES-GCM Decrypt Buffer
+async function decryptAESGCM(key, combinedBuf) {
+    const bytes = new Uint8Array(combinedBuf);
+    const iv = bytes.slice(0, 12);
+    const ciphertext = bytes.slice(12);
+    return await window.crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
+}
+
+// Initialize Local Client Crypto Keys
+async function initClientCrypto() {
+    if (!myVkId || !password || !token) return false;
+    
+    const masterKey = await deriveMasterKey(password, myVkId + "_vk_e2ee_salt");
+    
+    // Check if keypair exists in Firebase via API
+    const res = await fetch(`/api/keys/${myVkId}`);
+    const stored = await res.json();
+    
+    if (stored && stored.public_key && stored.private_key_enc) {
+        try {
+            // Decrypt private key locally on device
+            const privEncBuf = b64ToBuf(stored.private_key_enc);
+            const privDecBuf = await decryptAESGCM(masterKey, privEncBuf);
+            const privJwk = JSON.parse(new TextDecoder().decode(privDecBuf));
+            const pubJwk = JSON.parse(stored.public_key);
+
+            const publicKey = await window.crypto.subtle.importKey(
+                "jwk", pubJwk, { name: "RSA-OAEP", hash: "SHA-256" }, true, ["encrypt"]
+            );
+            const privateKey = await window.crypto.subtle.importKey(
+                "jwk", privJwk, { name: "RSA-OAEP", hash: "SHA-256" }, true, ["decrypt"]
+            );
+
+            localKeyPair = { publicKey, privateKey, pubJwkStr: stored.public_key };
+            return true;
+        } catch(e) {
+            console.error("Local Key Decryption Failed:", e);
+            alert("Неверный пароль шифрования!");
+            return false;
+        }
+    } else {
+        // Generate new RSA keypair locally on device
+        const keyPair = await window.crypto.subtle.generateKey(
+            { name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
+            true, ["encrypt", "decrypt"]
+        );
+
+        const pubJwk = await window.crypto.subtle.exportKey("jwk", keyPair.publicKey);
+        const privJwk = await window.crypto.subtle.exportKey("jwk", keyPair.privateKey);
+        const pubJwkStr = JSON.stringify(pubJwk);
+
+        // Encrypt private key locally before uploading backup to Firebase
+        const privEncBuf = await encryptAESGCM(masterKey, new TextEncoder().encode(JSON.stringify(privJwk)));
+        const privEncB64 = bufToB64(privEncBuf);
+
+        await fetch(`/api/keys/${myVkId}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ public_key: pubJwkStr, private_key_enc: privEncB64 })
+        });
+
+        localKeyPair = { publicKey: keyPair.publicKey, privateKey: keyPair.privateKey, pubJwkStr };
+        return true;
+    }
+}
+
+// Fetch Peer Public Key
+async function getPeerPubKey(peerId) {
+    if (peerKeysCache[peerId]) return peerKeysCache[peerId];
+    
+    // If peer is self
+    if (String(peerId) === String(myVkId)) {
+        if (localKeyPair) {
+            peerKeysCache[peerId] = localKeyPair.publicKey;
+            return localKeyPair.publicKey;
+        }
+    }
+    
+    const res = await fetch(`/api/keys/${peerId}`);
+    const stored = await res.json();
+    if (stored && stored.public_key) {
+        const pubJwk = JSON.parse(stored.public_key);
+        const key = await window.crypto.subtle.importKey(
+            "jwk", pubJwk, { name: "RSA-OAEP", hash: "SHA-256" }, true, ["encrypt"]
+        );
+        peerKeysCache[peerId] = key;
+        return key;
+    }
+    return null;
+}
+
+// Encrypt payload buffer for Peer & Self locally on client
+async function clientEncryptData(peerKey, plainBuf) {
+    // Generate AES Session Key
+    const sessionKey = await window.crypto.subtle.generateKey(
+        { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]
+    );
+
+    // Encrypt payload with AES Session Key
+    const encPayload = await encryptAESGCM(sessionKey, plainBuf);
+
+    // Export raw session key
+    const rawSession = await window.crypto.subtle.exportKey("raw", sessionKey);
+
+    // Encrypt raw session key with Peer Public RSA Key
+    const encKeyPeer = await window.crypto.subtle.encrypt({ name: "RSA-OAEP" }, peerKey, rawSession);
+
+    // Encrypt raw session key with Local Self Public RSA Key
+    const encKeySelf = await window.crypto.subtle.encrypt({ name: "RSA-OAEP" }, localKeyPair.publicKey, rawSession);
+
+    return {
+        k1: bufToB64(encKeyPeer),
+        k2: bufToB64(encKeySelf),
+        payload: bufToB64(encPayload)
+    };
+}
+
+// Decrypt payload locally on client
+async function clientDecryptData(encObj) {
+    if (!localKeyPair) return null;
+    let rawSession = null;
+
+    // Try decrypting k1 then k2 with local private key
+    try {
+        rawSession = await window.crypto.subtle.decrypt({ name: "RSA-OAEP" }, localKeyPair.privateKey, b64ToBuf(encObj.k1));
+    } catch(e) {
+        try {
+            rawSession = await window.crypto.subtle.decrypt({ name: "RSA-OAEP" }, localKeyPair.privateKey, b64ToBuf(encObj.k2));
+        } catch(e2) {
+            return null;
+        }
+    }
+
+    const sessionKey = await window.crypto.subtle.importKey(
+        "raw", rawSession, { name: "AES-GCM" }, false, ["decrypt"]
+    );
+
+    const decrypted = await decryptAESGCM(sessionKey, b64ToBuf(encObj.payload));
+    return decrypted;
+}
+
+/* =========================================================================
+   UI & APP LOGIC
+   ========================================================================= */
+
+const AUTH_URL = 'https://oauth.vk.com/authorize?client_id=2685278&scope=messages,audio,photos,video,docs,notes,pages,status,wall,groups,email,stats,notifications,offline&redirect_uri=https://oauth.vk.com/blank.html&response_type=token';
+
+function getToken() { window.open(AUTH_URL, '_blank'); }
+
+async function login() {
+    const url = document.getElementById('tokenUrl').value.trim();
+    const pass = document.getElementById('password').value.trim();
+    if (!url) { alert('Вставишь ссылку с токеном'); return; }
+    if (!pass) { alert('Придумай пароль для шифрования'); return; }
+
+    const res = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+    const data = await res.json();
+    if (data.error) { alert(data.error); return; }
+
+    token = data.token;
+    currentUser = data.user;
+    myVkId = data.user.id;
+    password = pass;
+
+    localStorage.setItem('vk_token', token);
+    localStorage.setItem('vk_pass', pass);
+    localStorage.setItem('vk_user', JSON.stringify(data.user));
+
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('setupModal').classList.remove('hidden');
+}
+
+async function setupEncryption() {
+    document.getElementById('setupText').innerHTML = '<span class="loader"></span>Создание ключей на вашем смартфоне...';
+    document.getElementById('setupBtn').disabled = true;
+
+    const ok = await initClientCrypto();
+    if (ok) {
+        document.getElementById('setupModal').classList.add('hidden');
+        showDialogsScreen();
+        loadDialogs();
+        startPolling();
+    } else {
+        alert("Ошибка создания ключей!");
+        document.getElementById('setupBtn').disabled = false;
+    }
+}
+
+function showDialogsScreen() {
+    document.getElementById('dialogsScreen').classList.remove('hidden');
+    if (currentUser) {
+        document.getElementById('headerAvatar').src = currentUser.photo || '';
+        document.getElementById('headerTitle').textContent = currentUser.name || 'VK';
+    }
+}
+
+async function loadDialogs() {
+    const res = await fetch('/api/dialogs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
+    const data = await res.json();
+    if (data.error) return;
+    dialogsData = data.dialogs;
+    const list = document.getElementById('dialogsList'); list.innerHTML = '';
+    
+    for (let i = 0; i < data.dialogs.length; i++) {
+        const d = data.dialogs[i];
+        const div = document.createElement('div');
+        div.className = 'dialog';
+        div.onclick = () => openChat(i);
+        const time = d.date ? new Date(d.date * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : '';
+        
+        let preview = d.last_message || '';
+        if (preview.startsWith(ENCRYPT_PREFIX)) {
+            preview = '🔒 Зашифрованное сообщение';
+        }
+        
+        div.innerHTML = `<img class="dialog-avatar" src="${d.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'"><div class="dialog-info"><div class="dialog-top"><div class="dialog-name">${escapeHtml(d.name)}</div><div class="dialog-time">${time}</div></div><div class="dialog-bottom"><div class="dialog-preview">${escapeHtml(preview)}</div>${d.unread > 0 ? `<div class="dialog-unread">${d.unread}</div>` : ''}</div></div>`;
+        list.appendChild(div);
+    }
+}
+
+async function openChat(index) {
+    const d = dialogsData[index]; currentPeer = d.id;
+    document.getElementById('chatTitle').textContent = d.name;
+    document.getElementById('chatAvatar').src = d.photo || 'https://vk.com/images/camera_100.png';
+    document.getElementById('chatScreen').classList.add('active');
+
+    // Check peer key
+    const peerKey = await getPeerPubKey(currentPeer);
+    const status = document.getElementById('chatEncryptStatus');
+    if (peerKey) {
+        status.textContent = '🔒 Защищено (E2EE)';
+        status.style.color = '#4caf50';
+    } else {
+        status.textContent = 'Обычный чат (нет ключа у собеседника)';
+        status.style.color = '#888';
+    }
+
+    loadMessages();
+}
+
+function backToDialogs() {
+    document.getElementById('chatScreen').classList.remove('active');
+    currentPeer = null;
+}
+
+async function loadMessages() {
+    if (!currentPeer) return;
+    const res = await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, peer_id: currentPeer }) });
+    const data = await res.json();
+    const container = document.getElementById('messages'); container.innerHTML = '';
+    if (data.messages) {
+        const msgs = data.messages.reverse();
+        for (const m of msgs) {
+            await renderMessageItem(container, m);
+        }
+    }
+    container.scrollTop = container.scrollHeight;
+}
+
+async function renderMessageItem(container, msg) {
+    const div = document.createElement('div');
+    const isEncrypted = msg.text && msg.text.startsWith(ENCRYPT_PREFIX);
+    div.className = 'msg ' + (msg.out ? 'msg-out' : 'msg-in') + (isEncrypted ? ' msg-encrypted' : '');
+    div.id = 'msg-' + msg.id;
+
+    let html = '';
+    if (!msg.out && msg.name) html += `<div class="msg-author">${escapeHtml(msg.name)}</div>`;
+
+    let displayText = msg.text || '';
+    if (isEncrypted) {
+        if (decryptedCache[msg.id]) {
+            displayText = decryptedCache[msg.id];
+        } else {
+            displayText = '🔒 Расшифровка...';
+            // Decrypt asynchronously
+            setTimeout(async () => {
+                try {
+                    const encObj = JSON.parse(msg.text.substring(ENCRYPT_PREFIX.length));
+                    const decBuf = await clientDecryptData(encObj);
+                    if (decDecBuf = decBuf) {
+                        const plainText = new TextDecoder().decode(decDecBuf);
+                        decryptedCache[msg.id] = plainText;
+                        const textElem = document.querySelector(`#msg-${msg.id} .msg-text`);
+                        if (textElem) textElem.textContent = plainText;
+                    }
+                } catch(e) {
+                    const textElem = document.querySelector(`#msg-${msg.id} .msg-text`);
+                    if (textElem) textElem.textContent = '🔒 Не удалось расшифровать';
+                }
+            }, 10);
+        }
+    }
+
+    html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
+
+    // Process attachments
+    if (msg.attachments) {
+        for (const a of msg.attachments) {
+            if (a.type === 'photo') {
+                const p = a.photo?.sizes?.find(s => s.type === 'x') || a.photo?.sizes?.[a.photo?.sizes?.length - 1];
+                if (p) html += `<img class="msg-photo" src="${p.url}">`;
+            }
+            if (a.type === 'doc') {
+                const doc = a.doc;
+                if (doc.title && (doc.title.startsWith('enc_') || doc.ext === 'meow' || doc.ext === 'mur' || doc.ext === 'enc')) {
+                    const docId = `doc_${doc.owner_id}_${doc.id}`;
+                    html += `<div class="msg-file" id="${docId}"><span class="msg-file-icon">🔒</span><div class="msg-file-info"><div class="msg-file-name">Зашифрованный медиафайл</div><div class="msg-file-size">Локальная расшифровка...</div></div></div>`;
+                    
+                    // Decrypt media asynchronously
+                    setTimeout(() => processEncryptedAttachment(docId, doc.url), 10);
+                } else {
+                    html += `<div class="msg-file"><span class="msg-file-icon">📎</span><div class="msg-file-info"><div class="msg-file-name">${escapeHtml(doc.title || 'Файл')}</div><div class="msg-file-size">${(doc.size / 1024).toFixed(1)} KB</div></div></div>`;
+                }
+            }
+        }
+    }
+
+    html += `<div class="msg-time">${msg.date ? new Date(msg.date * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : ''}</div>`;
+    div.innerHTML = html;
+    container.appendChild(div);
+}
+
+// Fetch & Decrypt Encrypted Attachment on Phone
+async function processEncryptedAttachment(elemId, url) {
+    const elem = document.getElementById(elemId);
+    if (!elem) return;
+
+    if (decryptedCache[elemId]) {
+        renderDecryptedMedia(elem, decryptedCache[elemId]);
+        return;
+    }
+
+    try {
+        // Fetch binary through local proxy to avoid CORS
+        const resp = await fetch(`/api/proxy_file?url=${encodeURIComponent(url)}`);
+        const encArrayBuf = await resp.arrayBuffer();
+
+        // Read binary header size (first 4 bytes uint32)
+        const view = new DataView(encArrayBuf);
+        const headerLen = view.getUint32(0);
+        
+        const headerJsonBytes = new Uint8Array(encArrayBuf, 4, headerLen);
+        const headerStr = new TextDecoder().decode(headerJsonBytes);
+        const header = JSON.parse(headerStr);
+
+        const encPayload = encArrayBuf.slice(4 + headerLen);
+
+        // Decrypt payload with client RSA private key
+        const decPayloadBuf = await clientDecryptData({
+            k1: header.k1,
+            k2: header.k2,
+            payload: bufToB64(encPayload)
+        });
+
+        if (!decPayloadBuf) throw new Error("Decryption failed");
+
+        const blob = new Blob([decPayloadBuf], { type: header.mime || 'application/octet-stream' });
+        const blobUrl = URL.createObjectURL(blob);
+        decryptedCache[elemId] = { blobUrl, mime: header.mime, name: header.name };
+
+        renderDecryptedMedia(elem, decryptedCache[elemId]);
+
+    } catch (e) {
+        console.error("Failed to decrypt media:", e);
+        elem.querySelector('.msg-file-size').textContent = 'Ошибка расшифровки';
+    }
+}
+
+function renderDecryptedMedia(elem, data) {
+    if (data.mime.startsWith('image/')) {
+        const img = document.createElement('img');
+        img.className = 'msg-photo';
+        img.src = data.blobUrl;
+        elem.replaceWith(img);
+    } else if (data.mime.startsWith('video/')) {
+        const vid = document.createElement('video');
+        vid.className = 'msg-video';
+        vid.src = data.blobUrl;
+        vid.controls = true;
+        elem.replaceWith(vid);
+    } else {
+        elem.querySelector('.msg-file-size').textContent = 'Расшифровано (нажмите для скачивания)';
+        elem.onclick = () => {
+            const a = document.createElement('a');
+            a.href = data.blobUrl;
+            a.download = data.name || 'file';
+            a.click();
+        };
+    }
+}
+
+function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
+async function sendMessage() {
+    const input = document.getElementById('msgInput');
+    const text = input.value.trim();
+    if (!text || !currentPeer) return;
+
+    const btn = document.getElementById('sendBtn'); btn.disabled = true;
+    let sendText = text;
+
+    if (encryptionEnabled) {
+        const peerKey = await getPeerPubKey(currentPeer);
+        if (peerKey) {
+            // Encrypt text message locally on phone
+            const plainBuf = new TextEncoder().encode(text).buffer;
+            const encObj = await clientEncryptData(peerKey, plainBuf);
+            sendText = ENCRYPT_PREFIX + JSON.stringify(encObj);
+        }
+    }
+
+    await fetch('/api/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, peer_id: currentPeer, text: sendText }) });
+    input.value = ''; btn.disabled = false;
+    
+    // Add message locally
+    addLocalMessage(sendText);
+}
+
+function addLocalMessage(text) {
+    const container = document.getElementById('messages');
+    renderMessageItem(container, {
+        id: 'loc_' + Date.now(),
+        text: text,
+        out: 1,
+        date: Math.floor(Date.now() / 1000)
+    });
+    container.scrollTop = container.scrollHeight;
+}
+
+// Encrypt & Upload File 100% locally on phone
+async function handleFile(e) {
+    const file = e.target.files[0];
+    if (!file || !currentPeer) return;
+
+    const btn = document.getElementById('sendBtn'); btn.disabled = true;
+
+    if (encryptionEnabled) {
+        const peerKey = await getPeerPubKey(currentPeer);
+        if (peerKey) {
+            // Read file into ArrayBuffer locally
+            const fileArrayBuf = await file.arrayBuffer();
+
+            // Encrypt payload locally
+            const encObj = await clientEncryptData(peerKey, fileArrayBuf);
+            const payloadBuf = b64ToBuf(encObj.payload);
+
+            // Construct Binary File with Header
+            const headerStr = JSON.stringify({
+                k1: encObj.k1,
+                k2: encObj.k2,
+                mime: file.type,
+                name: file.name
+            });
+            const headerBytes = new TextEncoder().encode(headerStr);
+
+            const totalLen = 4 + headerBytes.byteLength + payloadBuf.byteLength;
+            const resultBuf = new ArrayBuffer(totalLen);
+            const view = new DataView(resultBuf);
+            
+            // 4 bytes uint32 header length
+            view.setUint32(0, headerBytes.byteLength);
+
+            const u8 = new Uint8Array(resultBuf);
+            u8.set(headerBytes, 4);
+            u8.set(new Uint8Array(payloadBuf), 4 + headerBytes.byteLength);
+
+            // Create encrypted blob
+            const encBlob = new Blob([resultBuf], { type: 'application/octet-stream' });
+            
+            // Extension tag
+            let ext = 'enc';
+            if (file.type.startsWith('image/')) ext = 'meow';
+            else if (file.type.startsWith('video/')) ext = 'mur';
+
+            const formData = new FormData();
+            formData.append('token', token);
+            formData.append('peer_id', currentPeer);
+            formData.append('file', encBlob, `enc_${Date.now()}.${ext}`);
+
+            await fetch('/api/upload_encrypted_doc', { method: 'POST', body: formData });
+            btn.disabled = false;
+            loadMessages();
+            return;
+        }
+    }
+
+    // Unencrypted normal upload
+    const formData = new FormData();
+    formData.append('token', token);
+    formData.append('peer_id', currentPeer);
+    formData.append('file', file);
+    await fetch('/api/upload_normal', { method: 'POST', body: formData });
+
+    btn.disabled = false;
+    loadMessages();
+}
+
+function toggleEncrypt() {
+    encryptionEnabled = !encryptionEnabled;
+    const btn = document.getElementById('encryptBtn');
+    if (encryptionEnabled) {
+        btn.classList.add('active');
+    } else {
+        btn.classList.remove('active');
+    }
+}
+
+function startPolling() {
+    if (pollInterval) clearInterval(pollInterval);
+    pollInterval = setInterval(() => { if (currentPeer) loadMessages(); }, 3000);
+}
+
+function logout() {
+    localStorage.clear();
+    location.reload();
+}
+
+function showDialogs() {
+    document.getElementById('chatScreen').classList.remove('active');
+    loadDialogs();
+}
+
+document.getElementById('msgInput').addEventListener('keypress', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
-const data=await res.json();
-if(data.error){alert(data.error);return}
 
-document.getElementById('setupModal').classList.add('hidden');
-showDialogsScreen();
-loadDialogs();
-startPolling();
-encryptionEnabled=true;
-updateEncryptUI();
-}
-
-function showDialogsScreen(){
-document.getElementById('dialogsScreen').classList.remove('hidden');
-if(currentUser){
-document.getElementById('headerAvatar').src=currentUser.photo||'';
-document.getElementById('headerTitle').textContent=currentUser.name||'VK';
-document.getElementById('headerStatus').textContent=currentUser.online?'онлайн':'офлайн';
-}
-}
-
-async function loadDialogs(){
-const res=await fetch('/api/dialogs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});
-const data=await res.json();
-if(data.error)return;
-dialogsData=data.dialogs;
-const list=document.getElementById('dialogsList');list.innerHTML='';
-data.dialogs.forEach((d,i)=>{
-const div=document.createElement('div');div.className='dialog';div.onclick=()=>openChat(i);
-const time=d.date?new Date(d.date*1000).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}):'';
-const hasKey=peerKeys[d.id]?'🔒':'';
-div.innerHTML=`<img class="dialog-avatar" src="${d.photo||'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'" alt=""><div class="dialog-info"><div class="dialog-top"><div class="dialog-name">${d.name}</div><div class="dialog-time">${time}</div></div><div class="dialog-bottom"><div class="dialog-preview">${d.last_message||''}</div><span class="dialog-lock">${hasKey}</span>${d.unread>0?`<div class="dialog-unread">${d.unread}</div>`:''}</div></div>`;
-list.appendChild(div)
-})
-}
-
-async function openChat(index){
-const d=dialogsData[index];currentPeer=d.id;
-document.getElementById('chatTitle').textContent=d.name;
-document.getElementById('chatAvatar').src=d.photo||'https://vk.com/images/camera_100.png';
-document.getElementById('chatScreen').classList.add('active');
-
-// Check if peer has encryption keys
-const keyRes=await fetch('/api/check_peer_key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({peer_id:currentPeer,my_vk_id:myVkId})});
-const keyData=await keyRes.json();
-if(keyData.has_key){
-peerKeys[currentPeer]=true;
-document.getElementById('chatEncryptStatus').textContent='🔒 Защищено';
-} else {
-document.getElementById('chatEncryptStatus').textContent='Обычный чат';
-}
-
-loadMessages();
-}
-
-function backToDialogs(){
-document.getElementById('chatScreen').classList.remove('active');
-currentPeer=null;
-}
-
-async function loadMessages(){
-if(!currentPeer)return;
-const res=await fetch('/api/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,peer_id:currentPeer})});
-const data=await res.json();
-const container=document.getElementById('messages');container.innerHTML='';
-if(data.messages)data.messages.reverse().forEach(m=>addMessage(m));
-container.scrollTop=container.scrollHeight;
-}
-
-function addMessage(msg){
-const container=document.getElementById('messages');
-const div=document.createElement('div');
-const isEncrypted=msg.text&&msg.text.startsWith('ENC:');
-div.className='msg '+(msg.out?'msg-out':'msg-in')+(isEncrypted?' msg-encrypted':'');
-let html='';
-if(!msg.out&&msg.name)html+=`<div class="msg-author">${msg.name}</div>`;
-
-let displayText=msg.text||'';
-if(isEncrypted){
-displayText='🔒 Зашифровано';
-}
-
-html+=`<div class="msg-text">${escapeHtml(displayText)}</div>`;
-
-if(msg.attachments)msg.attachments.forEach(a=>{
-if(a.type==='photo'){const p=a.photo?.sizes?.find(s=>s.type==='x')||a.photo?.sizes?.[a.photo?.sizes?.length-1];if(p)html+=`<img class="msg-photo" src="${p.url}" alt="">`}
-if(a.type==='doc'){
-const ext=a.doc?.ext||'';
-if(ext==='meow')html+=`<div class="msg-file"><span class="msg-file-icon">🔒</span><div class="msg-file-info"><div class="msg-file-name">Зашифрованное фото</div><div class="msg-file-size">.meow</div></div></div>`;
-else if(ext==='mur')html+=`<div class="msg-file"><span class="msg-file-icon">🔒</span><div class="msg-file-info"><div class="msg-file-name">Зашифрованное видео</div><div class="msg-file-size">.mur</div></div></div>`;
-else html+=`<div class="msg-file"><span class="msg-file-icon">📎</span><div class="msg-file-info"><div class="msg-file-name">${a.doc?.title||'Файл'}</div><div class="msg-file-size">${(a.doc?.size/1024).toFixed(1)} KB</div></div></div>`;
-}
-});
-
-html+=`<div class="msg-time">${msg.date?new Date(msg.date*1000).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}):''}</div>`;
-div.innerHTML=html;container.appendChild(div);
-}
-
-function escapeHtml(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML}
-
-async function sendMessage(){
-const input=document.getElementById('msgInput');
-const text=input.value.trim();
-if(!text||!currentPeer)return;
-
-const btn=document.getElementById('sendBtn');btn.disabled=true;
-
-let sendText=text;
-if(encryptionEnabled){
-// Encrypt message
-const encRes=await fetch('/api/encrypt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:token,peer_id:currentPeer,my_vk_id:myVkId,text:text})});
-const encData=await encRes.json();
-if(encData.encrypted){
-sendText='ENC:'+encData.encrypted;
-console.log('Encrypted sent');
-} else {
-console.log('Encrypt failed:', encData.error);
-}
-}
-
-await fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,peer_id:currentPeer,text:sendText})});
-input.value='';btn.disabled=false;
-addMessage({text:sendText,out:1,date:Math.floor(Date.now()/1000)});
-document.getElementById('messages').scrollTop=999999;
-}
-
-async function handleFile(e){
-const file=e.target.files[0];
-if(!file||!currentPeer)return;
-const btn=document.getElementById('sendBtn');btn.disabled=true;
-
-const formData=new FormData();
-formData.append('token',token);
-formData.append('peer_id',currentPeer);
-formData.append('file',file);
-formData.append('encrypt',encryptionEnabled&&peerKeys[currentPeer]?'1':'0');
-
-await fetch('/api/upload',{method:'POST',body:formData});
-btn.disabled=false;
-loadMessages();
-}
-
-function toggleEncrypt(){
-encryptionEnabled=!encryptionEnabled;
-updateEncryptUI();
-}
-
-function updateEncryptUI(){
-const btn=document.getElementById('encryptBtn');
-if(encryptionEnabled){
-btn.classList.add('active');
-btn.style.color='#4caf50';
-} else {
-btn.classList.remove('active');
-btn.style.color='#fff';
-}
-}
-
-function startPolling(){
-if(pollInterval)clearInterval(pollInterval);
-pollInterval=setInterval(()=>{if(currentPeer)loadMessages()},3000);
-}
-
-function logout(){
-localStorage.clear();
-location.reload();
-}
-
-function showDialogs(){
-document.getElementById('chatScreen').classList.remove('active');
-loadDialogs();
-}
-
-document.getElementById('msgInput').addEventListener('keypress',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage()}});
-
-// Auto login
-if(token&&password){
-currentUser=JSON.parse(localStorage.getItem('vk_user')||'{}');
-myVkId=currentUser.id;
-showDialogsScreen();
-loadDialogs();
-startPolling();
-encryptionEnabled=true;
-updateEncryptUI();
-}
+// Auto Login & Initialize Client Keys
+(async () => {
+    if (token && password && localStorage.getItem('vk_user')) {
+        currentUser = JSON.parse(localStorage.getItem('vk_user'));
+        myVkId = currentUser.id;
+        showDialogsScreen();
+        const ok = await initClientCrypto();
+        if (ok) {
+            loadDialogs();
+            startPolling();
+        }
+    }
+})();
 </script>
 </body>
 </html>
@@ -667,58 +876,22 @@ def auth():
     })
 
 
-@app.route('/api/setup_keys', methods=['POST'])
-def setup_keys():
+@app.route('/api/keys/<vk_id>', methods=['GET'])
+def get_key(vk_id):
+    """Retrieve public key and encrypted private key for user from Firebase"""
+    stored = firebase_get(f"keys/{vk_id}")
+    if stored:
+        return jsonify(stored)
+    return jsonify({'error': 'Not found'}), 404
+
+
+@app.route('/api/keys/<vk_id>', methods=['POST'])
+def save_key(vk_id):
+    """Store public key and locally-encrypted private key in Firebase"""
     data = request.json
-    token = data.get('token')
-    vk_id = data.get('vk_id')
-    password = data.get('password')
-
-    if not all([token, vk_id, password]):
-        return jsonify({'error': 'Missing params'}), 400
-
-    keys = get_or_create_keys(vk_id, token, password)
-    return jsonify({'ok': True, 'public_key': keys['public_key'][:50] + '...'})
-
-
-@app.route('/api/check_peer_key', methods=['POST'])
-def check_peer_key():
-    data = request.json
-    peer_id = data.get('peer_id')
-    my_vk_id = data.get('my_vk_id')
-
-    # Чат сам с собой — всегда есть ключ (свой)
-    if my_vk_id and str(peer_id) == str(my_vk_id):
-        return jsonify({'has_key': True})
-
-    key = get_peer_public_key(peer_id)
-    return jsonify({'has_key': key is not None})
-
-
-@app.route('/api/encrypt', methods=['POST'])
-def encrypt_message():
-    data = request.json
-    token = data.get('token')
-    peer_id = data.get('peer_id')
-    my_vk_id = data.get('my_vk_id')
-    text = data.get('text')
-
-    # Чат сам с собой — используем свои ключи
-    if my_vk_id and str(peer_id) == str(my_vk_id):
-        # Получаем свои ключи из Firebase
-        stored = firebase_get(f"keys/{my_vk_id}")
-        if stored and stored.get('public_key'):
-            pub_key = stored['public_key']
-        else:
-            return jsonify({'error': 'Your encryption keys not found'}), 400
-    else:
-        pub_key = get_peer_public_key(peer_id)
-
-    if not pub_key:
-        return jsonify({'error': 'Peer has no encryption key'}), 400
-
-    encrypted = encrypt_for_peer(pub_key, text)
-    return jsonify({'encrypted': encrypted})
+    data['created_at'] = datetime.now().isoformat()
+    firebase_put(f"keys/{vk_id}", data)
+    return jsonify({'ok': True})
 
 
 @app.route('/api/dialogs', methods=['POST'])
@@ -796,11 +969,39 @@ def send_message():
     return jsonify({'result': result})
 
 
-@app.route('/api/upload', methods=['POST'])
-def upload_file():
+@app.route('/api/upload_encrypted_doc', methods=['POST'])
+def upload_encrypted_doc():
+    """Upload pre-encrypted file binary directly as VK Document attachment"""
     token = request.form.get('token')
     peer_id = request.form.get('peer_id')
-    encrypt = request.form.get('encrypt') == '1'
+    file = request.files.get('file')
+
+    if not file:
+        return jsonify({'error': 'No file'}), 400
+
+    upload_server = vk_request('docs.getMessagesUploadServer', token, type='doc', peer_id=peer_id)
+    if isinstance(upload_server, dict) and 'error' in upload_server:
+        return jsonify(upload_server), 400
+
+    upload_url = upload_server.get('upload_url')
+    files = {'file': (file.filename, file.read(), 'application/octet-stream')}
+    upload_resp = requests.post(upload_url, files=files, timeout=30).json()
+
+    save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=file.filename)
+    if isinstance(save_result, dict) and 'doc' in save_result:
+        doc = save_result['doc']
+        attachment = f"doc{doc['owner_id']}_{doc['id']}"
+        vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=0)
+        return jsonify({'ok': True})
+
+    return jsonify({'error': 'Upload failed'}), 400
+
+
+@app.route('/api/upload_normal', methods=['POST'])
+def upload_normal():
+    """Normal unencrypted upload proxy"""
+    token = request.form.get('token')
+    peer_id = request.form.get('peer_id')
     file = request.files.get('file')
 
     if not file:
@@ -809,95 +1010,56 @@ def upload_file():
     filename = file.filename.lower()
     file_bytes = file.read()
 
-    # Encrypt if enabled
-    if encrypt:
-        # Derive key from token (simplified — in production use proper key exchange)
-        key = hashlib.sha256(token.encode()).digest()
-        key_b64 = base64.urlsafe_b64encode(key)
-        encrypted = encrypt_file(key_b64, file_bytes)
-        file_bytes = encrypted
-
-        # Determine extension
-        if filename.endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')):
-            ext = 'meow'
-            mime = 'application/octet-stream'
-        elif filename.endswith(('.mp4', '.avi', '.mov', '.mkv')):
-            ext = 'mur'
-            mime = 'application/octet-stream'
-        else:
-            ext = 'enc'
-            mime = 'application/octet-stream'
-
-        # Upload as document with custom extension
-        upload_server = vk_request('docs.getMessagesUploadServer', token, type='doc', peer_id=peer_id)
+    if filename.endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')):
+        upload_server = vk_request('photos.getMessagesUploadServer', token, peer_id=peer_id)
         if isinstance(upload_server, dict) and 'error' in upload_server:
             return jsonify(upload_server), 400
 
         upload_url = upload_server.get('upload_url')
-        files = {'file': (f'encrypted.{ext}', BytesIO(file_bytes), mime)}
+        files = {'photo': (filename, BytesIO(file_bytes), file.content_type or 'image/jpeg')}
         upload_resp = requests.post(upload_url, files=files, timeout=30).json()
 
-        save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=f'encrypted.{ext}')
-        if isinstance(save_result, dict) and 'doc' in save_result:
-            doc = save_result['doc']
-            attachment = f"doc{doc['owner_id']}_{doc['id']}"
+        save_result = vk_request('photos.saveMessagesPhoto', token,
+            photo=upload_resp.get('photo'),
+            server=upload_resp.get('server'),
+            hash=upload_resp.get('hash')
+        )
+
+        if isinstance(save_result, list) and len(save_result) > 0:
+            photo = save_result[0]
+            attachment = f"photo{photo['owner_id']}_{photo['id']}"
             vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=0)
             return jsonify({'ok': True})
 
-    else:
-        # Normal upload
-        if filename.endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')):
-            upload_server = vk_request('photos.getMessagesUploadServer', token, peer_id=peer_id)
-            if isinstance(upload_server, dict) and 'error' in upload_server:
-                return jsonify(upload_server), 400
+    upload_server = vk_request('docs.getMessagesUploadServer', token, type='doc', peer_id=peer_id)
+    if isinstance(upload_server, dict) and 'error' in upload_server:
+        return jsonify(upload_server), 400
 
-            upload_url = upload_server.get('upload_url')
-            files = {'photo': (filename, BytesIO(file_bytes), file.content_type or 'image/jpeg')}
-            upload_resp = requests.post(upload_url, files=files, timeout=30).json()
+    upload_url = upload_server.get('upload_url')
+    files = {'file': (filename, BytesIO(file_bytes), file.content_type or 'application/octet-stream')}
+    upload_resp = requests.post(upload_url, files=files, timeout=30).json()
 
-            save_result = vk_request('photos.saveMessagesPhoto', token,
-                photo=upload_resp.get('photo'),
-                server=upload_resp.get('server'),
-                hash=upload_resp.get('hash')
-            )
-
-            if isinstance(save_result, list) and len(save_result) > 0:
-                photo = save_result[0]
-                attachment = f"photo{photo['owner_id']}_{photo['id']}"
-                vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=0)
-                return jsonify({'ok': True})
-
-        elif filename.endswith(('.mp4', '.avi', '.mov', '.mkv')):
-            upload_server = vk_request('video.save', token, name=filename, peer_id=peer_id)
-            if isinstance(upload_server, dict) and 'error' in upload_server:
-                return jsonify(upload_server), 400
-
-            upload_url = upload_server.get('upload_url')
-            files = {'video_file': (filename, BytesIO(file_bytes), file.content_type or 'video/mp4')}
-            requests.post(upload_url, files=files, timeout=60)
-
-            video = upload_server
-            attachment = f"video{video['owner_id']}_{video['video_id']}"
-            vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=0)
-            return jsonify({'ok': True})
-
-        else:
-            upload_server = vk_request('docs.getMessagesUploadServer', token, type='doc', peer_id=peer_id)
-            if isinstance(upload_server, dict) and 'error' in upload_server:
-                return jsonify(upload_server), 400
-
-            upload_url = upload_server.get('upload_url')
-            files = {'file': (filename, BytesIO(file_bytes), file.content_type or 'application/octet-stream')}
-            upload_resp = requests.post(upload_url, files=files, timeout=30).json()
-
-            save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=filename)
-            if isinstance(save_result, dict) and 'doc' in save_result:
-                doc = save_result['doc']
-                attachment = f"doc{doc['owner_id']}_{doc['id']}"
-                vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=0)
-                return jsonify({'ok': True})
+    save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=filename)
+    if isinstance(save_result, dict) and 'doc' in save_result:
+        doc = save_result['doc']
+        attachment = f"doc{doc['owner_id']}_{doc['id']}"
+        vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=0)
+        return jsonify({'ok': True})
 
     return jsonify({'error': 'Upload failed'}), 400
+
+
+@app.route('/api/proxy_file')
+def proxy_file():
+    """Proxy encrypted attachments to bypass browser CORS on VK CDN"""
+    url = request.args.get('url')
+    if not url:
+        return jsonify({'error': 'No URL'}), 400
+    try:
+        resp = requests.get(url, timeout=30)
+        return Response(resp.content, mimetype='application/octet-stream')
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
