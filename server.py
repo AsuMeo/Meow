@@ -17,32 +17,80 @@ API_VERSION = "5.199"
 FIREBASE_DB_URL = os.environ.get('FIREBASE_DB_URL', '')
 FIREBASE_API_KEY = os.environ.get('FIREBASE_API_KEY', '')
 
-# Re-use HTTP connections for maximum API speed
+KEYS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'keys_storage.json')
+
+# Persistent HTTP session
 http_session = requests.Session()
 
 
+def load_local_keys():
+    """Load keys from Railway local disk storage"""
+    if os.path.exists(KEYS_FILE):
+        try:
+            with open(KEYS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print("Local key load error:", e)
+            return {}
+    return {}
+
+
+def save_local_keys(data):
+    """Save keys to Railway local disk storage"""
+    try:
+        with open(KEYS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print("Local key save error:", e)
+
+
 def firebase_get(path):
-    """GET data from Firebase Realtime Database with high performance"""
+    """GET data from Firebase Realtime Database"""
     if not FIREBASE_DB_URL:
         return None
-    url = f"{FIREBASE_DB_URL}/{path}.json"
+    url = f"{FIREBASE_DB_URL.rstrip('/')}/{path}.json"
     try:
         resp = http_session.get(url, timeout=5)
-        return resp.json()
-    except Exception:
-        return None
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception as e:
+        print("Firebase GET error:", e)
+    return None
 
 
 def firebase_put(path, data):
     """PUT data to Firebase Realtime Database"""
     if not FIREBASE_DB_URL:
         return False
-    url = f"{FIREBASE_DB_URL}/{path}.json"
+    url = f"{FIREBASE_DB_URL.rstrip('/')}/{path}.json"
     try:
         resp = http_session.put(url, json=data, timeout=5)
         return resp.status_code == 200
-    except Exception:
+    except Exception as e:
+        print("Firebase PUT error:", e)
         return False
+
+
+def get_stored_key(vk_id):
+    """Try Firebase first, fallback to Railway disk storage"""
+    vk_id_str = str(vk_id)
+    if FIREBASE_DB_URL:
+        fb_data = firebase_get(f"keys/{vk_id_str}")
+        if fb_data and isinstance(fb_data, dict) and 'public_key' in fb_data:
+            return fb_data
+    local_data = load_local_keys()
+    return local_data.get(vk_id_str)
+
+
+def store_key(vk_id, data):
+    """Save to both Railway disk and Firebase (if configured)"""
+    vk_id_str = str(vk_id)
+    local_data = load_local_keys()
+    local_data[vk_id_str] = data
+    save_local_keys(local_data)
+
+    if FIREBASE_DB_URL:
+        firebase_put(f"keys/{vk_id_str}", data)
 
 
 def vk_request(method, token, **params):
@@ -55,6 +103,31 @@ def vk_request(method, token, **params):
         return data.get('response', data.get('error'))
     except Exception as e:
         return {'error': str(e)}
+
+
+def extract_doc_attachment(save_result):
+    """Safely extract doc attachment string from various VK API response formats"""
+    if not save_result or isinstance(save_result, dict) and 'error' in save_result:
+        return None
+    
+    if isinstance(save_result, list) and len(save_result) > 0:
+        d = save_result[0]
+        if isinstance(d, dict) and 'owner_id' in d and 'id' in d:
+            return f"doc{d['owner_id']}_{d['id']}"
+
+    if isinstance(save_result, dict):
+        if 'doc' in save_result:
+            d = save_result['doc']
+            if isinstance(d, dict) and 'owner_id' in d and 'id' in d:
+                return f"doc{d['owner_id']}_{d['id']}"
+        if 'audio_message' in save_result:
+            d = save_result['audio_message']
+            if isinstance(d, dict) and 'owner_id' in d and 'id' in d:
+                return f"doc{d['owner_id']}_{d['id']}"
+        if 'owner_id' in save_result and 'id' in save_result:
+            return f"doc{save_result['owner_id']}_{save_result['id']}"
+            
+    return None
 
 
 HTML = """
@@ -85,19 +158,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 /* Header */
 .header{height:56px;background:#0d0d0d;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #1c1c1c;flex-shrink:0;z-index:20}
-.header-back{width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;margin-right:8px;background:rgba(255,255,255,0.1);color:#fff;flex-shrink:0;transition:background 0.15s}
+.header-back{width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;margin-right:8px;background:rgba(255,255,255,0.08);color:#fff;flex-shrink:0;transition:background 0.15s}
 .header-back:active{background:rgba(255,255,255,0.25)}
 .header-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;margin-right:10px;background:#222;flex-shrink:0;cursor:pointer}
 .header-info{flex:1;min-width:0;cursor:pointer}
 .header-title{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.header-subtitle{font-size:12px;color:#888;display:flex;align-items:center;gap:4px}
+.header-subtitle{font-size:12px;color:#8e8e93;display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.header-subtitle.typing{color:#34c759;font-weight:500;animation:pulseTyping 1.2s infinite alternate}
+@keyframes pulseTyping{from{opacity:0.6}to{opacity:1}}
 .header-actions{display:flex;gap:6px;align-items:center}
 .header-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;color:#aaa;background:rgba(255,255,255,0.05)}
 .header-btn:active{background:rgba(255,255,255,0.15);color:#fff}
 .header-btn.active{color:#fff;background:rgba(255,255,255,0.15)}
 
 /* Dialogs */
-.dialogs-screen{flex:1;display:flex;flex-direction:column;overflow:hidden;animation:fadeIn 0.15s ease-out}
+.dialogs-screen{flex:1;display:flex;flex-direction:column;overflow:hidden;animation:fadeIn 0.15s ease-out;position:relative}
 .dialogs-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .dialog{display:flex;align-items:center;padding:12px 14px;cursor:pointer;border-bottom:1px solid #111}
 .dialog:active{background:#111}
@@ -109,6 +184,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .dialog-bottom{display:flex;align-items:center;gap:6px}
 .dialog-preview{font-size:13px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
 .dialog-unread{min-width:18px;height:18px;border-radius:50%;background:#fff;color:#000;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0}
+
+/* Navigation Drawer (Swipeable Side Menu) */
+.drawer-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:200;opacity:0;pointer-events:none;transition:opacity 0.25s ease}
+.drawer-overlay.active{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;left:0;width:80%;max-width:310px;height:100%;background:#141416;z-index:201;transform:translateX(-100%);transition:transform 0.25s cubic-bezier(0.1,0.9,0.2,1);display:flex;flex-direction:column;box-shadow:5px 0 25px rgba(0,0,0,0.8);border-right:1px solid #222}
+.drawer.active{transform:translateX(0)}
+
+.drawer-header{padding:24px 18px;background:#1c1c1e;border-bottom:1px solid #28282a;display:flex;flex-direction:column;gap:12px;position:relative}
+.drawer-avatar-wrap{position:relative;width:72px;height:72px;margin-bottom:4px}
+.drawer-avatar{width:72px;height:72px;border-radius:50%;object-fit:cover;background:#333;border:2px solid rgba(255,255,255,0.1)}
+.drawer-avatar-edit{position:absolute;bottom:0;right:0;width:26px;height:26px;background:#fff;color:#000;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.4)}
+.drawer-user-name{font-size:18px;font-weight:700;color:#fff}
+.drawer-user-status{font-size:13px;color:#aaa;line-height:1.3;cursor:pointer;display:flex;align-items:center;gap:6px}
+
+.drawer-content{flex:1;overflow-y:auto;padding:12px 10px;display:flex;flex-direction:column;gap:6px}
+.drawer-item{display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:12px;color:#ddd;font-size:15px;font-weight:500;cursor:pointer;transition:background 0.15s}
+.drawer-item:active{background:rgba(255,255,255,0.08);color:#fff}
+.drawer-item svg{color:#aaa}
 
 /* Chat Screen */
 .chat-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;z-index:10;transform:translateX(100%);transition:transform 0.22s cubic-bezier(0.1, 0.9, 0.2, 1)}
@@ -127,7 +220,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .msg-in{align-self:flex-start;background:#1c1c1e;border-bottom-left-radius:4px;color:#fff}
 .msg-out{align-self:flex-end;background:#2c2c2e;border-bottom-right-radius:4px;color:#fff}
 
-/* PURE CIRCLE VIDEO WRAPPER - NO GREY RECTANGLE BACKGROUND */
+/* PURE CIRCLE VIDEO WRAPPER */
 .msg-circle-mode{background:transparent !important;padding:0 !important;border-radius:0 !important;box-shadow:none !important;max-width:200px !important}
 .msg-circle-mode .msg-time{position:absolute;bottom:6px;right:10px;background:rgba(0,0,0,0.55);padding:2px 6px;border-radius:10px;backdrop-filter:blur(4px);z-index:5}
 
@@ -208,7 +301,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .action-sheet-item.danger{color:#ff3b30}
 
 /* Modals */
-.modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px}
+.modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:300;padding:20px}
 .modal-content{background:#161616;border-radius:20px;padding:24px;width:100%;max-width:380px;border:1px solid #282828}
 .modal-title{font-size:18px;font-weight:600;margin-bottom:10px;color:#fff}
 .modal-text{font-size:13px;color:#aaa;margin-bottom:20px;line-height:1.5}
@@ -229,6 +322,60 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <span class="loader"></span>
 <span id="uploadToastText">Загрузка...</span>
 </div>
+
+<!-- Navigation Drawer Overlay & Side Panel -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+<div class="drawer-header">
+<div class="drawer-avatar-wrap">
+<img class="drawer-avatar" id="drawerAvatar" src="" alt="">
+<div class="drawer-avatar-edit" onclick="triggerAvatarSelect()" title="Изменить фото">
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+</div>
+</div>
+<div class="drawer-user-name" id="drawerName">Имя Фамилия</div>
+<div class="drawer-user-status" id="drawerStatus" onclick="openProfileEditModal()">
+<span id="drawerStatusText">Нажмите, чтобы изменить описание...</span>
+<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+</div>
+</div>
+
+<div class="drawer-content">
+<div class="drawer-item" onclick="openProfileEditModal()">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+<span>Редактировать профиль</span>
+</div>
+<div class="drawer-item" onclick="triggerAvatarSelect()">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+<span>Сменить аватар из галереи</span>
+</div>
+<div class="drawer-item" onclick="toggleEncrypt(); closeDrawer();">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+<span>Шифрование E2EE</span>
+</div>
+<div style="flex:1"></div>
+<div class="drawer-item" style="color:#ff3b30" onclick="logout()">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+<span>Выйти из аккаунта</span>
+</div>
+</div>
+</div>
+
+<!-- Profile Edit Modal -->
+<div class="modal hidden" id="profileModal">
+<div class="modal-content">
+<div class="modal-title">Редактирование профиля</div>
+<input type="text" class="token-input" id="editFirstName" placeholder="Имя">
+<input type="text" class="token-input" id="editLastName" placeholder="Фамилия">
+<input type="text" class="token-input" id="editStatusInput" placeholder="Статус (описание)">
+<div style="display:flex;gap:8px;margin-top:8px">
+<button class="btn btn-secondary" style="flex:1" onclick="closeProfileModal()">Отмена</button>
+<button class="btn" style="flex:1" onclick="saveProfileChanges()">Сохранить</button>
+</div>
+</div>
+</div>
+
+<input type="file" class="file-input" id="avatarFileInput" accept="image/*" onchange="uploadAvatarFile(event)">
 
 <!-- Login Screen -->
 <div class="login-screen" id="loginScreen">
@@ -263,8 +410,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <!-- Dialogs Screen -->
 <div class="dialogs-screen hidden" id="dialogsScreen">
 <div class="header">
-<img class="header-avatar" id="headerAvatar" src="" alt="">
-<div class="header-info">
+<img class="header-avatar" id="headerAvatar" src="" alt="" onclick="openDrawer()">
+<div class="header-info" onclick="openDrawer()">
 <div class="header-title" id="headerTitle">VK</div>
 <div class="header-subtitle">Защита активна</div>
 </div>
@@ -282,6 +429,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
 <span>Чаты</span>
 </div>
+<div class="nav-item" onclick="openDrawer()">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+<span>Профиль</span>
+</div>
 <div class="nav-item" onclick="logout()">
 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
 <span>Выход</span>
@@ -292,14 +443,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <!-- Chat Screen -->
 <div class="chat-screen" id="chatScreen">
 <div class="header">
-<!-- VISIBLE BACK BUTTON TO RETURN TO DIALOGS -->
-<div class="header-back" onclick="backToDialogs()" title="Выйти из диалога">
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+<!-- VISIBLE SVG ARROW BACK BUTTON TO RETURN TO DIALOGS -->
+<div class="header-back" onclick="backToDialogs()" title="Выйти из переписки">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+<line x1="19" y1="12" x2="5" y2="12"></line>
+<polyline points="12 19 5 12 12 5"></polyline>
+</svg>
 </div>
 <img class="header-avatar" id="chatAvatar" src="" alt="" onclick="backToDialogs()">
 <div class="header-info" onclick="backToDialogs()">
 <div class="header-title" id="chatTitle"></div>
-<div class="header-subtitle" id="chatEncryptStatus">E2EE Ready</div>
+<div class="header-subtitle" id="chatEncryptStatus">в сети</div>
 </div>
 </div>
 
@@ -401,7 +555,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 <script>
 /* =========================================================================
-   PURE CLIENT-SIDE E2EE ENGINE (PERSISTENT CLOUD KEY PAIR PER VK ID)
+   PURE CLIENT-SIDE E2EE ENGINE & CLOUD PERSISTENCE
    ========================================================================= */
 
 const ENCRYPT_PREFIX = "ENC2:";
@@ -421,6 +575,8 @@ let decryptedCache = {};
 let replyToMsg = null;
 let editMsg = null;
 let selectedMsgForAction = null;
+let typingTimeout = null;
+let peerTypingTimer = null;
 
 function showUploadProgress(text) {
     const toast = document.getElementById('uploadToast');
@@ -486,9 +642,8 @@ async function decryptAESGCM(key, combinedBuf) {
 }
 
 /* 
-   IMPORTANT: KEY RESTORATION / CREATION PER VK USER ID (CLOUDS SYNC)
-   Checks Firebase for existing keypair by VK_ID. If present, decrypts private key using password.
-   If NOT present, generates keypair and uploads encrypted private key + public key to Firebase.
+   PERMANENT KEY RESTORATION & CREATION PER VK USER ID
+   Stores & loads from persistent Firebase DB / Railway server storage.
 */
 async function initClientCrypto() {
     if (!myVkId || !password) return false;
@@ -521,7 +676,7 @@ async function initClientCrypto() {
                 return false;
             }
         } else {
-            // Key not found in Firebase for this VK ID -> Generate new keypair once
+            // Generate deterministic RSA-OAEP keypair for user once and store permanently
             const keyPair = await window.crypto.subtle.generateKey(
                 { name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
                 true, ["encrypt", "decrypt"]
@@ -637,7 +792,6 @@ async function login() {
         myVkId = data.user.id;
         password = pass;
 
-        // PERSIST LOGIN DATA FOR AUTO-LOGIN ON PAGE RELOAD
         localStorage.setItem('vk_token', token);
         localStorage.setItem('vk_pass', pass);
         localStorage.setItem('vk_user', JSON.stringify(data.user));
@@ -648,6 +802,7 @@ async function login() {
             showDialogsScreen();
             loadDialogs();
             startPolling();
+            updateDrawerProfile();
         }
     } finally {
         hideUploadProgress();
@@ -659,6 +814,131 @@ function showDialogsScreen() {
     if (currentUser) {
         document.getElementById('headerAvatar').src = currentUser.photo || '';
         document.getElementById('headerTitle').textContent = currentUser.name || 'VK';
+        updateDrawerProfile();
+    }
+}
+
+function updateDrawerProfile() {
+    if (!currentUser) return;
+    document.getElementById('drawerAvatar').src = currentUser.photo || '';
+    document.getElementById('drawerName').textContent = currentUser.name || '';
+    if (currentUser.status) {
+        document.getElementById('drawerStatusText').textContent = currentUser.status;
+    } else {
+        document.getElementById('drawerStatusText').textContent = 'Нажмите, чтобы изменить описание...';
+    }
+}
+
+/* DRAWER (SWIPEABLE SIDE MENU) LOGIC */
+let touchStartX = 0;
+let touchStartY = 0;
+
+function openDrawer() {
+    document.getElementById('drawerOverlay').classList.add('active');
+    document.getElementById('drawer').classList.add('active');
+}
+
+function closeDrawer() {
+    document.getElementById('drawerOverlay').classList.remove('active');
+    document.getElementById('drawer').classList.remove('active');
+}
+
+// Attach swipe gesture listeners for Drawer
+document.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+}, { passive: true });
+
+document.addEventListener('touchend', (e) => {
+    const diffX = e.changedTouches[0].clientX - touchStartX;
+    const diffY = Math.abs(e.changedTouches[0].clientY - touchStartY);
+
+    if (diffY < 60) {
+        // Swipe Right from left edge opens drawer
+        if (touchStartX < 40 && diffX > 60) {
+            openDrawer();
+        }
+        // Swipe Left closes drawer
+        if (diffX < -60 && document.getElementById('drawer').classList.contains('active')) {
+            closeDrawer();
+        }
+    }
+}, { passive: true });
+
+/* PROFILE EDITING MODALS & API CALLS */
+function openProfileEditModal() {
+    closeDrawer();
+    const nameParts = (currentUser.name || '').split(' ');
+    document.getElementById('editFirstName').value = nameParts[0] || '';
+    document.getElementById('editLastName').value = nameParts.slice(1).join(' ') || '';
+    document.getElementById('editStatusInput').value = currentUser.status || '';
+    document.getElementById('profileModal').classList.remove('hidden');
+}
+
+function closeProfileModal() {
+    document.getElementById('profileModal').classList.add('hidden');
+}
+
+async function saveProfileChanges() {
+    const firstName = document.getElementById('editFirstName').value.trim();
+    const lastName = document.getElementById('editLastName').value.trim();
+    const statusText = document.getElementById('editStatusInput').value.trim();
+
+    showUploadProgress('Сохранение...');
+    try {
+        const res = await fetch('/api/profile/update', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ token, first_name: firstName, last_name: lastName, status: statusText })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            currentUser.name = `${firstName} ${lastName}`.trim();
+            currentUser.status = statusText;
+            localStorage.setItem('vk_user', JSON.stringify(currentUser));
+            document.getElementById('headerTitle').textContent = currentUser.name;
+            updateDrawerProfile();
+            closeProfileModal();
+        } else {
+            alert('Ошибка при сохранении профиля');
+        }
+    } catch(e) {
+        alert('Ошибка связи с сервером');
+    } finally {
+        hideUploadProgress();
+    }
+}
+
+function triggerAvatarSelect() {
+    closeDrawer();
+    document.getElementById('avatarFileInput').click();
+}
+
+async function uploadAvatarFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    showUploadProgress('Обновление аватара...');
+    const formData = new FormData();
+    formData.append('token', token);
+    formData.append('photo', file);
+
+    try {
+        const res = await fetch('/api/profile/upload_avatar', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.ok && data.photo_url) {
+            currentUser.photo = data.photo_url;
+            localStorage.setItem('vk_user', JSON.stringify(currentUser));
+            document.getElementById('headerAvatar').src = data.photo_url;
+            document.getElementById('drawerAvatar').src = data.photo_url;
+        } else {
+            alert('Не удалось обновить аватар: ' + (data.error || 'ошибка VK API'));
+        }
+    } catch(err) {
+        alert('Ошибка при загрузке фото');
+    } finally {
+        hideUploadProgress();
+        e.target.value = '';
     }
 }
 
@@ -694,16 +974,7 @@ async function openChat(index) {
     document.getElementById('chatAvatar').src = d.photo || 'https://vk.com/images/camera_100.png';
     document.getElementById('chatScreen').classList.add('active');
 
-    const peerKey = await getPeerPubKey(currentPeer);
-    const status = document.getElementById('chatEncryptStatus');
-    if (peerKey) {
-        status.textContent = '🔒 Защищено (E2EE)';
-        status.style.color = '#8e8e93';
-    } else {
-        status.textContent = 'Обычный чат';
-        status.style.color = '#888';
-    }
-
+    fetchPeerStatus();
     cancelReplyOrEdit();
     loadMessages();
 }
@@ -712,6 +983,48 @@ function backToDialogs() {
     document.getElementById('chatScreen').classList.remove('active');
     currentPeer = null;
     cancelReplyOrEdit();
+}
+
+/* PEER STATUS & TELEGRAM-LIKE TYPING INDICATOR */
+async function fetchPeerStatus() {
+    if (!currentPeer) return;
+    try {
+        const res = await fetch('/api/peer_status', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ token, peer_id: currentPeer })
+        });
+        const data = await res.json();
+        const statusElem = document.getElementById('chatEncryptStatus');
+        if (data.status_text && !statusElem.classList.contains('typing')) {
+            statusElem.textContent = data.status_text;
+        }
+    } catch(e){}
+}
+
+function triggerTypingSignal() {
+    if (!currentPeer) return;
+    if (typingTimeout) clearTimeout(typingTimeout);
+    
+    fetch('/api/typing', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ token, peer_id: currentPeer })
+    });
+
+    typingTimeout = setTimeout(() => {}, 5000);
+}
+
+function setPeerTypingDisplay() {
+    const statusElem = document.getElementById('chatEncryptStatus');
+    statusElem.textContent = 'печатает...';
+    statusElem.classList.add('typing');
+
+    if (peerTypingTimer) clearTimeout(peerTypingTimer);
+    peerTypingTimer = setTimeout(() => {
+        statusElem.classList.remove('typing');
+        fetchPeerStatus();
+    }, 2500);
 }
 
 async function loadMessages() {
@@ -803,7 +1116,7 @@ function renderMessageItem(container, msg) {
         if (displayText) html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
     }
 
-    // Attachments
+    // Attachments Processing
     if (msg.attachments) {
         for (const a of msg.attachments) {
             if (a.type === 'photo') {
@@ -843,7 +1156,6 @@ function renderMessageItem(container, msg) {
         }
     }
 
-    // PURE TG CIRCLE CLASS ADJUSTMENT (NO GREY CONTAINER RECTANGLE)
     if (isPureCircle) {
         div.classList.add('msg-circle-mode');
     }
@@ -921,7 +1233,6 @@ function closeDeleteModal() {
     document.getElementById('deleteModal').classList.add('hidden');
 }
 
-/* OPTIMISTIC FAST DELETION (INSTANT UI RESPONSE) */
 async function confirmDeleteMessage() {
     if (!selectedMsgForAction) return;
     const msgId = selectedMsgForAction.id;
@@ -930,7 +1241,6 @@ async function confirmDeleteMessage() {
     closeDeleteModal();
     showUploadProgress('Удаление...');
     
-    // INSTANT UI DELETE
     const elem = document.getElementById(`msg-${msgId}`);
     if (elem) elem.closest('.msg-container').remove();
     
@@ -1144,12 +1454,16 @@ function renderDecryptedMedia(elem, data) {
 function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 
 function handleInputTyping() {
-    const val = document.getElementById('msgInput').value.trim();
+    const val = document.getElementById('msgInput').value;
     const sendBtn = document.getElementById('sendBtn');
     const voiceBtn = document.getElementById('voiceRecBtn');
     const circleBtn = document.getElementById('circleRecBtn');
 
-    if (val.length > 0 || editMsg) {
+    if (val.length > 0) {
+        triggerTypingSignal();
+    }
+
+    if (val.trim().length > 0 || editMsg) {
         sendBtn.classList.remove('hidden');
         voiceBtn.classList.add('hidden');
         circleBtn.classList.add('hidden');
@@ -1160,7 +1474,6 @@ function handleInputTyping() {
     }
 }
 
-/* OPTIMISTIC FAST SEND MESSAGE */
 async function sendMessage() {
     const input = document.getElementById('msgInput');
     const text = input.value.trim();
@@ -1246,7 +1559,7 @@ async function sendMediaBlob(blob, filename, mimeType) {
     }
 }
 
-/* VOICE RECORDING */
+/* VOICE RECORDING (.meg) */
 let voiceRecorder = null;
 let voiceChunks = [];
 let voiceTimerInterval = null;
@@ -1257,7 +1570,9 @@ async function startVoiceRecording() {
         const mimeType = getSupportedMimeType('audio');
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         voiceChunks = [];
-        voiceRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+        
+        const recOptions = mimeType ? { mimeType } : undefined;
+        voiceRecorder = new MediaRecorder(stream, recOptions);
 
         voiceRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) voiceChunks.push(e.data); };
         voiceRecorder.start(100);
@@ -1303,7 +1618,7 @@ async function stopAndSendVoiceRecording() {
     voiceRecorder.stop();
 }
 
-/* TG CIRCLE RECORDING */
+/* TG CIRCLE RECORDING (.mec) */
 let circleRecorder = null;
 let circleChunks = [];
 let circleStream = null;
@@ -1334,7 +1649,9 @@ async function startCircleRecording() {
         document.getElementById('circleModal').classList.remove('hidden');
 
         const mimeType = getSupportedMimeType('video');
-        circleRecorder = new MediaRecorder(circleStream, mimeType ? { mimeType } : {});
+        const recOptions = mimeType ? { mimeType } : undefined;
+        circleRecorder = new MediaRecorder(circleStream, recOptions);
+        
         circleRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) circleChunks.push(e.data); };
         circleRecorder.start(100);
 
@@ -1467,7 +1784,12 @@ function toggleEncrypt() {
 
 function startPolling() {
     if (pollInterval) clearInterval(pollInterval);
-    pollInterval = setInterval(() => { if (currentPeer) loadMessages(); }, 2000);
+    pollInterval = setInterval(() => { 
+        if (currentPeer) {
+            loadMessages();
+            fetchPeerStatus();
+        } 
+    }, 2000);
 }
 
 function logout() {
@@ -1522,7 +1844,7 @@ def auth():
     if not token_match:
         return jsonify({'error': 'Токен не найден в ссылке'}), 400
     token = token_match.group(1)
-    user_info = vk_request('users.get', token, fields='photo_100,online')
+    user_info = vk_request('users.get', token, fields='photo_100,online,status')
     if isinstance(user_info, dict) and 'error' in user_info:
         return jsonify({'error': 'Неверный или просроченный токен'}), 400
     user = user_info[0] if isinstance(user_info, list) else user_info
@@ -1532,15 +1854,16 @@ def auth():
             'id': user.get('id'),
             'name': user.get('first_name', '') + ' ' + user.get('last_name', ''),
             'photo': user.get('photo_100', ''),
-            'online': user.get('online', 0)
+            'online': user.get('online', 0),
+            'status': user.get('status', '')
         }
     })
 
 
 @app.route('/api/keys/<vk_id>', methods=['GET'])
 def get_key(vk_id):
-    """Retrieve public key and encrypted private key for user from Firebase"""
-    stored = firebase_get(f"keys/{vk_id}")
+    """Retrieve public key and encrypted private key for user from Railway storage / Firebase"""
+    stored = get_stored_key(vk_id)
     if stored:
         return jsonify(stored)
     return jsonify({'error': 'Not found'}), 404
@@ -1548,10 +1871,10 @@ def get_key(vk_id):
 
 @app.route('/api/keys/<vk_id>', methods=['POST'])
 def save_key(vk_id):
-    """Store public key and locally-encrypted private key in Firebase"""
+    """Store public key and locally-encrypted private key persistently"""
     data = request.json
     data['created_at'] = datetime.now().isoformat()
-    firebase_put(f"keys/{vk_id}", data)
+    store_key(vk_id, data)
     return jsonify({'ok': True})
 
 
@@ -1622,6 +1945,96 @@ def get_messages():
     return jsonify({'messages': messages})
 
 
+@app.route('/api/peer_status', methods=['POST'])
+def peer_status():
+    token = request.json.get('token')
+    peer_id = request.json.get('peer_id')
+    
+    if not peer_id or int(peer_id) < 0:
+        return jsonify({'status_text': 'сообщество'})
+
+    user_info = vk_request('users.get', token, user_ids=peer_id, fields='online,last_seen,sex')
+    if isinstance(user_info, list) and len(user_info) > 0:
+        u = user_info[0]
+        online = u.get('online', 0)
+        sex = u.get('sex', 1)  # 1 = female, 2 = male
+        
+        if online == 1:
+            return jsonify({'status_text': 'в сети', 'online': True})
+            
+        last_seen = u.get('last_seen', {})
+        time_sec = last_seen.get('time')
+        if time_sec:
+            dt = datetime.fromtimestamp(time_sec)
+            now = datetime.now()
+            verb = "была" if sex == 1 else "был"
+            
+            if dt.date() == now.date():
+                formatted_time = dt.strftime('%H:%M')
+                return jsonify({'status_text': f'{verb} в сети в {formatted_time}', 'online': False})
+            elif (now.date() - dt.date()).days == 1:
+                formatted_time = dt.strftime('%H:%M')
+                return jsonify({'status_text': f'{verb} в сети вчера в {formatted_time}', 'online': False})
+            else:
+                formatted_date = dt.strftime('%d.%m в %H:%M')
+                return jsonify({'status_text': f'{verb} в сети {formatted_date}', 'online': False})
+
+    return jsonify({'status_text': 'офлайн', 'online': False})
+
+
+@app.route('/api/typing', methods=['POST'])
+def set_typing():
+    token = request.json.get('token')
+    peer_id = request.json.get('peer_id')
+    if token and peer_id:
+        vk_request('messages.setActivity', token, peer_id=peer_id, type='typing')
+    return jsonify({'ok': True})
+
+
+@app.route('/api/profile/update', methods=['POST'])
+def update_profile():
+    token = request.json.get('token')
+    first_name = request.json.get('first_name')
+    last_name = request.json.get('last_name')
+    status_text = request.json.get('status', '')
+
+    res_info = vk_request('account.saveProfileInfo', token, first_name=first_name, last_name=last_name)
+    vk_request('status.set', token, text=status_text)
+    
+    return jsonify({'ok': True})
+
+
+@app.route('/api/profile/upload_avatar', methods=['POST'])
+def upload_avatar():
+    token = request.form.get('token')
+    photo_file = request.files.get('photo')
+
+    if not photo_file:
+        return jsonify({'error': 'Файл не выбран'}), 400
+
+    upload_server = vk_request('photos.getOwnerPhotoUploadServer', token)
+    if isinstance(upload_server, dict) and 'error' in upload_server:
+        return jsonify(upload_server), 400
+
+    upload_url = upload_server.get('upload_url')
+    files = {'photo': (photo_file.filename, photo_file.read(), photo_file.content_type or 'image/jpeg')}
+    upload_resp = http_session.post(upload_url, files=files, timeout=15).json()
+
+    save_result = vk_request('photos.saveOwnerPhoto', token,
+        server=upload_resp.get('server'),
+        photo=upload_resp.get('photo'),
+        hash=upload_resp.get('hash')
+    )
+
+    if isinstance(save_result, dict) and 'photo_hash' in save_result:
+        # Get updated user profile photo
+        u_info = vk_request('users.get', token, fields='photo_100')
+        if isinstance(u_info, list) and len(u_info) > 0:
+            return jsonify({'ok': True, 'photo_url': u_info[0].get('photo_100')})
+
+    return jsonify({'ok': True})
+
+
 @app.route('/api/send', methods=['POST'])
 def send_message():
     token = request.json.get('token')
@@ -1674,9 +2087,9 @@ def upload_encrypted_doc():
     upload_resp = http_session.post(upload_url, files=files, timeout=15).json()
 
     save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=file.filename)
-    if isinstance(save_result, dict) and 'doc' in save_result:
-        doc = save_result['doc']
-        attachment = f"doc{doc['owner_id']}_{doc['id']}"
+    attachment = extract_doc_attachment(save_result)
+
+    if attachment:
         vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=0)
         return jsonify({'ok': True})
 
@@ -1725,9 +2138,9 @@ def upload_normal():
     upload_resp = http_session.post(upload_url, files=files, timeout=15).json()
 
     save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=filename)
-    if isinstance(save_result, dict) and 'doc' in save_result:
-        doc = save_result['doc']
-        attachment = f"doc{doc['owner_id']}_{doc['id']}"
+    attachment = extract_doc_attachment(save_result)
+
+    if attachment:
         vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=0)
         return jsonify({'ok': True})
 
