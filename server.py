@@ -1,8 +1,8 @@
 import os
 import re
 import json
-import base64
-import hashlib
+import random
+import threading
 import requests
 from io import BytesIO
 from datetime import datetime
@@ -19,12 +19,18 @@ FIREBASE_API_KEY = os.environ.get('FIREBASE_API_KEY', '')
 
 KEYS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'keys_storage.json')
 
-# Persistent HTTP session
-http_session = requests.Session()
+# Thread-safe HTTP sessions
+_session_local = threading.local()
+
+
+def get_session():
+    if not hasattr(_session_local, 'session'):
+        _session_local.session = requests.Session()
+    return _session_local.session
 
 
 def load_local_keys():
-    """Load keys from Railway local disk storage"""
+    """Load keys from local disk storage"""
     if os.path.exists(KEYS_FILE):
         try:
             with open(KEYS_FILE, 'r', encoding='utf-8') as f:
@@ -36,7 +42,7 @@ def load_local_keys():
 
 
 def save_local_keys(data):
-    """Save keys to Railway local disk storage"""
+    """Save keys to local disk storage"""
     try:
         with open(KEYS_FILE, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
@@ -45,12 +51,14 @@ def save_local_keys(data):
 
 
 def firebase_get(path):
-    """GET data from Firebase Realtime Database"""
+    """GET data from Firebase Realtime Database with Auth Parameter"""
     if not FIREBASE_DB_URL:
         return None
     url = f"{FIREBASE_DB_URL.rstrip('/')}/{path}.json"
+    if FIREBASE_API_KEY:
+        url += f"?auth={FIREBASE_API_KEY}"
     try:
-        resp = http_session.get(url, timeout=5)
+        resp = get_session().get(url, timeout=5)
         if resp.status_code == 200:
             return resp.json()
     except Exception as e:
@@ -59,12 +67,14 @@ def firebase_get(path):
 
 
 def firebase_put(path, data):
-    """PUT data to Firebase Realtime Database"""
+    """PUT data to Firebase Realtime Database with Auth Parameter"""
     if not FIREBASE_DB_URL:
         return False
     url = f"{FIREBASE_DB_URL.rstrip('/')}/{path}.json"
+    if FIREBASE_API_KEY:
+        url += f"?auth={FIREBASE_API_KEY}"
     try:
-        resp = http_session.put(url, json=data, timeout=5)
+        resp = get_session().put(url, json=data, timeout=5)
         return resp.status_code == 200
     except Exception as e:
         print("Firebase PUT error:", e)
@@ -72,7 +82,7 @@ def firebase_put(path, data):
 
 
 def get_stored_key(vk_id):
-    """Try Firebase first, fallback to Railway disk storage"""
+    """Try Firebase first, fallback to disk storage"""
     vk_id_str = str(vk_id)
     if FIREBASE_DB_URL:
         fb_data = firebase_get(f"keys/{vk_id_str}")
@@ -83,7 +93,7 @@ def get_stored_key(vk_id):
 
 
 def store_key(vk_id, data):
-    """Save to both Railway disk and Firebase (if configured)"""
+    """Save to both local disk and Firebase"""
     vk_id_str = str(vk_id)
     local_data = load_local_keys()
     local_data[vk_id_str] = data
@@ -94,11 +104,11 @@ def store_key(vk_id, data):
 
 
 def vk_request(method, token, **params):
-    """Proxy request to VK API with persistent HTTP session"""
+    """Proxy request to VK API with thread-safe HTTP session"""
     params['access_token'] = token
     params['v'] = API_VERSION
     try:
-        resp = http_session.get(f"{VK_API}/{method}", params=params, timeout=10)
+        resp = get_session().get(f"{VK_API}/{method}", params=params, timeout=10)
         data = resp.json()
         return data.get('response', data.get('error'))
     except Exception as e:
@@ -106,7 +116,7 @@ def vk_request(method, token, **params):
 
 
 def extract_doc_attachment(save_result):
-    """Safely extract doc attachment string from various VK API response formats"""
+    """Safely extract doc attachment string from VK API response"""
     if not save_result or (isinstance(save_result, dict) and 'error' in save_result):
         return None
     
@@ -136,7 +146,7 @@ HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>M.E.O.W - E2EE Messenger</title>
+<title>VK Meow - E2EE Messenger</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#000;color:#fff;height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
@@ -144,7 +154,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 /* Login Screen */
 .login-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:800;animation:fadeIn 0.2s ease-out}
-.login-screen h1{font-size:28px;margin-bottom:6px;font-weight:800;color:#fff;letter-spacing:1px}
+.login-screen h1{font-size:32px;margin-bottom:6px;font-weight:900;color:#fff;letter-spacing:1.5px}
 .login-screen p{color:#888;margin-bottom:24px;font-size:13px;text-align:center;max-width:320px}
 .badge-e2e{background:#1c1c1e;color:#8e8e93;border:1px solid #2c2c2e;padding:6px 12px;border-radius:14px;font-size:12px;font-weight:600;margin-bottom:20px;display:inline-flex;align-items:center;gap:6px}
 .token-input,.pass-input{width:100%;max-width:360px;padding:14px 16px;border:none;border-radius:14px;background:#161616;color:#fff;font-size:15px;margin-bottom:12px;outline:none;border:1px solid #2c2c2c;transition:border-color 0.2s}
@@ -153,17 +163,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .btn{width:100%;max-width:360px;padding:14px;border:none;border-radius:14px;background:#fff;color:#000;font-size:16px;font-weight:600;cursor:pointer;margin-bottom:8px;transition:all 0.1s active}
 .btn:active{transform:scale(0.97);opacity:.85}
 .btn-secondary{background:transparent;color:#fff;border:1px solid #333}
-.btn-green{background:#2c2c2e;color:#fff;border:1px solid #3a3a3c}
 .btn-danger{background:#ff3b30;color:#fff}
 
 /* Header */
 .header{height:56px;background:#0d0d0d;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #1c1c1c;flex-shrink:0}
+.header-menu-btn{width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;margin-right:10px;background:rgba(255,255,255,0.08);color:#fff;flex-shrink:0}
+.header-menu-btn:active{background:rgba(255,255,255,0.2)}
 .header-back{width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;margin-right:6px;background:rgba(255,255,255,0.1);color:#fff;flex-shrink:0}
 .header-back svg{width:22px;height:22px;stroke:#fff;stroke-width:2.5px;fill:none}
 .header-back:active{background:rgba(255,255,255,0.25)}
 .header-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;margin-right:10px;background:#222;flex-shrink:0;cursor:pointer}
 .header-info{flex:1;min-width:0;cursor:pointer}
+
+/* LARGER TITLE FOR VK MEOW */
+.header-title-main{font-size:20px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:0.8px;color:#fff}
 .header-title{font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:0.5px}
+
 .header-subtitle{font-size:12px;color:#8e8e93;display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .header-subtitle.typing{color:#34c759;font-weight:500;animation:pulseTyping 1.2s infinite alternate}
 @keyframes pulseTyping{from{opacity:0.6}to{opacity:1}}
@@ -186,7 +201,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .dialog-preview{font-size:13px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
 .dialog-unread{min-width:18px;height:18px;border-radius:50%;background:#fff;color:#000;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0}
 
-/* Navigation Drawer (Swipeable Side Menu) */
+/* Navigation Drawer */
 .drawer-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:400;opacity:0;pointer-events:none;transition:opacity 0.25s ease}
 .drawer-overlay.active{opacity:1;pointer-events:auto}
 .drawer{position:fixed;top:0;left:0;width:82%;max-width:320px;height:100%;background:#141416;z-index:401;transform:translateX(-100%);transition:transform 0.25s cubic-bezier(0.1,0.9,0.2,1);display:flex;flex-direction:column;box-shadow:5px 0 25px rgba(0,0,0,0.8);border-right:1px solid #222}
@@ -382,7 +397,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 <!-- Login Screen -->
 <div class="login-screen" id="loginScreen">
-<h1>M.E.O.W</h1>
+<h1>VK Meow</h1>
 <div class="badge-e2e">
 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
 100% Client-Side E2EE Messenger
@@ -413,10 +428,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <!-- Dialogs Screen -->
 <div class="dialogs-screen hidden" id="dialogsScreen">
 <div class="header">
-<img class="header-avatar" id="headerAvatar" src="" alt="" onclick="openDrawer()">
+<!-- DRAWER / MENU ICON BUTTON INSTEAD OF USER AVATAR -->
+<div class="header-menu-btn" onclick="openDrawer()" title="Меню">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+</div>
 <div class="header-info" onclick="openDrawer()">
-<!-- DIALOGS HEADER TITLE IS M.E.O.W -->
-<div class="header-title" id="dialogsHeaderTitle">M.E.O.W</div>
+<!-- VK MEOW TITLE LARGER -->
+<div class="header-title-main" id="dialogsHeaderTitle">VK Meow</div>
 <div class="header-subtitle" id="dialogsHeaderSubtitle">Сообщения</div>
 </div>
 <div class="header-actions">
@@ -610,6 +628,7 @@ function b64ToBuf(b64) {
     return bytes.buffer;
 }
 
+/* HIGH-SECURITY PBKDF2 (600,000 ITERATIONS) */
 async function deriveMasterKey(pass, saltStr) {
     const enc = new TextEncoder();
     const keyMaterial = await window.crypto.subtle.importKey(
@@ -619,7 +638,7 @@ async function deriveMasterKey(pass, saltStr) {
         {
             name: "PBKDF2",
             salt: enc.encode(saltStr),
-            iterations: 100000,
+            iterations: 600000,
             hash: "SHA-256"
         },
         keyMaterial,
@@ -817,8 +836,7 @@ async function login() {
 function showDialogsScreen() {
     document.getElementById('dialogsScreen').classList.remove('hidden');
     if (currentUser) {
-        document.getElementById('headerAvatar').src = currentUser.photo || '';
-        document.getElementById('dialogsHeaderTitle').textContent = 'M.E.O.W';
+        document.getElementById('dialogsHeaderTitle').textContent = 'VK Meow';
         document.getElementById('dialogsHeaderSubtitle').textContent = 'Сообщения';
         updateDrawerProfile();
     }
@@ -929,7 +947,6 @@ async function uploadAvatarFile(e) {
         if (data.ok && data.photo_url) {
             currentUser.photo = data.photo_url;
             localStorage.setItem('vk_user', JSON.stringify(currentUser));
-            document.getElementById('headerAvatar').src = data.photo_url;
             document.getElementById('drawerAvatar').src = data.photo_url;
         } else {
             alert('Не удалось обновить аватар: ' + (data.error || 'ошибка VK API'));
@@ -1933,7 +1950,6 @@ def auth():
 
 @app.route('/api/keys/<vk_id>', methods=['GET'])
 def get_key(vk_id):
-    """Retrieve public key and encrypted private key for user from Railway storage / Firebase"""
     stored = get_stored_key(vk_id)
     if stored:
         return jsonify(stored)
@@ -1942,7 +1958,6 @@ def get_key(vk_id):
 
 @app.route('/api/keys/<vk_id>', methods=['POST'])
 def save_key(vk_id):
-    """Store public key and locally-encrypted private key persistently"""
     data = request.json
     data['created_at'] = datetime.now().isoformat()
     store_key(vk_id, data)
@@ -2092,7 +2107,7 @@ def upload_avatar():
 
     upload_url = upload_server.get('upload_url')
     files = {'photo': (photo_file.filename, photo_file.read(), photo_file.content_type or 'image/jpeg')}
-    upload_resp = http_session.post(upload_url, files=files, timeout=15).json()
+    upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
 
     save_result = vk_request('photos.saveOwnerPhoto', token,
         server=upload_resp.get('server'),
@@ -2115,7 +2130,7 @@ def send_message():
     text = request.json.get('text', '')
     reply_to = request.json.get('reply_to')
     
-    params = {'peer_id': peer_id, 'message': text, 'random_id': 0}
+    params = {'peer_id': peer_id, 'message': text, 'random_id': random.randint(1, 2147483647)}
     if reply_to:
         params['reply_to'] = reply_to
 
@@ -2157,13 +2172,13 @@ def upload_encrypted_doc():
 
     upload_url = upload_server.get('upload_url')
     files = {'file': (file.filename, file.read(), 'application/octet-stream')}
-    upload_resp = http_session.post(upload_url, files=files, timeout=15).json()
+    upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
 
     save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=file.filename)
     attachment = extract_doc_attachment(save_result)
 
     if attachment:
-        vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=0)
+        vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
         return jsonify({'ok': True})
 
     return jsonify({'error': 'Upload failed'}), 400
@@ -2188,7 +2203,7 @@ def upload_normal():
 
         upload_url = upload_server.get('upload_url')
         files = {'photo': (filename, BytesIO(file_bytes), file.content_type or 'image/jpeg')}
-        upload_resp = http_session.post(upload_url, files=files, timeout=15).json()
+        upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
 
         save_result = vk_request('photos.saveMessagesPhoto', token,
             photo=upload_resp.get('photo'),
@@ -2199,7 +2214,7 @@ def upload_normal():
         if isinstance(save_result, list) and len(save_result) > 0:
             photo = save_result[0]
             attachment = f"photo{photo['owner_id']}_{photo['id']}"
-            vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=0)
+            vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
             return jsonify({'ok': True})
 
     upload_server = vk_request('docs.getMessagesUploadServer', token, type='doc', peer_id=peer_id)
@@ -2208,13 +2223,13 @@ def upload_normal():
 
     upload_url = upload_server.get('upload_url')
     files = {'file': (filename, BytesIO(file_bytes), file.content_type or 'application/octet-stream')}
-    upload_resp = http_session.post(upload_url, files=files, timeout=15).json()
+    upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
 
     save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=filename)
     attachment = extract_doc_attachment(save_result)
 
     if attachment:
-        vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=0)
+        vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
         return jsonify({'ok': True})
 
     return jsonify({'error': 'Upload failed'}), 400
@@ -2226,7 +2241,7 @@ def proxy_file():
     if not url:
         return jsonify({'error': 'No URL'}), 400
     try:
-        resp = http_session.get(url, timeout=15)
+        resp = get_session().get(url, timeout=15)
         return Response(resp.content, mimetype='application/octet-stream')
     except Exception as e:
         return jsonify({'error': str(e)}), 500
