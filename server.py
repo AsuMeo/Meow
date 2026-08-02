@@ -136,7 +136,7 @@ HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>VK Client - E2EE</title>
+<title>M.E.O.W - E2EE Messenger</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#000;color:#fff;height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
@@ -144,7 +144,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 /* Login Screen */
 .login-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:800;animation:fadeIn 0.2s ease-out}
-.login-screen h1{font-size:26px;margin-bottom:6px;font-weight:700;color:#fff}
+.login-screen h1{font-size:28px;margin-bottom:6px;font-weight:800;color:#fff;letter-spacing:1px}
 .login-screen p{color:#888;margin-bottom:24px;font-size:13px;text-align:center;max-width:320px}
 .badge-e2e{background:#1c1c1e;color:#8e8e93;border:1px solid #2c2c2e;padding:6px 12px;border-radius:14px;font-size:12px;font-weight:600;margin-bottom:20px;display:inline-flex;align-items:center;gap:6px}
 .token-input,.pass-input{width:100%;max-width:360px;padding:14px 16px;border:none;border-radius:14px;background:#161616;color:#fff;font-size:15px;margin-bottom:12px;outline:none;border:1px solid #2c2c2c;transition:border-color 0.2s}
@@ -163,7 +163,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .header-back:active{background:rgba(255,255,255,0.25)}
 .header-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;margin-right:10px;background:#222;flex-shrink:0;cursor:pointer}
 .header-info{flex:1;min-width:0;cursor:pointer}
-.header-title{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.header-title{font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:0.5px}
 .header-subtitle{font-size:12px;color:#8e8e93;display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .header-subtitle.typing{color:#34c759;font-weight:500;animation:pulseTyping 1.2s infinite alternate}
 @keyframes pulseTyping{from{opacity:0.6}to{opacity:1}}
@@ -210,7 +210,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .messages-wrapper{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column}
 .messages{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch}
 
-/* Message styling - RESTORED ORIGINAL COLORS (#1c1c1e and #2c2c2e) */
+/* Message styling - STRICT ORIGINAL COLORS (#1c1c1e and #2c2c2e) */
 .msg-container{position:relative;display:flex;width:100%;align-items:flex-end;touch-action:pan-y;margin-bottom:2px}
 .msg-swipe-bg{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;width:40px;opacity:0;transition:opacity 0.15s;color:#8e8e93;z-index:1}
 .msg-swipe-right{right:-40px}
@@ -218,9 +218,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .msg{max-width:82%;padding:8px 12px;border-radius:18px;font-size:14px;line-height:1.4;word-wrap:break-word;position:relative;animation:msgAppear 0.15s ease-out}
 @keyframes msgAppear{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
-/* INCOMING BUBBLE (ORIGINAL) */
+/* INCOMING BUBBLE (#1c1c1e) */
 .msg-in{align-self:flex-start;background:#1c1c1e;border-bottom-left-radius:4px;color:#fff}
-/* OUTGOING BUBBLE (ORIGINAL) */
+/* OUTGOING BUBBLE (#2c2c2e) */
 .msg-out{align-self:flex-end;background:#2c2c2e;border-bottom-right-radius:4px;color:#fff}
 
 /* PURE CIRCLE VIDEO WRAPPER */
@@ -237,12 +237,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 .decrypting-shimmer{color:#888;font-style:italic}
 
-/* TG Circle Video Message (.mec) */
+/* TG Circle Video Message (.mkru) */
 .tg-circle-container{width:200px;height:200px;position:relative;border-radius:50%;overflow:hidden;margin:0;background:#111;box-shadow:0 4px 15px rgba(0,0,0,0.5);transform:translateZ(0)}
 .tg-circle-video{width:100%;height:100%;object-fit:cover;border-radius:50%;cursor:pointer;display:block}
 .tg-circle-overlay{position:absolute;top:0;left:0;width:100%;height:100%;border-radius:50%;pointer-events:none;box-shadow:inset 0 0 0 2px rgba(255,255,255,0.15)}
 
-/* TG Voice Message (.meg) */
+/* TG Voice Message (.mgs) */
 .tg-voice-container{display:flex;align-items:center;gap:10px;padding:4px 0;width:220px;user-select:none}
 .tg-voice-play-btn{width:38px;height:38px;border-radius:50%;background:#fff;color:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
 .tg-voice-play-btn:active{transform:scale(0.92)}
@@ -252,7 +252,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .tg-voice-bar.active{background:#fff}
 .tg-voice-info{display:flex;justify-content:space-between;font-size:10px;color:#aaa}
 
-/* Media Attachments - NO OUTLINE / BORDER AT ALL */
+/* Media Attachments - ABSOLUTELY NO BORDER / OUTLINE */
 .msg-photo{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;object-fit:cover;cursor:pointer;background:#111;border:none!important;outline:none!important;box-shadow:none!important}
 .msg-video{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;background:#000;border:none!important;outline:none!important;box-shadow:none!important}
 .msg-file{background:rgba(255,255,255,.05);padding:10px;border-radius:12px;margin-top:6px;display:flex;align-items:center;gap:10px;cursor:pointer}
@@ -382,10 +382,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 <!-- Login Screen -->
 <div class="login-screen" id="loginScreen">
-<h1>VK Client E2EE</h1>
+<h1>M.E.O.W</h1>
 <div class="badge-e2e">
 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-100% Client-Side E2EE Cloud
+100% Client-Side E2EE Messenger
 </div>
 <p>Сквозное шифрование. Приятный моментальный интерфейс без задержек.</p>
 <button class="btn btn-secondary" onclick="getToken()">1. Получить токен VK</button>
@@ -415,8 +415,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <div class="header">
 <img class="header-avatar" id="headerAvatar" src="" alt="" onclick="openDrawer()">
 <div class="header-info" onclick="openDrawer()">
-<div class="header-title" id="headerTitle">VK</div>
-<div class="header-subtitle">Сообщения</div>
+<!-- DIALOGS HEADER TITLE IS M.E.O.W -->
+<div class="header-title" id="dialogsHeaderTitle">M.E.O.W</div>
+<div class="header-subtitle" id="dialogsHeaderSubtitle">Сообщения</div>
 </div>
 <div class="header-actions">
 <div class="header-btn active" id="encryptBtn" onclick="toggleEncrypt()" title="Локальное шифрование">
@@ -483,11 +484,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 <textarea class="message-input" id="msgInput" placeholder="Сообщение..." rows="1" oninput="handleInputTyping()"></textarea>
 
-<button class="media-rec-btn" id="voiceRecBtn" onclick="startVoiceRecording()" title="Голосовое сообщение (.meg)">
+<button class="media-rec-btn" id="voiceRecBtn" onclick="startVoiceRecording()" title="Голосовое сообщение (.mgs)">
 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
 </button>
 
-<button class="media-rec-btn" id="circleRecBtn" onclick="startCircleRecording()" title="Кружочек (.mec)">
+<button class="media-rec-btn" id="circleRecBtn" onclick="startCircleRecording()" title="Кружочек (.mkru)">
 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
 </button>
 
@@ -727,6 +728,9 @@ async function getPeerPubKey(peerId) {
 }
 
 async function clientEncryptData(peerKey, plainBuf) {
+    if (!localKeyPair) {
+        await initClientCrypto();
+    }
     const sessionKey = await window.crypto.subtle.generateKey(
         { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]
     );
@@ -745,6 +749,9 @@ async function clientEncryptData(peerKey, plainBuf) {
 }
 
 async function clientDecryptData(encObj) {
+    if (!localKeyPair) {
+        await initClientCrypto();
+    }
     if (!localKeyPair) return null;
     let rawSession = null;
 
@@ -811,7 +818,8 @@ function showDialogsScreen() {
     document.getElementById('dialogsScreen').classList.remove('hidden');
     if (currentUser) {
         document.getElementById('headerAvatar').src = currentUser.photo || '';
-        document.getElementById('headerTitle').textContent = currentUser.name || 'VK';
+        document.getElementById('dialogsHeaderTitle').textContent = 'M.E.O.W';
+        document.getElementById('dialogsHeaderSubtitle').textContent = 'Сообщения';
         updateDrawerProfile();
     }
 }
@@ -889,7 +897,6 @@ async function saveProfileChanges() {
             if (firstName || lastName) currentUser.name = `${firstName} ${lastName}`.trim();
             currentUser.status = statusText;
             localStorage.setItem('vk_user', JSON.stringify(currentUser));
-            document.getElementById('headerTitle').textContent = currentUser.name;
             updateDrawerProfile();
             closeProfileModal();
         } else {
@@ -964,7 +971,7 @@ async function loadDialogs() {
 async function openChat(index) {
     const d = dialogsData[index]; currentPeer = d.id;
     
-    // Set PEER info in header
+    // Set PEER info in chat header
     document.getElementById('chatTitle').textContent = d.name;
     document.getElementById('chatAvatar').src = d.photo || 'https://vk.com/images/camera_100.png';
     document.getElementById('chatScreen').classList.add('active');
@@ -1127,15 +1134,21 @@ function renderMessageItem(container, msg) {
                 const title = (doc.title || '').toLowerCase();
                 const ext = (doc.ext || '').toLowerCase();
 
-                if (title.startsWith('enc_') || ext === 'meow' || ext === 'mur' || ext === 'enc' || ext === 'mec' || ext === 'meg' || title.endsWith('.mec') || title.endsWith('.meg')) {
+                const isCustomEnc = title.startsWith('enc_') || 
+                    ext === 'meow' || ext === 'mer' || ext === 'mkru' || ext === 'mgs' ||
+                    ext === 'enc' || ext === 'mec' || ext === 'meg' || ext === 'mur' ||
+                    title.endsWith('.meow') || title.endsWith('.mer') || title.endsWith('.mkru') || title.endsWith('.mgs') ||
+                    title.endsWith('.mec') || title.endsWith('.meg');
+
+                if (isCustomEnc) {
                     const docId = `doc_${doc.owner_id}_${doc.id}`;
                     
-                    if (ext === 'mec' || title.endsWith('.mec')) {
+                    if (ext === 'mkru' || ext === 'mec' || title.endsWith('.mkru') || title.endsWith('.mec')) {
                         isPureCircle = true;
                         html += `<div class="tg-circle-container" id="${docId}">
                             <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#888;font-size:12px"><span class="loader"></span></div>
                         </div>`;
-                    } else if (ext === 'meg' || title.endsWith('.meg')) {
+                    } else if (ext === 'mgs' || ext === 'meg' || title.endsWith('.mgs') || title.endsWith('.meg')) {
                         html += `<div class="tg-voice-container" id="${docId}">
                             <div class="tg-voice-play-btn"><span class="loader"></span></div>
                             <div class="tg-voice-wave-wrap">
@@ -1314,8 +1327,8 @@ async function processEncryptedAttachment(elemId, url, extInfo) {
         const resp = await fetch(`/api/proxy_file?url=${encodeURIComponent(url)}`);
         const encArrayBuf = await resp.arrayBuffer();
 
-        try {
-            if (encArrayBuf.byteLength > 4) {
+        if (encArrayBuf.byteLength > 4) {
+            try {
                 const view = new DataView(encArrayBuf);
                 const headerLen = view.getUint32(0);
                 if (headerLen > 0 && headerLen < encArrayBuf.byteLength - 4) {
@@ -1340,14 +1353,16 @@ async function processEncryptedAttachment(elemId, url, extInfo) {
                         }
                     }
                 }
+            } catch(eParse) {
+                console.log("Not encrypted binary file or header parse failed:", eParse);
             }
-        } catch(eParse) {
-            console.log("Not encrypted binary file, fallback to direct proxy");
         }
 
         // Direct fallback if unencrypted or plain attachment
         let fallbackMime = 'video/webm';
-        if (extInfo.includes('meg') || extInfo.includes('audio')) fallbackMime = 'audio/webm';
+        if (extInfo.includes('mgs') || extInfo.includes('meg') || extInfo.includes('audio')) fallbackMime = 'audio/webm';
+        else if (extInfo.includes('meow') || extInfo.includes('image')) fallbackMime = 'image/jpeg';
+        else if (extInfo.includes('mer') || extInfo.includes('video')) fallbackMime = 'video/mp4';
         
         decryptedCache[elemId] = { blobUrl: `/api/proxy_file?url=${encodeURIComponent(url)}`, mime: fallbackMime, name: extInfo, extInfo };
         renderDecryptedMedia(elem, decryptedCache[elemId]);
@@ -1359,8 +1374,21 @@ async function processEncryptedAttachment(elemId, url, extInfo) {
 }
 
 function renderDecryptedMedia(elem, data) {
-    const isCircle = (data.name && data.name.endsWith('.mec')) || data.mime.includes('mec') || (data.extInfo && data.extInfo.includes('mec'));
-    const isVoice = (data.name && data.name.endsWith('.meg')) || data.mime.includes('meg') || (data.extInfo && data.extInfo.includes('meg'));
+    const isCircle = (data.name && (data.name.endsWith('.mkru') || data.name.endsWith('.mec'))) || 
+        data.mime.includes('mkru') || data.mime.includes('mec') || 
+        (data.extInfo && (data.extInfo.includes('mkru') || data.extInfo.includes('mec')));
+
+    const isVoice = (data.name && (data.name.endsWith('.mgs') || data.name.endsWith('.meg'))) || 
+        data.mime.includes('mgs') || data.mime.includes('meg') || 
+        (data.extInfo && (data.extInfo.includes('mgs') || data.extInfo.includes('meg')));
+
+    const isPhoto = (data.name && data.name.endsWith('.meow')) || 
+        data.mime.startsWith('image/') || 
+        (data.extInfo && (data.extInfo.includes('meow') || data.extInfo.includes('image')));
+
+    const isVideo = (data.name && data.name.endsWith('.mer')) || 
+        data.mime.startsWith('video/') || 
+        (data.extInfo && (data.extInfo.includes('mer') || data.extInfo.includes('video')));
 
     if (isCircle) {
         const container = document.createElement('div');
@@ -1446,12 +1474,12 @@ function renderDecryptedMedia(elem, data) {
 
         elem.replaceWith(container);
 
-    } else if (data.mime.startsWith('image/')) {
+    } else if (isPhoto) {
         const img = document.createElement('img');
         img.className = 'msg-photo';
         img.src = data.blobUrl;
         elem.replaceWith(img);
-    } else if (data.mime.startsWith('video/')) {
+    } else if (isVideo) {
         const vid = document.createElement('video');
         vid.className = 'msg-video';
         vid.src = data.blobUrl;
@@ -1504,11 +1532,15 @@ async function sendMessage() {
 
     let sendText = text;
     if (encryptionEnabled) {
-        const peerKey = await getPeerPubKey(currentPeer);
-        if (peerKey) {
-            const plainBuf = new TextEncoder().encode(text).buffer;
-            const encObj = await clientEncryptData(peerKey, plainBuf);
-            sendText = ENCRYPT_PREFIX + JSON.stringify(encObj);
+        try {
+            const peerKey = await getPeerPubKey(currentPeer);
+            if (peerKey) {
+                const plainBuf = new TextEncoder().encode(text).buffer;
+                const encObj = await clientEncryptData(peerKey, plainBuf);
+                sendText = ENCRYPT_PREFIX + JSON.stringify(encObj);
+            }
+        } catch(eEnc) {
+            console.error("E2EE encryption error, fallback to plain text:", eEnc);
         }
     }
 
@@ -1531,6 +1563,8 @@ async function sendMessage() {
                 body: JSON.stringify(payload)
             });
         }
+    } catch(errSend) {
+        alert("Ошибка сети при отправке!");
     } finally {
         hideUploadProgress();
         loadMessages();
@@ -1556,10 +1590,14 @@ async function sendMediaBlob(blob, filename, mimeType) {
     try {
         let sent = false;
         if (encryptionEnabled) {
-            const peerKey = await getPeerPubKey(currentPeer);
-            if (peerKey) {
-                await uploadEncryptedMedia(blob, filename, mimeType);
-                sent = true;
+            try {
+                const peerKey = await getPeerPubKey(currentPeer);
+                if (peerKey) {
+                    await uploadEncryptedMedia(blob, filename, mimeType);
+                    sent = true;
+                }
+            } catch(eEnc) {
+                console.error("Encrypted upload failed, fallback to normal:", eEnc);
             }
         }
 
@@ -1568,7 +1606,10 @@ async function sendMediaBlob(blob, filename, mimeType) {
             formData.append('token', token);
             formData.append('peer_id', currentPeer);
             formData.append('file', blob, filename);
-            await fetch('/api/upload_normal', { method: 'POST', body: formData });
+            const res = await fetch('/api/upload_normal', { method: 'POST', body: formData });
+            if (!res.ok) {
+                throw new Error("Ошибка при не зашифрованной загрузке файла");
+            }
         }
     } catch(e) {
         alert('Ошибка при отправке: ' + (e.message || e));
@@ -1578,7 +1619,7 @@ async function sendMediaBlob(blob, filename, mimeType) {
     }
 }
 
-/* VOICE RECORDING (.meg) */
+/* VOICE RECORDING (.mgs) */
 let voiceRecorder = null;
 let voiceChunks = [];
 let voiceTimerInterval = null;
@@ -1629,7 +1670,7 @@ async function stopAndSendVoiceRecording() {
 
         const blob = new Blob(voiceChunks, { type: voiceRecorder.mimeType || 'audio/webm' });
         if (blob.size > 0) {
-            await sendMediaBlob(blob, `voice_${Date.now()}.meg`, blob.type || 'audio/webm');
+            await sendMediaBlob(blob, `voice_${Date.now()}.mgs`, blob.type || 'audio/webm');
         } else hideUploadProgress();
     };
 
@@ -1637,7 +1678,7 @@ async function stopAndSendVoiceRecording() {
     voiceRecorder.stop();
 }
 
-/* TG CIRCLE RECORDING (.mec) */
+/* TG CIRCLE RECORDING (.mkru) */
 let circleRecorder = null;
 let circleChunks = [];
 let circleStream = null;
@@ -1742,7 +1783,7 @@ async function stopAndSendCircleRecording() {
 
         const blob = new Blob(circleChunks, { type: circleRecorder.mimeType || 'video/webm' });
         if (blob.size > 0) {
-            await sendMediaBlob(blob, `circle_${Date.now()}.mec`, blob.type || 'video/webm');
+            await sendMediaBlob(blob, `circle_${Date.now()}.mkru`, blob.type || 'video/webm');
         } else hideUploadProgress();
     };
 
@@ -1750,6 +1791,7 @@ async function stopAndSendCircleRecording() {
     circleRecorder.stop();
 }
 
+/* LOCAL E2EE ENCRYPT + UPLOAD TO VK DOCS */
 async function uploadEncryptedMedia(blob, filename, mimeType) {
     if (!currentPeer) return;
     const peerKey = await getPeerPubKey(currentPeer);
@@ -1773,24 +1815,34 @@ async function uploadEncryptedMedia(blob, filename, mimeType) {
     const encBlob = new Blob([resultBuf], { type: 'application/octet-stream' });
 
     let ext = 'enc';
-    if (filename.endsWith('.mec') || mimeType.includes('mec')) ext = 'mec';
-    else if (filename.endsWith('.meg') || mimeType.includes('meg')) ext = 'meg';
-    else if (mimeType.startsWith('image/')) ext = 'meow';
-    else if (mimeType.startsWith('video/')) ext = 'mur';
+    if (filename.endsWith('.mkru') || mimeType.includes('mkru')) ext = 'mkru';
+    else if (filename.endsWith('.mgs') || mimeType.includes('mgs')) ext = 'mgs';
+    else if (filename.endsWith('.meow') || mimeType.startsWith('image/')) ext = 'meow';
+    else if (filename.endsWith('.mer') || mimeType.startsWith('video/')) ext = 'mer';
 
     const formData = new FormData();
     formData.append('token', token);
     formData.append('peer_id', currentPeer);
     formData.append('file', encBlob, `enc_${Date.now()}.${ext}`);
 
-    await fetch('/api/upload_encrypted_doc', { method: 'POST', body: formData });
+    const res = await fetch('/api/upload_encrypted_doc', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+        throw new Error(data.error || "Ошибка загрузки документа в VK");
+    }
 }
 
 async function handleFile(e) {
     const file = e.target.files[0];
     if (!file || !currentPeer) return;
     try {
-        await sendMediaBlob(file, file.name, file.type || 'application/octet-stream');
+        let name = file.name;
+        if (file.type.startsWith('image/')) {
+            name = `photo_${Date.now()}.meow`;
+        } else if (file.type.startsWith('video/')) {
+            name = `video_${Date.now()}.mer`;
+        }
+        await sendMediaBlob(file, name, file.type || 'application/octet-stream');
     } finally {
         e.target.value = '';
     }
