@@ -557,11 +557,16 @@ if(!text||!currentPeer)return;
 const btn=document.getElementById('sendBtn');btn.disabled=true;
 
 let sendText=text;
-if(encryptionEnabled&&peerKeys[currentPeer]){
+if(encryptionEnabled){
 // Encrypt message
 const encRes=await fetch('/api/encrypt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:token,peer_id:currentPeer,my_vk_id:myVkId,text:text})});
 const encData=await encRes.json();
-if(encData.encrypted)sendText='ENC:'+encData.encrypted;
+if(encData.encrypted){
+sendText='ENC:'+encData.encrypted;
+console.log('Encrypted sent');
+} else {
+console.log('Encrypt failed:', encData.error);
+}
 }
 
 await fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,peer_id:currentPeer,text:sendText})});
