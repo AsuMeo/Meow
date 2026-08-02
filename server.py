@@ -107,7 +107,7 @@ def vk_request(method, token, **params):
 
 def extract_doc_attachment(save_result):
     """Safely extract doc attachment string from various VK API response formats"""
-    if not save_result or isinstance(save_result, dict) and 'error' in save_result:
+    if not save_result or (isinstance(save_result, dict) and 'error' in save_result):
         return None
     
     if isinstance(save_result, list) and len(save_result) > 0:
@@ -159,6 +159,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 /* Header */
 .header{height:56px;background:#0d0d0d;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #1c1c1c;flex-shrink:0}
 .header-back{width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;margin-right:6px;background:rgba(255,255,255,0.1);color:#fff;flex-shrink:0}
+.header-back svg{width:22px;height:22px;stroke:#fff;stroke-width:2.5px;fill:none}
 .header-back:active{background:rgba(255,255,255,0.25)}
 .header-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;margin-right:10px;background:#222;flex-shrink:0;cursor:pointer}
 .header-info{flex:1;min-width:0;cursor:pointer}
@@ -203,24 +204,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .drawer-item:active{background:rgba(255,255,255,0.08);color:#fff}
 .drawer-item svg{color:#aaa}
 
-/* Chat Screen - MUST HAVE Z-INDEX HIGHER THAN DIALOGS SCREEN (z-index: 100) */
+/* Chat Screen */
 .chat-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;z-index:100;transform:translateX(100%);transition:transform 0.22s cubic-bezier(0.1, 0.9, 0.2, 1)}
 .chat-screen.active{transform:translateX(0)}
 .messages-wrapper{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column}
 .messages{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch}
 
-/* Message styling - TELEGRAM STYLE BUBBLE SEPARATION */
-.msg-container{position:relative;display:flex;width:100%;align-items:flex-end;touch-action:pan-y;margin-bottom:4px}
+/* Message styling - RESTORED ORIGINAL COLORS (#1c1c1e and #2c2c2e) */
+.msg-container{position:relative;display:flex;width:100%;align-items:flex-end;touch-action:pan-y;margin-bottom:2px}
 .msg-swipe-bg{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;width:40px;opacity:0;transition:opacity 0.15s;color:#8e8e93;z-index:1}
 .msg-swipe-right{right:-40px}
 
-.msg{max-width:78%;padding:9px 13px;border-radius:18px;font-size:14px;line-height:1.4;word-wrap:break-word;position:relative;animation:msgAppear 0.15s ease-out}
+.msg{max-width:82%;padding:8px 12px;border-radius:18px;font-size:14px;line-height:1.4;word-wrap:break-word;position:relative;animation:msgAppear 0.15s ease-out}
 @keyframes msgAppear{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
-/* INCOMING (LEFT, DARK GREY BUBBLE) */
-.msg-in{align-self:flex-start;background:#1f2936;border-bottom-left-radius:4px;color:#fff;margin-right:auto}
-/* OUTGOING (RIGHT, BLUE-GREY BUBBLE) */
-.msg-out{align-self:flex-end;background:#2b5278;border-bottom-right-radius:4px;color:#fff;margin-left:auto}
+/* INCOMING BUBBLE (ORIGINAL) */
+.msg-in{align-self:flex-start;background:#1c1c1e;border-bottom-left-radius:4px;color:#fff}
+/* OUTGOING BUBBLE (ORIGINAL) */
+.msg-out{align-self:flex-end;background:#2c2c2e;border-bottom-right-radius:4px;color:#fff}
 
 /* PURE CIRCLE VIDEO WRAPPER */
 .msg-circle-mode{background:transparent !important;padding:0 !important;border-radius:0 !important;box-shadow:none !important;max-width:200px !important}
@@ -230,9 +231,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .msg-reply-name{font-weight:600;color:#aaa;margin-bottom:2px;font-size:11px}
 .msg-reply-text{color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-.msg-author{font-size:11px;color:#82b1ff;font-weight:600;margin-bottom:3px}
+.msg-author{font-size:11px;color:#aaa;font-weight:600;margin-bottom:2px}
 .msg-text{color:#fff}
-.msg-time{font-size:10px;color:rgba(255,255,255,0.6);margin-top:4px;text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:3px}
+.msg-time{font-size:10px;color:#888;margin-top:4px;text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:3px}
 
 .decrypting-shimmer{color:#888;font-style:italic}
 
@@ -251,9 +252,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .tg-voice-bar.active{background:#fff}
 .tg-voice-info{display:flex;justify-content:space-between;font-size:10px;color:#aaa}
 
-/* Media Attachments */
-.msg-photo{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;object-fit:cover;cursor:pointer;background:#111}
-.msg-video{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;background:#000}
+/* Media Attachments - NO OUTLINE / BORDER AT ALL */
+.msg-photo{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;object-fit:cover;cursor:pointer;background:#111;border:none!important;outline:none!important;box-shadow:none!important}
+.msg-video{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;background:#000;border:none!important;outline:none!important;box-shadow:none!important}
 .msg-file{background:rgba(255,255,255,.05);padding:10px;border-radius:12px;margin-top:6px;display:flex;align-items:center;gap:10px;cursor:pointer}
 
 /* Input Bar & Actions */
@@ -447,7 +448,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <div class="header">
 <!-- EXPLICIT VISIBLE ARROW BACK BUTTON BEFORE AVATAR -->
 <div class="header-back" onclick="backToDialogs()" title="Назад к диалогам">
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+<svg viewBox="0 0 24 24">
 <line x1="19" y1="12" x2="5" y2="12"></line>
 <polyline points="12 19 5 12 12 5"></polyline>
 </svg>
@@ -963,7 +964,7 @@ async function loadDialogs() {
 async function openChat(index) {
     const d = dialogsData[index]; currentPeer = d.id;
     
-    // Explicitly set PEER name and PEER photo in chat header
+    // Set PEER info in header
     document.getElementById('chatTitle').textContent = d.name;
     document.getElementById('chatAvatar').src = d.photo || 'https://vk.com/images/camera_100.png';
     document.getElementById('chatScreen').classList.add('active');
@@ -1043,12 +1044,11 @@ async function loadMessages() {
     } catch(e){}
 }
 
-/* RENDER MESSAGE ITEM WITH PROPER BUBBLE SEPARATION (LEFT = INCOMING, RIGHT = OUTGOING) */
+/* RENDER MESSAGE ITEM */
 function renderMessageItem(container, msg) {
     const containerDiv = document.createElement('div');
     containerDiv.className = 'msg-container';
     
-    // Explicit flex alignment for bubbles (TG Style)
     if (msg.out) {
         containerDiv.style.justifyContent = 'flex-end';
     } else {
@@ -1314,27 +1314,47 @@ async function processEncryptedAttachment(elemId, url, extInfo) {
         const resp = await fetch(`/api/proxy_file?url=${encodeURIComponent(url)}`);
         const encArrayBuf = await resp.arrayBuffer();
 
-        const view = new DataView(encArrayBuf);
-        const headerLen = view.getUint32(0);
-        const headerJsonBytes = new Uint8Array(encArrayBuf, 4, headerLen);
-        const header = JSON.parse(new TextDecoder().decode(headerJsonBytes));
-        const encPayload = encArrayBuf.slice(4 + headerLen);
+        try {
+            if (encArrayBuf.byteLength > 4) {
+                const view = new DataView(encArrayBuf);
+                const headerLen = view.getUint32(0);
+                if (headerLen > 0 && headerLen < encArrayBuf.byteLength - 4) {
+                    const headerJsonBytes = new Uint8Array(encArrayBuf, 4, headerLen);
+                    const headerStr = new TextDecoder().decode(headerJsonBytes);
+                    const header = JSON.parse(headerStr);
 
-        const decPayloadBuf = await clientDecryptData({
-            k1: header.k1,
-            k2: header.k2,
-            payload: bufToB64(encPayload)
-        });
+                    if (header.k1 && header.k2) {
+                        const encPayload = encArrayBuf.slice(4 + headerLen);
+                        const decPayloadBuf = await clientDecryptData({
+                            k1: header.k1,
+                            k2: header.k2,
+                            payload: bufToB64(encPayload)
+                        });
 
-        if (!decPayloadBuf) throw new Error("Decryption failed");
+                        if (decPayloadBuf) {
+                            const blob = new Blob([decPayloadBuf], { type: header.mime || 'application/octet-stream' });
+                            const blobUrl = URL.createObjectURL(blob);
+                            decryptedCache[elemId] = { blobUrl, mime: header.mime, name: header.name, extInfo };
+                            renderDecryptedMedia(elem, decryptedCache[elemId]);
+                            return;
+                        }
+                    }
+                }
+            }
+        } catch(eParse) {
+            console.log("Not encrypted binary file, fallback to direct proxy");
+        }
 
-        const blob = new Blob([decPayloadBuf], { type: header.mime || 'application/octet-stream' });
-        const blobUrl = URL.createObjectURL(blob);
-        decryptedCache[elemId] = { blobUrl, mime: header.mime, name: header.name, extInfo };
-
+        // Direct fallback if unencrypted or plain attachment
+        let fallbackMime = 'video/webm';
+        if (extInfo.includes('meg') || extInfo.includes('audio')) fallbackMime = 'audio/webm';
+        
+        decryptedCache[elemId] = { blobUrl: `/api/proxy_file?url=${encodeURIComponent(url)}`, mime: fallbackMime, name: extInfo, extInfo };
         renderDecryptedMedia(elem, decryptedCache[elemId]);
+
     } catch (e) {
-        if (elem.querySelector('.msg-file-size')) elem.querySelector('.msg-file-size').textContent = 'Ошибка расшифровки';
+        console.error("Attachment process error:", e);
+        if (elem.querySelector('.msg-file-size')) elem.querySelector('.msg-file-size').textContent = 'Ошибка загрузки';
     }
 }
 
@@ -1956,7 +1976,7 @@ def peer_status():
     if isinstance(user_info, list) and len(user_info) > 0:
         u = user_info[0]
         online = u.get('online', 0)
-        sex = u.get('sex', 1)  # 1 = female, 2 = male
+        sex = u.get('sex', 1)
         
         if online == 1:
             return jsonify({'status_text': 'в сети', 'online': True})
