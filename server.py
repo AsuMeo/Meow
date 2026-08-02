@@ -82,12 +82,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .btn-danger{background:#ff3b30;color:#fff}
 
 /* Header */
-.header{height:52px;background:#0d0d0d;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #1c1c1c;flex-shrink:0;z-index:20}
-.header-back{width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;transition:background 0.2s}
-.header-back:active{background:#222}
-.header-avatar{width:34px;height:34px;border-radius:50%;object-fit:cover;margin-right:10px;background:#222;transition:transform 0.2s}
+.header{height:54px;background:#0d0d0d;display:flex;align-items:center;padding:0 8px;border-bottom:1px solid #1c1c1c;flex-shrink:0;z-index:20}
+.header-back{display:flex;align-items:center;gap:4px;padding:6px 10px;cursor:pointer;border-radius:12px;background:#1a1a1c;color:#fff;font-size:13px;font-weight:600;margin-right:8px;transition:background 0.2s}
+.header-back:active{background:#2a2a2c}
+.header-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;margin-right:10px;background:#222;cursor:pointer;transition:transform 0.2s}
 .header-avatar:active{transform:scale(0.95)}
-.header-info{flex:1;min-width:0}
+.header-info{flex:1;min-width:0;cursor:pointer}
 .header-title{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .header-subtitle{font-size:12px;color:#888;display:flex;align-items:center;gap:4px}
 .header-subtitle.e2e-on{color:#8e8e93}
@@ -116,7 +116,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .messages-wrapper{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column}
 .messages{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
 
-/* Message styling - STRICTLY NO GREEN COLOR FOR ENCRYPTED */
+/* Upload Progress Banner */
+.upload-status-banner{background:#1c1c1e;color:#fff;font-size:13px;padding:8px 14px;display:flex;align-items:center;justify-content:center;gap:8px;border-bottom:1px solid #2c2c2e;animation:slideDown 0.2s ease-out;z-index:15}
+
+/* Message styling - STRICTLY NORMAL COLORS FOR ENCRYPTED MESSAGES */
 .msg-container{position:relative;display:flex;width:100%;align-items:center;touch-action:pan-y;margin-bottom:2px}
 .msg-swipe-bg{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;width:40px;opacity:0;transition:opacity 0.15s;color:#8e8e93;z-index:1}
 .msg-swipe-right{right:-40px}
@@ -124,7 +127,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .msg{max-width:82%;padding:8px 12px;border-radius:18px;font-size:14px;line-height:1.4;word-wrap:break-word;position:relative;transition:transform 0.2s cubic-bezier(0.1, 0.8, 0.3, 1), background-color 0.2s;will-change:transform;animation:msgAppear 0.25s ease-out}
 @keyframes msgAppear{from{opacity:0;transform:translateY(8px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}
 
-/* NORMAL COLORS FOR ALL MESSAGES - ENCRYPTED USES THE SAME EXACT COLOR */
 .msg-in{align-self:flex-start;background:#1c1c1e;border-bottom-left-radius:4px;color:#fff}
 .msg-out{align-self:flex-end;background:#2c2c2e;border-bottom-right-radius:4px;color:#fff}
 .msg-encrypted{/* strictly identical to normal message bubbles */}
@@ -204,11 +206,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .recording-cancel{font-size:13px;color:#ff3b30;cursor:pointer;font-weight:500;padding:4px 8px;border-radius:12px}
 .recording-cancel:active{background:rgba(255,59,48,0.1)}
 
-/* TG Circle Camera Modal / Floating Video Preview */
-.circle-recorder-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;animation:fadeIn 0.2s ease-out}
-.circle-preview-box{width:260px;height:260px;border-radius:50%;overflow:hidden;position:relative;box-shadow:0 0 30px rgba(0,0,0,0.8);border:4px solid #fff}
-.circle-preview-video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
-.circle-rec-controls{margin-top:30px;display:flex;align-items:center;gap:24px}
+/* TG Circle Camera Modal / Video Controls */
+.circle-recorder-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;animation:fadeIn 0.2s ease-out}
+.circle-preview-box{width:260px;height:260px;border-radius:50%;overflow:hidden;position:relative;box-shadow:0 0 30px rgba(0,0,0,0.8);border:4px solid #fff;background:#000}
+.circle-preview-video{width:100%;height:100%;object-fit:cover}
+.circle-tools-bar{display:flex;align-items:center;gap:16px;margin-top:20px}
+.circle-tool-btn{width:44px;height:44px;border-radius:50%;background:#2c2c2e;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform 0.15s, background 0.15s}
+.circle-tool-btn:active{transform:scale(0.9);background:#3a3a3c}
+.circle-tool-btn.active{background:#fff;color:#000}
+
+.circle-rec-controls{margin-top:24px;display:flex;align-items:center;gap:24px}
 .circle-btn-action{width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform 0.15s}
 .circle-btn-action:active{transform:scale(0.9)}
 .circle-btn-stop{background:#ff3b30;color:#fff;box-shadow:0 0 15px rgba(255,59,48,0.5)}
@@ -320,14 +327,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <!-- Chat Screen -->
 <div class="chat-screen" id="chatScreen">
 <div class="header">
-<div class="header-back" onclick="backToDialogs()">
-<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+<!-- PROMINENT BACK BUTTON TO EXIT CHAT -->
+<div class="header-back" onclick="backToDialogs()" title="Выйти из чата">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+<span>Назад</span>
 </div>
-<img class="header-avatar" id="chatAvatar" src="" alt="">
-<div class="header-info">
+<img class="header-avatar" id="chatAvatar" onclick="backToDialogs()" src="" alt="">
+<div class="header-info" onclick="backToDialogs()">
 <div class="header-title" id="chatTitle"></div>
 <div class="header-subtitle" id="chatEncryptStatus">E2EE Ready</div>
 </div>
+</div>
+
+<!-- Uploading Progress Status Banner -->
+<div class="upload-status-banner hidden" id="uploadStatusBanner">
+<span class="loader"></span> <span id="uploadStatusText">Шифрование и отправка медиа...</span>
 </div>
 
 <div class="messages-wrapper">
@@ -393,12 +407,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </div>
 </div>
 
-<!-- Circle Video Camera Preview Modal -->
+<!-- Circle Video Camera Preview Modal with Flip & Flash Controls -->
 <div class="circle-recorder-modal hidden" id="circleModal">
 <div class="circle-preview-box">
 <video class="circle-preview-video" id="circleVideoPreview" autoplay muted playsinline></video>
 </div>
-<div class="recording-timer" id="circleTimer" style="margin-top:16px;font-size:18px">0:00</div>
+
+<div class="circle-tools-bar">
+<!-- Camera Switch Button -->
+<div class="circle-tool-btn" id="circleFlipBtn" onclick="switchCircleCamera()" title="Переключить камеру">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0-4.418-3.582-8-8-8s-8 3.582-8 8c0 1.62.483 3.127 1.314 4.386L3 17l4.137-.966A7.962 7.962 0 0 0 12 18c4.418 0 8-3.582 8-8z"/><path d="M16 14l4 4-4 4"/></svg>
+</div>
+
+<div class="recording-timer" id="circleTimer" style="font-size:18px">0:00</div>
+
+<!-- Torch / Flashlight Button -->
+<div class="circle-tool-btn" id="circleTorchBtn" onclick="toggleCircleTorch()" title="Фонарик">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+</div>
+</div>
+
 <div class="circle-rec-controls">
 <div class="circle-btn-action circle-btn-cancel" onclick="cancelCircleRecording()">
 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -521,7 +549,6 @@ async function initClientCrypto() {
     
     if (stored && stored.public_key && stored.private_key_enc) {
         try {
-            // Decrypt private key locally on device
             const privEncBuf = b64ToBuf(stored.private_key_enc);
             const privDecBuf = await decryptAESGCM(masterKey, privEncBuf);
             const privJwk = JSON.parse(new TextDecoder().decode(privDecBuf));
@@ -542,7 +569,6 @@ async function initClientCrypto() {
             return false;
         }
     } else {
-        // Generate new RSA keypair locally on device
         const keyPair = await window.crypto.subtle.generateKey(
             { name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
             true, ["encrypt", "decrypt"]
@@ -552,7 +578,6 @@ async function initClientCrypto() {
         const privJwk = await window.crypto.subtle.exportKey("jwk", keyPair.privateKey);
         const pubJwkStr = JSON.stringify(pubJwk);
 
-        // Encrypt private key locally before uploading backup to Firebase
         const privEncBuf = await encryptAESGCM(masterKey, new TextEncoder().encode(JSON.stringify(privJwk)));
         const privEncB64 = bufToB64(privEncBuf);
 
@@ -571,7 +596,6 @@ async function initClientCrypto() {
 async function getPeerPubKey(peerId) {
     if (peerKeysCache[peerId]) return peerKeysCache[peerId];
     
-    // If peer is self
     if (String(peerId) === String(myVkId)) {
         if (localKeyPair) {
             peerKeysCache[peerId] = localKeyPair.publicKey;
@@ -719,7 +743,6 @@ async function openChat(index) {
     document.getElementById('chatAvatar').src = d.photo || 'https://vk.com/images/camera_100.png';
     document.getElementById('chatScreen').classList.add('active');
 
-    // Check peer key
     const peerKey = await getPeerPubKey(currentPeer);
     const status = document.getElementById('chatEncryptStatus');
     if (peerKey) {
@@ -738,6 +761,21 @@ function backToDialogs() {
     document.getElementById('chatScreen').classList.remove('active');
     currentPeer = null;
     cancelReplyOrEdit();
+}
+
+// UPLOAD PROGRESS STATUS CONTROLS
+function showUploadStatus(msg) {
+    const banner = document.getElementById('uploadStatusBanner');
+    const text = document.getElementById('uploadStatusText');
+    if (banner && text) {
+        text.textContent = msg || 'Шифрование и отправка медиа...';
+        banner.classList.remove('hidden');
+    }
+}
+
+function hideUploadStatus() {
+    const banner = document.getElementById('uploadStatusBanner');
+    if (banner) banner.classList.add('hidden');
 }
 
 async function loadMessages() {
@@ -774,7 +812,6 @@ async function renderMessageItem(container, msg) {
     swipeBgRight.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>`;
 
     const div = document.createElement('div');
-    // NORMAL COLORS FOR ENCRYPTED AND UNENCRYPTED MESSAGES
     div.className = 'msg ' + (msg.out ? 'msg-out' : 'msg-in') + (isEncrypted ? ' msg-encrypted' : '');
     div.id = 'msg-' + msg.id;
 
@@ -844,13 +881,12 @@ async function renderMessageItem(container, msg) {
                 const title = (doc.title || '').toLowerCase();
                 const ext = (doc.ext || '').toLowerCase();
 
-                // Check if encrypted doc, circle (.mec) or voice (.meg)
                 if (title.startsWith('enc_') || ext === 'meow' || ext === 'mur' || ext === 'enc' || ext === 'mec' || ext === 'meg' || title.endsWith('.mec') || title.endsWith('.meg')) {
                     const docId = `doc_${doc.owner_id}_${doc.id}`;
                     
                     if (ext === 'mec' || title.endsWith('.mec')) {
                         html += `<div class="tg-circle-container" id="${docId}">
-                            <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#888;font-size:12px"><span class="loader"></span>Загрузка кружочка...</div>
+                            <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#888;font-size:12px"><span class="loader"></span>Расшифровка кружочка...</div>
                         </div>`;
                     } else if (ext === 'meg' || title.endsWith('.meg')) {
                         html += `<div class="tg-voice-container" id="${docId}">
@@ -1274,16 +1310,27 @@ async function sendMessage() {
     loadMessages();
 }
 
-// SUPPORTED MEDIA RECORDER MIME TYPES
+// SUPPORTED MEDIA RECORDER MIME TYPES FOR ANDROID / ALL BROWSERS
 function getSupportedMimeType(kind) {
     if (kind === 'video') {
-        const types = ['video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'];
+        const types = [
+            'video/webm;codecs=vp8,opus',
+            'video/webm',
+            'video/mp4',
+            'video/3gpp'
+        ];
         for (let t of types) {
             if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
         }
         return '';
     } else {
-        const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac', 'audio/ogg'];
+        const types = [
+            'audio/webm;codecs=opus',
+            'audio/webm',
+            'audio/mp4',
+            'audio/aac',
+            'audio/ogg'
+        ];
         for (let t of types) {
             if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
         }
@@ -1343,37 +1390,68 @@ async function stopAndSendVoiceRecording() {
         document.getElementById('inputAreaVoice').classList.add('hidden');
         document.getElementById('inputAreaNormal').classList.remove('hidden');
 
-        const blob = new Blob(voiceChunks, { type: voiceRecorder.mimeType || 'audio/webm' });
-        await uploadEncryptedMedia(blob, `voice_${Date.now()}.meg`, blob.type || 'audio/webm');
+        showUploadStatus("🔐 Шифрование и отправка голосового...");
+        try {
+            const blob = new Blob(voiceChunks, { type: voiceRecorder.mimeType || 'audio/webm' });
+            await uploadEncryptedMedia(blob, `voice_${Date.now()}.meg`, blob.type || 'audio/webm');
+        } finally {
+            hideUploadStatus();
+        }
     };
 
     voiceRecorder.stop();
 }
 
-// RECORDING CIRCLE VIDEO MESSAGES (.MEC)
+// RECORDING CIRCLE VIDEO MESSAGES (.MEC) WITH CAMERA SWITCH & TORCH
 let circleRecorder = null;
 let circleChunks = [];
 let circleStream = null;
 let circleTimerInterval = null;
 let circleSeconds = 0;
+let circleFacingMode = 'user'; // 'user' (front) or 'environment' (back)
+let isTorchOn = false;
+
+async function getCircleMediaStream() {
+    // Android Robust getUserMedia fallback ladder
+    const videoConstraints = {
+        facingMode: circleFacingMode,
+        width: { ideal: 480 },
+        height: { ideal: 480 }
+    };
+
+    try {
+        return await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: true });
+    } catch(e1) {
+        try {
+            return await navigator.mediaDevices.getUserMedia({ video: { facingMode: circleFacingMode }, audio: true });
+        } catch(e2) {
+            return await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        }
+    }
+}
 
 async function startCircleRecording() {
     try {
-        const mimeType = getSupportedMimeType('video');
-        circleStream = await navigator.mediaDevices.getUserMedia({ 
-            video: { width: { ideal: 400 }, height: { ideal: 400 }, facingMode: 'user' }, 
-            audio: true 
-        });
+        circleStream = await getCircleMediaStream();
         circleChunks = [];
         
         const videoElem = document.getElementById('circleVideoPreview');
         videoElem.srcObject = circleStream;
         videoElem.play();
 
+        // Style mirror for front camera
+        if (circleFacingMode === 'user') {
+            videoElem.style.transform = 'scaleX(-1)';
+        } else {
+            videoElem.style.transform = 'none';
+        }
+
         document.getElementById('circleModal').classList.remove('hidden');
 
+        const mimeType = getSupportedMimeType('video');
         const options = mimeType ? { mimeType } : {};
         circleRecorder = new MediaRecorder(circleStream, options);
+
         circleRecorder.ondataavailable = e => {
             if (e.data && e.data.size > 0) circleChunks.push(e.data);
         };
@@ -1389,8 +1467,42 @@ async function startCircleRecording() {
         }, 1000);
 
     } catch(e) {
-        console.error(e);
-        alert("Ошибка доступа к камере или микрофону");
+        console.error("Circle Record Error:", e);
+        alert("Ошибка доступа к камере или микрофону!");
+    }
+}
+
+async function switchCircleCamera() {
+    if (circleTimerInterval) clearInterval(circleTimerInterval);
+    circleFacingMode = (circleFacingMode === 'user') ? 'environment' : 'user';
+    
+    if (circleStream) {
+        circleStream.getTracks().forEach(t => t.stop());
+    }
+    
+    startCircleRecording();
+}
+
+async function toggleCircleTorch() {
+    if (!circleStream) return;
+    const videoTrack = circleStream.getVideoTracks()[0];
+    if (!videoTrack) return;
+
+    try {
+        const capabilities = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
+        if (capabilities.torch) {
+            isTorchOn = !isTorchOn;
+            await videoTrack.applyConstraints({ advanced: [{ torch: isTorchOn }] });
+            const torchBtn = document.getElementById('circleTorchBtn');
+            if (torchBtn) {
+                if (isTorchOn) torchBtn.classList.add('active');
+                else torchBtn.classList.remove('active');
+            }
+        } else {
+            alert("Фонарик не поддерживается этой камерой");
+        }
+    } catch(e) {
+        alert("Не удалось включить фонарик");
     }
 }
 
@@ -1409,8 +1521,13 @@ async function stopAndSendCircleRecording() {
         if (circleTimerInterval) clearInterval(circleTimerInterval);
         document.getElementById('circleModal').classList.add('hidden');
 
-        const blob = new Blob(circleChunks, { type: circleRecorder.mimeType || 'video/webm' });
-        await uploadEncryptedMedia(blob, `circle_${Date.now()}.mec`, blob.type || 'video/webm');
+        showUploadStatus("🔐 Шифрование и отправка кружочка...");
+        try {
+            const blob = new Blob(circleChunks, { type: circleRecorder.mimeType || 'video/webm' });
+            await uploadEncryptedMedia(blob, `circle_${Date.now()}.mec`, blob.type || 'video/webm');
+        } finally {
+            hideUploadStatus();
+        }
     };
 
     circleRecorder.stop();
@@ -1453,7 +1570,7 @@ async function uploadEncryptedMedia(blob, filename, mimeType) {
 
     const encBlob = new Blob([resultBuf], { type: 'application/octet-stream' });
 
-    // DETERMINE THE EXTENSION FOR VK ENCRYPTED DOC TITLE
+    // DETERMINE EXTENSION FOR VK ENCRYPTED DOC TITLE
     let ext = 'enc';
     if (filename.endsWith('.mec') || mimeType.includes('mec')) ext = 'mec';
     else if (filename.endsWith('.meg') || mimeType.includes('meg')) ext = 'meg';
@@ -1478,26 +1595,32 @@ async function handleFile(e) {
 
     const btn = document.getElementById('sendBtn'); if (btn) btn.disabled = true;
 
-    if (encryptionEnabled) {
-        const peerKey = await getPeerPubKey(currentPeer);
-        if (peerKey) {
-            await uploadEncryptedMedia(file, file.name, file.type || 'application/octet-stream');
-            if (btn) btn.disabled = false;
-            e.target.value = '';
-            return;
+    showUploadStatus("🔐 Шифрование и загрузка файла...");
+
+    try {
+        if (encryptionEnabled) {
+            const peerKey = await getPeerPubKey(currentPeer);
+            if (peerKey) {
+                await uploadEncryptedMedia(file, file.name, file.type || 'application/octet-stream');
+                if (btn) btn.disabled = false;
+                e.target.value = '';
+                return;
+            }
         }
+
+        // Unencrypted normal upload
+        const formData = new FormData();
+        formData.append('token', token);
+        formData.append('peer_id', currentPeer);
+        formData.append('file', file);
+        await fetch('/api/upload_normal', { method: 'POST', body: formData });
+
+        if (btn) btn.disabled = false;
+        e.target.value = '';
+        loadMessages();
+    } finally {
+        hideUploadStatus();
     }
-
-    // Unencrypted normal upload
-    const formData = new FormData();
-    formData.append('token', token);
-    formData.append('peer_id', currentPeer);
-    formData.append('file', file);
-    await fetch('/api/upload_normal', { method: 'POST', body: formData });
-
-    if (btn) btn.disabled = false;
-    e.target.value = '';
-    loadMessages();
 }
 
 function toggleEncrypt() {
@@ -1764,7 +1887,7 @@ def upload_normal():
     files = {'file': (filename, BytesIO(file_bytes), file.content_type or 'application/octet-stream')}
     upload_resp = requests.post(upload_url, files=files, timeout=30).json()
 
-    save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=filename)
+    save_result = vk_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=filename)
     if isinstance(save_result, dict) and 'doc' in save_result:
         doc = save_result['doc']
         attachment = f"doc{doc['owner_id']}_{doc['id']}"
