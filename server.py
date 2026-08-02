@@ -82,19 +82,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .btn-danger{background:#ff3b30;color:#fff}
 
 /* Header */
-.header{height:54px;background:#0d0d0d;display:flex;align-items:center;padding:0 8px;border-bottom:1px solid #1c1c1c;flex-shrink:0;z-index:20}
-.header-back{display:flex;align-items:center;gap:4px;padding:6px 10px;cursor:pointer;border-radius:12px;background:#1a1a1c;color:#fff;font-size:13px;font-weight:600;margin-right:8px;transition:background 0.2s}
-.header-back:active{background:#2a2a2c}
-.header-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;margin-right:10px;background:#222;cursor:pointer;transition:transform 0.2s}
+.header{height:56px;background:#0d0d0d;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #1c1c1c;flex-shrink:0;z-index:20}
+.header-back{width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;margin-right:6px;background:rgba(255,255,255,0.08);color:#fff;transition:background 0.2s;flex-shrink:0}
+.header-back:active{background:rgba(255,255,255,0.2)}
+.header-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;margin-right:10px;background:#222;transition:transform 0.2s;cursor:pointer}
 .header-avatar:active{transform:scale(0.95)}
 .header-info{flex:1;min-width:0;cursor:pointer}
 .header-title{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .header-subtitle{font-size:12px;color:#888;display:flex;align-items:center;gap:4px}
 .header-subtitle.e2e-on{color:#8e8e93}
-.header-actions{display:flex;gap:4px}
-.header-btn{width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;color:#777;transition:all 0.2s}
-.header-btn:active{transform:scale(0.9)}
-.header-btn.active{color:#fff}
+.header-actions{display:flex;gap:6px;align-items:center}
+.header-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;color:#aaa;background:rgba(255,255,255,0.05);transition:all 0.2s}
+.header-btn:active{transform:scale(0.9);background:rgba(255,255,255,0.15)}
+.header-btn.active{color:#fff;background:rgba(255,255,255,0.15)}
 
 /* Dialogs */
 .dialogs-screen{flex:1;display:flex;flex-direction:column;overflow:hidden;animation:fadeIn 0.25s ease-out}
@@ -116,10 +116,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .messages-wrapper{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column}
 .messages{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
 
-/* Upload Progress Banner */
-.upload-status-banner{background:#1c1c1e;color:#fff;font-size:13px;padding:8px 14px;display:flex;align-items:center;justify-content:center;gap:8px;border-bottom:1px solid #2c2c2e;animation:slideDown 0.2s ease-out;z-index:15}
-
-/* Message styling - STRICTLY NORMAL COLORS FOR ENCRYPTED MESSAGES */
+/* Message styling - STRICTLY NO GREEN COLOR FOR ENCRYPTED */
 .msg-container{position:relative;display:flex;width:100%;align-items:center;touch-action:pan-y;margin-bottom:2px}
 .msg-swipe-bg{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;width:40px;opacity:0;transition:opacity 0.15s;color:#8e8e93;z-index:1}
 .msg-swipe-right{right:-40px}
@@ -129,9 +126,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 .msg-in{align-self:flex-start;background:#1c1c1e;border-bottom-left-radius:4px;color:#fff}
 .msg-out{align-self:flex-end;background:#2c2c2e;border-bottom-right-radius:4px;color:#fff}
-.msg-encrypted{/* strictly identical to normal message bubbles */}
+.msg-encrypted{}
 
-/* Reply quote inside message */
 .msg-reply-quote{background:rgba(255,255,255,0.08);border-left:3px solid #8e8e93;padding:4px 8px;border-radius:4px;margin-bottom:6px;font-size:12px;cursor:pointer}
 .msg-reply-name{font-weight:600;color:#aaa;margin-bottom:2px;font-size:11px}
 .msg-reply-text{color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -206,20 +202,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .recording-cancel{font-size:13px;color:#ff3b30;cursor:pointer;font-weight:500;padding:4px 8px;border-radius:12px}
 .recording-cancel:active{background:rgba(255,59,48,0.1)}
 
-/* TG Circle Camera Modal / Video Controls */
-.circle-recorder-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;animation:fadeIn 0.2s ease-out}
+/* TG Circle Camera Modal / Floating Video Preview */
+.circle-recorder-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;animation:fadeIn 0.2s ease-out}
 .circle-preview-box{width:260px;height:260px;border-radius:50%;overflow:hidden;position:relative;box-shadow:0 0 30px rgba(0,0,0,0.8);border:4px solid #fff;background:#000}
-.circle-preview-video{width:100%;height:100%;object-fit:cover}
-.circle-tools-bar{display:flex;align-items:center;gap:16px;margin-top:20px}
-.circle-tool-btn{width:44px;height:44px;border-radius:50%;background:#2c2c2e;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform 0.15s, background 0.15s}
-.circle-tool-btn:active{transform:scale(0.9);background:#3a3a3c}
-.circle-tool-btn.active{background:#fff;color:#000}
-
-.circle-rec-controls{margin-top:24px;display:flex;align-items:center;gap:24px}
-.circle-btn-action{width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform 0.15s}
+.circle-preview-video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.circle-rec-controls{margin-top:24px;display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap}
+.circle-btn-action{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform 0.15s, background 0.2s;user-select:none}
 .circle-btn-action:active{transform:scale(0.9)}
+.circle-btn-sec{background:#2c2c2e;color:#fff;border:1px solid #3a3a3c}
+.circle-btn-sec.active{background:#fff;color:#000}
 .circle-btn-stop{background:#ff3b30;color:#fff;box-shadow:0 0 15px rgba(255,59,48,0.5)}
 .circle-btn-cancel{background:#3a3a3c;color:#fff}
+
+/* Global Upload Progress Banner / Toast */
+.upload-toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(28,28,30,0.95);border:1px solid #3a3a3c;color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:500;z-index:500;display:flex;align-items:center;gap:10px;box-shadow:0 4px 16px rgba(0,0,0,0.5);animation:fadeIn 0.2s ease-out}
 
 /* Bottom Nav */
 .bottom-nav{height:50px;background:#0d0d0d;border-top:1px solid #1a1a1a;display:flex;justify-content:space-around;align-items:center;flex-shrink:0}
@@ -252,6 +248,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </head>
 <body>
 <div class="app">
+
+<!-- Global Progress Toast Banner -->
+<div class="upload-toast hidden" id="uploadToast">
+<span class="loader"></span>
+<span id="uploadToastText">Загрузка...</span>
+</div>
 
 <!-- Login Screen -->
 <div class="login-screen" id="loginScreen">
@@ -327,21 +329,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <!-- Chat Screen -->
 <div class="chat-screen" id="chatScreen">
 <div class="header">
-<!-- PROMINENT BACK BUTTON TO EXIT CHAT -->
 <div class="header-back" onclick="backToDialogs()" title="Выйти из чата">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-<span>Назад</span>
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
 </div>
-<img class="header-avatar" id="chatAvatar" onclick="backToDialogs()" src="" alt="">
-<div class="header-info" onclick="backToDialogs()">
+<img class="header-avatar" id="chatAvatar" src="" alt="" onclick="backToDialogs()" title="Выйти из чата">
+<div class="header-info" onclick="backToDialogs()" title="Выйти из чата">
 <div class="header-title" id="chatTitle"></div>
 <div class="header-subtitle" id="chatEncryptStatus">E2EE Ready</div>
 </div>
+<div class="header-actions">
+<div class="header-btn" onclick="backToDialogs()" title="Выйти из чата">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
 </div>
-
-<!-- Uploading Progress Status Banner -->
-<div class="upload-status-banner hidden" id="uploadStatusBanner">
-<span class="loader"></span> <span id="uploadStatusText">Шифрование и отправка медиа...</span>
+</div>
 </div>
 
 <div class="messages-wrapper">
@@ -407,33 +407,34 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </div>
 </div>
 
-<!-- Circle Video Camera Preview Modal with Flip & Flash Controls -->
+<!-- Circle Video Camera Preview Modal -->
 <div class="circle-recorder-modal hidden" id="circleModal">
 <div class="circle-preview-box">
 <video class="circle-preview-video" id="circleVideoPreview" autoplay muted playsinline></video>
 </div>
+<div class="recording-timer" id="circleTimer" style="margin-top:16px;font-size:18px">0:00</div>
+<div class="circle-rec-controls">
 
-<div class="circle-tools-bar">
-<!-- Camera Switch Button -->
-<div class="circle-tool-btn" id="circleFlipBtn" onclick="switchCircleCamera()" title="Переключить камеру">
-<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0-4.418-3.582-8-8-8s-8 3.582-8 8c0 1.62.483 3.127 1.314 4.386L3 17l4.137-.966A7.962 7.962 0 0 0 12 18c4.418 0 8-3.582 8-8z"/><path d="M16 14l4 4-4 4"/></svg>
+<!-- Switch Camera -->
+<div class="circle-btn-action circle-btn-sec" onclick="toggleCircleCamera()" title="Сменить камеру">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0-4.418-3.582-8-8-8s-8 3.582-8 8"/><path d="M4 14c0 4.418 3.582 8 8 8s8-3.582 8-8"/><polyline points="1 7 4 10 7 7"/><polyline points="23 17 20 14 17 17"/></svg>
 </div>
 
-<div class="recording-timer" id="circleTimer" style="font-size:18px">0:00</div>
-
-<!-- Torch / Flashlight Button -->
-<div class="circle-tool-btn" id="circleTorchBtn" onclick="toggleCircleTorch()" title="Фонарик">
+<!-- Toggle Flashlight/Torch -->
+<div class="circle-btn-action circle-btn-sec" id="circleTorchBtn" onclick="toggleCircleTorch()" title="Фонарик">
 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
 </div>
+
+<!-- Cancel -->
+<div class="circle-btn-action circle-btn-cancel" onclick="cancelCircleRecording()" title="Отмена">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
 </div>
 
-<div class="circle-rec-controls">
-<div class="circle-btn-action circle-btn-cancel" onclick="cancelCircleRecording()">
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+<!-- Stop & Send -->
+<div class="circle-btn-action circle-btn-stop" onclick="stopAndSendCircleRecording()" title="Отправить">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
 </div>
-<div class="circle-btn-action circle-btn-stop" onclick="stopAndSendCircleRecording()">
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
-</div>
+
 </div>
 </div>
 
@@ -483,6 +484,21 @@ let decryptedCache = {}; // message/doc id -> blob URL / text
 let replyToMsg = null;
 let editMsg = null;
 let selectedMsgForAction = null;
+
+// Progress Indicator Helper
+function showUploadProgress(text) {
+    const toast = document.getElementById('uploadToast');
+    const toastText = document.getElementById('uploadToastText');
+    if (toast && toastText) {
+        toastText.textContent = text || 'Загрузка...';
+        toast.classList.remove('hidden');
+    }
+}
+
+function hideUploadProgress() {
+    const toast = document.getElementById('uploadToast');
+    if (toast) toast.classList.add('hidden');
+}
 
 // Convert Buffers
 function bufToB64(buf) {
@@ -549,6 +565,7 @@ async function initClientCrypto() {
     
     if (stored && stored.public_key && stored.private_key_enc) {
         try {
+            // Decrypt private key locally on device
             const privEncBuf = b64ToBuf(stored.private_key_enc);
             const privDecBuf = await decryptAESGCM(masterKey, privEncBuf);
             const privJwk = JSON.parse(new TextDecoder().decode(privDecBuf));
@@ -569,6 +586,7 @@ async function initClientCrypto() {
             return false;
         }
     } else {
+        // Generate new RSA keypair locally on device
         const keyPair = await window.crypto.subtle.generateKey(
             { name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
             true, ["encrypt", "decrypt"]
@@ -578,6 +596,7 @@ async function initClientCrypto() {
         const privJwk = await window.crypto.subtle.exportKey("jwk", keyPair.privateKey);
         const pubJwkStr = JSON.stringify(pubJwk);
 
+        // Encrypt private key locally before uploading backup to Firebase
         const privEncBuf = await encryptAESGCM(masterKey, new TextEncoder().encode(JSON.stringify(privJwk)));
         const privEncB64 = bufToB64(privEncBuf);
 
@@ -596,6 +615,7 @@ async function initClientCrypto() {
 async function getPeerPubKey(peerId) {
     if (peerKeysCache[peerId]) return peerKeysCache[peerId];
     
+    // If peer is self
     if (String(peerId) === String(myVkId)) {
         if (localKeyPair) {
             peerKeysCache[peerId] = localKeyPair.publicKey;
@@ -672,21 +692,26 @@ async function login() {
     if (!url) { alert('Вставишь ссылку с токеном'); return; }
     if (!pass) { alert('Придумай пароль для шифрования'); return; }
 
-    const res = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
-    const data = await res.json();
-    if (data.error) { alert(data.error); return; }
+    showUploadProgress('Авторизация...');
+    try {
+        const res = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+        const data = await res.json();
+        if (data.error) { alert(data.error); return; }
 
-    token = data.token;
-    currentUser = data.user;
-    myVkId = data.user.id;
-    password = pass;
+        token = data.token;
+        currentUser = data.user;
+        myVkId = data.user.id;
+        password = pass;
 
-    localStorage.setItem('vk_token', token);
-    localStorage.setItem('vk_pass', pass);
-    localStorage.setItem('vk_user', JSON.stringify(data.user));
+        localStorage.setItem('vk_token', token);
+        localStorage.setItem('vk_pass', pass);
+        localStorage.setItem('vk_user', JSON.stringify(data.user));
 
-    document.getElementById('loginScreen').classList.add('hidden');
-    document.getElementById('setupModal').classList.remove('hidden');
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('setupModal').classList.remove('hidden');
+    } finally {
+        hideUploadProgress();
+    }
 }
 
 async function setupEncryption() {
@@ -743,6 +768,7 @@ async function openChat(index) {
     document.getElementById('chatAvatar').src = d.photo || 'https://vk.com/images/camera_100.png';
     document.getElementById('chatScreen').classList.add('active');
 
+    // Check peer key
     const peerKey = await getPeerPubKey(currentPeer);
     const status = document.getElementById('chatEncryptStatus');
     if (peerKey) {
@@ -761,21 +787,6 @@ function backToDialogs() {
     document.getElementById('chatScreen').classList.remove('active');
     currentPeer = null;
     cancelReplyOrEdit();
-}
-
-// UPLOAD PROGRESS STATUS CONTROLS
-function showUploadStatus(msg) {
-    const banner = document.getElementById('uploadStatusBanner');
-    const text = document.getElementById('uploadStatusText');
-    if (banner && text) {
-        text.textContent = msg || 'Шифрование и отправка медиа...';
-        banner.classList.remove('hidden');
-    }
-}
-
-function hideUploadStatus() {
-    const banner = document.getElementById('uploadStatusBanner');
-    if (banner) banner.classList.add('hidden');
 }
 
 async function loadMessages() {
@@ -881,12 +892,13 @@ async function renderMessageItem(container, msg) {
                 const title = (doc.title || '').toLowerCase();
                 const ext = (doc.ext || '').toLowerCase();
 
+                // Check if encrypted doc, circle (.mec) or voice (.meg)
                 if (title.startsWith('enc_') || ext === 'meow' || ext === 'mur' || ext === 'enc' || ext === 'mec' || ext === 'meg' || title.endsWith('.mec') || title.endsWith('.meg')) {
                     const docId = `doc_${doc.owner_id}_${doc.id}`;
                     
                     if (ext === 'mec' || title.endsWith('.mec')) {
                         html += `<div class="tg-circle-container" id="${docId}">
-                            <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#888;font-size:12px"><span class="loader"></span>Расшифровка кружочка...</div>
+                            <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#888;font-size:12px"><span class="loader"></span>Загрузка кружочка...</div>
                         </div>`;
                     } else if (ext === 'meg' || title.endsWith('.meg')) {
                         html += `<div class="tg-voice-container" id="${docId}">
@@ -1001,20 +1013,25 @@ async function confirmDeleteMessage() {
     const deleteForAll = document.getElementById('deleteForAllCheck').checked ? 1 : 0;
     
     closeDeleteModal();
+    showUploadProgress('Удаление...');
     
-    await fetch('/api/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            token: token,
-            message_ids: selectedMsgForAction.id,
-            delete_for_all: deleteForAll
-        })
-    });
+    try {
+        await fetch('/api/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                token: token,
+                message_ids: selectedMsgForAction.id,
+                delete_for_all: deleteForAll
+            })
+        });
 
-    const elem = document.getElementById(`msg-${selectedMsgForAction.id}`);
-    if (elem) elem.closest('.msg-container').remove();
-    selectedMsgForAction = null;
+        const elem = document.getElementById(`msg-${selectedMsgForAction.id}`);
+        if (elem) elem.closest('.msg-container').remove();
+        selectedMsgForAction = null;
+    } finally {
+        hideUploadProgress();
+    }
 }
 
 // REPLY & EDIT PREVIEW BAR CONTROLS
@@ -1250,8 +1267,35 @@ async function sendMessage() {
     if (!text || !currentPeer) return;
 
     const btn = document.getElementById('sendBtn'); btn.disabled = true;
+    showUploadProgress('Отправка...');
 
-    if (editMsg) {
+    try {
+        if (editMsg) {
+            let sendText = text;
+            if (encryptionEnabled) {
+                const peerKey = await getPeerPubKey(currentPeer);
+                if (peerKey) {
+                    const plainBuf = new TextEncoder().encode(text).buffer;
+                    const encObj = await clientEncryptData(peerKey, plainBuf);
+                    sendText = ENCRYPT_PREFIX + JSON.stringify(encObj);
+                }
+            }
+
+            await fetch('/api/edit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token, peer_id: currentPeer, message_id: editMsg.id, text: sendText })
+            });
+
+            decryptedCache[editMsg.id] = text;
+            cancelReplyOrEdit();
+            input.value = '';
+            btn.disabled = false;
+            handleInputTyping();
+            loadMessages();
+            return;
+        }
+
         let sendText = text;
         if (encryptionEnabled) {
             const peerKey = await getPeerPubKey(currentPeer);
@@ -1262,62 +1306,40 @@ async function sendMessage() {
             }
         }
 
-        await fetch('/api/edit', {
+        const payload = {
+            token,
+            peer_id: currentPeer,
+            text: sendText
+        };
+
+        if (replyToMsg) {
+            payload.reply_to = replyToMsg.id;
+        }
+
+        await fetch('/api/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token, peer_id: currentPeer, message_id: editMsg.id, text: sendText })
+            body: JSON.stringify(payload)
         });
 
-        decryptedCache[editMsg.id] = text;
-        cancelReplyOrEdit();
         input.value = '';
         btn.disabled = false;
+        cancelReplyOrEdit();
         handleInputTyping();
         loadMessages();
-        return;
+    } finally {
+        hideUploadProgress();
     }
-
-    let sendText = text;
-    if (encryptionEnabled) {
-        const peerKey = await getPeerPubKey(currentPeer);
-        if (peerKey) {
-            const plainBuf = new TextEncoder().encode(text).buffer;
-            const encObj = await clientEncryptData(peerKey, plainBuf);
-            sendText = ENCRYPT_PREFIX + JSON.stringify(encObj);
-        }
-    }
-
-    const payload = {
-        token,
-        peer_id: currentPeer,
-        text: sendText
-    };
-
-    if (replyToMsg) {
-        payload.reply_to = replyToMsg.id;
-    }
-
-    await fetch('/api/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    });
-
-    input.value = '';
-    btn.disabled = false;
-    cancelReplyOrEdit();
-    handleInputTyping();
-    loadMessages();
 }
 
-// SUPPORTED MEDIA RECORDER MIME TYPES FOR ANDROID / ALL BROWSERS
+// SUPPORTED MEDIA RECORDER MIME TYPES FOR ANDROID CHROME
 function getSupportedMimeType(kind) {
     if (kind === 'video') {
         const types = [
             'video/webm;codecs=vp8,opus',
             'video/webm',
-            'video/mp4',
-            'video/3gpp'
+            'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+            'video/mp4'
         ];
         for (let t of types) {
             if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
@@ -1335,6 +1357,45 @@ function getSupportedMimeType(kind) {
             if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
         }
         return '';
+    }
+}
+
+// GENERAL MEDIA BLOB UPLOAD (HANDLES ENCRYPTED & UNENCRYPTED MODES)
+async function sendMediaBlob(blob, filename, mimeType) {
+    if (!currentPeer) {
+        hideUploadProgress();
+        return;
+    }
+
+    try {
+        let sent = false;
+        if (encryptionEnabled) {
+            const peerKey = await getPeerPubKey(currentPeer);
+            if (peerKey) {
+                await uploadEncryptedMedia(blob, filename, mimeType);
+                sent = true;
+            }
+        }
+
+        if (!sent) {
+            showUploadProgress('Загрузка файла...');
+            const formData = new FormData();
+            formData.append('token', token);
+            formData.append('peer_id', currentPeer);
+            formData.append('file', blob, filename);
+
+            const res = await fetch('/api/upload_normal', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.error) {
+                alert('Ошибка отправки: ' + (data.error.error_msg || data.error));
+            }
+        }
+    } catch(e) {
+        console.error('Upload error:', e);
+        alert('Ошибка при отправке: ' + (e.message || e));
+    } finally {
+        hideUploadProgress();
+        loadMessages();
     }
 }
 
@@ -1362,6 +1423,7 @@ async function startVoiceRecording() {
 
         voiceSeconds = 0;
         document.getElementById('voiceTimer').textContent = '0:00';
+        if (voiceTimerInterval) clearInterval(voiceTimerInterval);
         voiceTimerInterval = setInterval(() => {
             voiceSeconds++;
             const m = Math.floor(voiceSeconds / 60);
@@ -1383,75 +1445,71 @@ function cancelVoiceRecording() {
 }
 
 async function stopAndSendVoiceRecording() {
-    if (!voiceRecorder) return;
-    
+    if (!voiceRecorder || voiceRecorder.state === 'inactive') return;
+
+    showUploadProgress('Подготовка голосового...');
+
     voiceRecorder.onstop = async () => {
         if (voiceTimerInterval) clearInterval(voiceTimerInterval);
         document.getElementById('inputAreaVoice').classList.add('hidden');
         document.getElementById('inputAreaNormal').classList.remove('hidden');
 
-        showUploadStatus("🔐 Шифрование и отправка голосового...");
-        try {
-            const blob = new Blob(voiceChunks, { type: voiceRecorder.mimeType || 'audio/webm' });
-            await uploadEncryptedMedia(blob, `voice_${Date.now()}.meg`, blob.type || 'audio/webm');
-        } finally {
-            hideUploadStatus();
+        const blob = new Blob(voiceChunks, { type: voiceRecorder.mimeType || 'audio/webm' });
+        if (blob.size === 0) {
+            hideUploadProgress();
+            alert('Голосовое сообщение получилось пустым.');
+            return;
         }
+
+        showUploadProgress('Отправка голосового...');
+        await sendMediaBlob(blob, `voice_${Date.now()}.meg`, blob.type || 'audio/webm');
     };
 
-    voiceRecorder.stop();
+    if (voiceRecorder.state !== 'inactive') {
+        try { voiceRecorder.requestData(); } catch(e){}
+        voiceRecorder.stop();
+    }
 }
 
-// RECORDING CIRCLE VIDEO MESSAGES (.MEC) WITH CAMERA SWITCH & TORCH
+// RECORDING CIRCLE VIDEO MESSAGES (.MEC) WITH CAMERA TOGGLE & TORCH
 let circleRecorder = null;
 let circleChunks = [];
 let circleStream = null;
 let circleTimerInterval = null;
 let circleSeconds = 0;
-let circleFacingMode = 'user'; // 'user' (front) or 'environment' (back)
+let currentFacingMode = 'user'; // 'user' (front) or 'environment' (back)
 let isTorchOn = false;
-
-async function getCircleMediaStream() {
-    // Android Robust getUserMedia fallback ladder
-    const videoConstraints = {
-        facingMode: circleFacingMode,
-        width: { ideal: 480 },
-        height: { ideal: 480 }
-    };
-
-    try {
-        return await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: true });
-    } catch(e1) {
-        try {
-            return await navigator.mediaDevices.getUserMedia({ video: { facingMode: circleFacingMode }, audio: true });
-        } catch(e2) {
-            return await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        }
-    }
-}
 
 async function startCircleRecording() {
     try {
-        circleStream = await getCircleMediaStream();
+        currentFacingMode = 'user';
+        isTorchOn = false;
+        const torchBtn = document.getElementById('circleTorchBtn');
+        if (torchBtn) torchBtn.classList.remove('active');
+
+        // Android Chrome compatibility constraints
+        try {
+            circleStream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: currentFacingMode, width: { ideal: 480 }, height: { ideal: 480 } }, 
+                audio: true 
+            });
+        } catch(errFallback) {
+            circleStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        }
+
         circleChunks = [];
         
         const videoElem = document.getElementById('circleVideoPreview');
         videoElem.srcObject = circleStream;
-        videoElem.play();
-
-        // Style mirror for front camera
-        if (circleFacingMode === 'user') {
-            videoElem.style.transform = 'scaleX(-1)';
-        } else {
-            videoElem.style.transform = 'none';
-        }
+        videoElem.style.transform = (currentFacingMode === 'user') ? 'scaleX(-1)' : 'scaleX(1)';
+        await videoElem.play().catch(e => console.log(e));
 
         document.getElementById('circleModal').classList.remove('hidden');
 
         const mimeType = getSupportedMimeType('video');
         const options = mimeType ? { mimeType } : {};
-        circleRecorder = new MediaRecorder(circleStream, options);
 
+        circleRecorder = new MediaRecorder(circleStream, options);
         circleRecorder.ondataavailable = e => {
             if (e.data && e.data.size > 0) circleChunks.push(e.data);
         };
@@ -1459,6 +1517,7 @@ async function startCircleRecording() {
 
         circleSeconds = 0;
         document.getElementById('circleTimer').textContent = '0:00';
+        if (circleTimerInterval) clearInterval(circleTimerInterval);
         circleTimerInterval = setInterval(() => {
             circleSeconds++;
             const m = Math.floor(circleSeconds / 60);
@@ -1467,80 +1526,126 @@ async function startCircleRecording() {
         }, 1000);
 
     } catch(e) {
-        console.error("Circle Record Error:", e);
-        alert("Ошибка доступа к камере или микрофону!");
+        console.error("Circle error:", e);
+        alert("Ошибка доступа к камере или микрофону. Разрешите доступ в браузере!");
     }
 }
 
-async function switchCircleCamera() {
-    if (circleTimerInterval) clearInterval(circleTimerInterval);
-    circleFacingMode = (circleFacingMode === 'user') ? 'environment' : 'user';
-    
-    if (circleStream) {
-        circleStream.getTracks().forEach(t => t.stop());
+// TOGGLE FRONT / BACK CAMERA DURING CIRCLE RECORDING
+async function toggleCircleCamera() {
+    currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
+    isTorchOn = false;
+    const torchBtn = document.getElementById('circleTorchBtn');
+    if (torchBtn) torchBtn.classList.remove('active');
+
+    if (!circleStream) return;
+
+    try {
+        let newVideoStream;
+        try {
+            newVideoStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: currentFacingMode, width: { ideal: 480 }, height: { ideal: 480 } }
+            });
+        } catch(e) {
+            newVideoStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: currentFacingMode }
+            });
+        }
+
+        const newVideoTrack = newVideoStream.getVideoTracks()[0];
+        const oldVideoTrack = circleStream.getVideoTracks()[0];
+
+        if (oldVideoTrack) {
+            oldVideoTrack.stop();
+            circleStream.removeTrack(oldVideoTrack);
+        }
+
+        circleStream.addTrack(newVideoTrack);
+
+        const videoElem = document.getElementById('circleVideoPreview');
+        videoElem.srcObject = circleStream;
+        videoElem.style.transform = (currentFacingMode === 'user') ? 'scaleX(-1)' : 'scaleX(1)';
+    } catch(err) {
+        console.error("Failed to switch camera:", err);
+        alert("Не удалось переключить камеру");
     }
-    
-    startCircleRecording();
 }
 
+// TOGGLE FLASHLIGHT / TORCH
 async function toggleCircleTorch() {
     if (!circleStream) return;
     const videoTrack = circleStream.getVideoTracks()[0];
     if (!videoTrack) return;
 
     try {
-        const capabilities = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
-        if (capabilities.torch) {
-            isTorchOn = !isTorchOn;
-            await videoTrack.applyConstraints({ advanced: [{ torch: isTorchOn }] });
-            const torchBtn = document.getElementById('circleTorchBtn');
-            if (torchBtn) {
-                if (isTorchOn) torchBtn.classList.add('active');
-                else torchBtn.classList.remove('active');
-            }
-        } else {
-            alert("Фонарик не поддерживается этой камерой");
-        }
-    } catch(e) {
-        alert("Не удалось включить фонарик");
+        const capabilities = (typeof videoTrack.getCapabilities === 'function') ? videoTrack.getCapabilities() : {};
+        
+        isTorchOn = !isTorchOn;
+        await videoTrack.applyConstraints({
+            advanced: [{ torch: isTorchOn }]
+        }).then(() => {
+            document.getElementById('circleTorchBtn')?.classList.toggle('active', isTorchOn);
+        }).catch(() => {
+            isTorchOn = false;
+            document.getElementById('circleTorchBtn')?.classList.remove('active');
+            alert("Фонарик не поддерживается на этой камере / устройстве");
+        });
+    } catch (e) {
+        console.error("Torch error:", e);
+        alert("Фонарик не поддерживается на данном устройстве");
     }
 }
 
 function cancelCircleRecording() {
     if (circleRecorder && circleRecorder.state !== 'inactive') circleRecorder.stop();
-    if (circleStream) circleStream.getTracks().forEach(t => t.stop());
+    if (circleStream) {
+        circleStream.getTracks().forEach(t => t.stop());
+        circleStream = null;
+    }
     if (circleTimerInterval) clearInterval(circleTimerInterval);
     document.getElementById('circleModal').classList.add('hidden');
 }
 
 async function stopAndSendCircleRecording() {
-    if (!circleRecorder) return;
+    if (!circleRecorder || circleRecorder.state === 'inactive') return;
+
+    showUploadProgress('Подготовка кружочка...');
 
     circleRecorder.onstop = async () => {
-        if (circleStream) circleStream.getTracks().forEach(t => t.stop());
         if (circleTimerInterval) clearInterval(circleTimerInterval);
+        if (circleStream) {
+            circleStream.getTracks().forEach(t => t.stop());
+            circleStream = null;
+        }
         document.getElementById('circleModal').classList.add('hidden');
 
-        showUploadStatus("🔐 Шифрование и отправка кружочка...");
-        try {
-            const blob = new Blob(circleChunks, { type: circleRecorder.mimeType || 'video/webm' });
-            await uploadEncryptedMedia(blob, `circle_${Date.now()}.mec`, blob.type || 'video/webm');
-        } finally {
-            hideUploadStatus();
+        const blob = new Blob(circleChunks, { type: circleRecorder.mimeType || 'video/webm' });
+        
+        if (blob.size === 0) {
+            hideUploadProgress();
+            alert('Запись кружочка оказалась пустой. Попробуйте еще раз.');
+            return;
         }
+
+        showUploadProgress('Отправка кружочка...');
+        await sendMediaBlob(blob, `circle_${Date.now()}.mec`, blob.type || 'video/webm');
     };
 
-    circleRecorder.stop();
+    if (circleRecorder.state !== 'inactive') {
+        try { circleRecorder.requestData(); } catch(e){}
+        circleRecorder.stop();
+    }
 }
 
 // HELPER: ENCRYPT & UPLOAD MEDIA BINARY (.MEC, .MEG, PHOTOS, FILES)
 async function uploadEncryptedMedia(blob, filename, mimeType) {
     if (!currentPeer) return;
 
+    showUploadProgress('Шифрование и отправка...');
+
     const peerKey = await getPeerPubKey(currentPeer);
     if (!peerKey) {
-        alert("У собеседника нет публичного ключа шифрования!");
-        return;
+        throw new Error("У собеседника нет публичного ключа шифрования!");
     }
 
     const fileArrayBuf = await blob.arrayBuffer();
@@ -1570,7 +1675,7 @@ async function uploadEncryptedMedia(blob, filename, mimeType) {
 
     const encBlob = new Blob([resultBuf], { type: 'application/octet-stream' });
 
-    // DETERMINE EXTENSION FOR VK ENCRYPTED DOC TITLE
+    // DETERMINE THE EXTENSION FOR VK ENCRYPTED DOC TITLE
     let ext = 'enc';
     if (filename.endsWith('.mec') || mimeType.includes('mec')) ext = 'mec';
     else if (filename.endsWith('.meg') || mimeType.includes('meg')) ext = 'meg';
@@ -1584,8 +1689,11 @@ async function uploadEncryptedMedia(blob, filename, mimeType) {
     formData.append('peer_id', currentPeer);
     formData.append('file', encBlob, vkFileName);
 
-    await fetch('/api/upload_encrypted_doc', { method: 'POST', body: formData });
-    loadMessages();
+    const resp = await fetch('/api/upload_encrypted_doc', { method: 'POST', body: formData });
+    const resJson = await resp.json();
+    if (resJson.error) {
+        alert("Ошибка загрузки: " + (resJson.error.error_msg || resJson.error));
+    }
 }
 
 // HANDLE GENERAL FILE / PHOTO UPLOAD
@@ -1593,33 +1701,16 @@ async function handleFile(e) {
     const file = e.target.files[0];
     if (!file || !currentPeer) return;
 
-    const btn = document.getElementById('sendBtn'); if (btn) btn.disabled = true;
-
-    showUploadStatus("🔐 Шифрование и загрузка файла...");
+    showUploadProgress('Отправка файла...');
 
     try {
-        if (encryptionEnabled) {
-            const peerKey = await getPeerPubKey(currentPeer);
-            if (peerKey) {
-                await uploadEncryptedMedia(file, file.name, file.type || 'application/octet-stream');
-                if (btn) btn.disabled = false;
-                e.target.value = '';
-                return;
-            }
-        }
-
-        // Unencrypted normal upload
-        const formData = new FormData();
-        formData.append('token', token);
-        formData.append('peer_id', currentPeer);
-        formData.append('file', file);
-        await fetch('/api/upload_normal', { method: 'POST', body: formData });
-
-        if (btn) btn.disabled = false;
-        e.target.value = '';
-        loadMessages();
+        await sendMediaBlob(file, file.name, file.type || 'application/octet-stream');
+    } catch(err) {
+        console.error(err);
+        alert('Ошибка отправки файла');
     } finally {
-        hideUploadStatus();
+        hideUploadProgress();
+        e.target.value = '';
     }
 }
 
@@ -1887,7 +1978,7 @@ def upload_normal():
     files = {'file': (filename, BytesIO(file_bytes), file.content_type or 'application/octet-stream')}
     upload_resp = requests.post(upload_url, files=files, timeout=30).json()
 
-    save_result = vk_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=filename)
+    save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=filename)
     if isinstance(save_result, dict) and 'doc' in save_result:
         doc = save_result['doc']
         attachment = f"doc{doc['owner_id']}_{doc['id']}"
