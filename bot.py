@@ -110,7 +110,7 @@ async def handle_comment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await message.delete()
     except Exception as e:
-        logger.error(f"Delete error: {e}")
+        logger.error("Delete error: " + str(e))
 
     reply_id = None
     if message.reply_to_message:
@@ -123,16 +123,16 @@ async def handle_comment(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_to_message_id=reply_id
         )
     except Exception as e:
-        logger.error(f"Send error: {e}")
+        logger.error("Send error: " + str(e))
+        msg_text = "Comment from " + name + ": " + text
         await context.bot.send_message(
             chat_id=message.chat_id,
-            text="Comment from " + name + ":
-" + text,
+            text=msg_text,
             reply_to_message_id=reply_id
         )
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.error(f"Error: {context.error}")
+    logger.error("Error: " + str(context.error))
 
 def main():
     if not BOT_TOKEN:
