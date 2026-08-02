@@ -492,7 +492,7 @@ document.getElementById('chatAvatar').src=d.photo||'https://vk.com/images/camera
 document.getElementById('chatScreen').classList.add('active');
 
 // Check if peer has encryption keys
-const keyRes=await fetch('/api/check_peer_key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({peer_id:currentPeer})});
+const keyRes=await fetch('/api/check_peer_key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({peer_id:currentPeer,my_vk_id:myVkId})});
 const keyData=await keyRes.json();
 if(keyData.has_key){
 peerKeys[currentPeer]=true;
@@ -559,7 +559,7 @@ const btn=document.getElementById('sendBtn');btn.disabled=true;
 let sendText=text;
 if(encryptionEnabled&&peerKeys[currentPeer]){
 // Encrypt message
-const encRes=await fetch('/api/encrypt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:token,peer_id:currentPeer,text:text})});
+const encRes=await fetch('/api/encrypt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:token,peer_id:currentPeer,my_vk_id:myVkId,text:text})});
 const encData=await encRes.json();
 if(encData.encrypted)sendText='ENC:'+encData.encrypted;
 }
@@ -678,7 +678,14 @@ def setup_keys():
 
 @app.route('/api/check_peer_key', methods=['POST'])
 def check_peer_key():
-    peer_id = request.json.get('peer_id')
+    data = request.json
+    peer_id = data.get('peer_id')
+    my_vk_id = data.get('my_vk_id')
+
+    # Чат сам с собой — всегда есть ключ (свой)
+    if my_vk_id and str(peer_id) == str(my_vk_id):
+        return jsonify({'has_key': True})
+
     key = get_peer_public_key(peer_id)
     return jsonify({'has_key': key is not None})
 
@@ -688,9 +695,20 @@ def encrypt_message():
     data = request.json
     token = data.get('token')
     peer_id = data.get('peer_id')
+    my_vk_id = data.get('my_vk_id')
     text = data.get('text')
 
-    pub_key = get_peer_public_key(peer_id)
+    # Чат сам с собой — используем свои ключи
+    if my_vk_id and str(peer_id) == str(my_vk_id):
+        # Получаем свои ключи из Firebase
+        stored = firebase_get(f"keys/{my_vk_id}")
+        if stored and stored.get('public_key'):
+            pub_key = stored['public_key']
+        else:
+            return jsonify({'error': 'Your encryption keys not found'}), 400
+    else:
+        pub_key = get_peer_public_key(peer_id)
+
     if not pub_key:
         return jsonify({'error': 'Peer has no encryption key'}), 400
 
