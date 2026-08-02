@@ -1,88 +1,121 @@
 import os
-import asyncio
+import re
 import logging
-from telegram import Update, Bot
-from telegram.ext import Application, CommandHandler, ContextTypes
+import yt_dlp
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import Application, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
-CHANNEL_ID = os.environ.get("CHANNEL_ID")  # ID канала, например -1001234567890
 
-TEXT = "Подпишись, мяу ~"
-
-
-async def animate_post(bot: Bot, chat_id: int, message_id: int):
-    """Анимация печати — редактирует пост по одной букве"""
-    current_text = ""
-    index = 0
-
-    while True:
-        if index <= len(TEXT):
-            current_text = TEXT[:index]
-            index += 1
-        else:
-            # Начинаем сначала
-            index = 0
-            current_text = ""
-            await asyncio.sleep(1)
-            continue
-
-        try:
-            await bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=message_id,
-                text=current_text
-            )
-            await asyncio.sleep(1)
-        except Exception as e:
-            error_str = str(e)
-            # Если слишком часто редактируем — ждём
-            if "Too Many Requests" in error_str or "retry after" in error_str:
-                # Парсим время ожидания
-                import re
-                match = re.search(r'retry after (\d+)', error_str)
-                if match:
-                    wait_time = int(match.group(1))
-                    logger.info("Rate limit, waiting " + str(wait_time) + " seconds")
-                    await asyncio.sleep(wait_time + 1)
-                else:
-                    logger.info("Rate limit, waiting 5 seconds")
-                    await asyncio.sleep(5)
-            elif "message is not modified" in error_str:
-                # Игнорируем, если текст не изменился
-                await asyncio.sleep(1)
-            else:
-                logger.error("Edit error: " + error_str)
-                await asyncio.sleep(3)
+YOUTUBE_PATTERN = re.compile(r'(https?://)?(www\.)?(youtube\.com|youtu\.be)/.+')
 
 
-async def start_animation(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Запускает анимацию в канале"""
-    if not CHANNEL_ID:
-        await update.message.reply_text("CHANNEL_ID не настроен!")
+def download_youtube(url, format_type):
+    """Скачивает видео или аудио с YouTube"""
+    if format_type == "360p":
+        ydl_opts = {
+            'format': 'best[height<=360]',
+            'outtmpl': '/app/video_%(id)s.%(ext)s',
+            'max_filesize': 50 * 1024 * 1024,  # 50MB лимит Telegram
+        }
+    else:  # mp3
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': '/app/audio_%(id)s.%(ext)s',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'max_filesize': 50 * 1024 * 1024,
+        }
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        filename = ydl.prepare_filename(info)
+
+        # Для mp3 меняем расширение
+        if format_type == "mp3":
+            filename = filename.rsplit('.', 1)[0] + '.mp3'
+
+        return filename, info.get('title', 'Unknown')
+
+
+async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обрабатывает ссылку на YouTube"""
+    message = update.message
+    if not message or not message.text:
         return
 
-    chat_id = int(CHANNEL_ID)
+    url = message.text.strip()
+    if not YOUTUBE_PATTERN.match(url):
+        return
 
-    # Создаём начальный пост
+    # Кнопки выбора
+    keyboard = [
+        [
+            InlineKeyboardButton("📹 Видео 360p", callback_data=f"video|{url}"),
+            InlineKeyboardButton("🎵 Аудио MP3", callback_data=f"mp3|{url}")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await message.reply_text("Выбери формат:", reply_markup=reply_markup)
+
+
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обрабатывает выбор формата"""
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data
+    format_type, url = data.split('|', 1)
+
+    # Удаляем кнопки
+    await query.edit_message_text("⏳ Скачиваю...")
+
     try:
-        msg = await context.bot.send_message(chat_id=chat_id, text=".")
-        logger.info("Post created: " + str(msg.message_id))
+        filename, title = download_youtube(url, format_type)
+        file_size = os.path.getsize(filename)
+
+        # Проверяем размер
+        if file_size > 50 * 1024 * 1024:
+            # Больше 50MB — отправляем как документ (Telegram позволяет до 2GB для премиум, но бот API 50MB)
+            # Или загружаем на файлообменник
+            await query.edit_message_text(
+                "❌ Файл слишком большой (>50MB).\n"
+                "Telegram Bot API ограничивает размер.\n"
+                "Попробуй скачать сам: " + url
+            )
+            os.remove(filename)
+            return
+
+        # Отправляем файл
+        with open(filename, 'rb') as f:
+            if format_type == "360p":
+                await context.bot.send_video(
+                    chat_id=query.message.chat_id,
+                    video=f,
+                    caption=title,
+                    supports_streaming=True
+                )
+            else:
+                await context.bot.send_audio(
+                    chat_id=query.message.chat_id,
+                    audio=f,
+                    title=title,
+                    performer="YouTube"
+                )
+
+        await query.edit_message_text("✅ Готово!")
+        os.remove(filename)
+
     except Exception as e:
-        await update.message.reply_text("Ошибка создания поста: " + str(e))
-        return
-
-    # Запускаем анимацию в фоне
-    asyncio.create_task(animate_post(context.bot, chat_id, msg.message_id))
-
-    await update.message.reply_text("Анимация запущена в канале!")
-
-
-async def stop_animation(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Останавливает анимацию (не реализовано полностью — нужно хранить task)"""
-    await update.message.reply_text("Чтобы остановить — перезапусти бота или удали пост вручную.")
+        logger.error("Download error: " + str(e))
+        await query.edit_message_text("❌ Ошибка: " + str(e))
 
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -95,11 +128,11 @@ def main():
         return
 
     application = Application.builder().token(BOT_TOKEN).build()
-    application.add_handler(CommandHandler("start_anim", start_animation))
-    application.add_handler(CommandHandler("stop", stop_animation))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_url))
+    application.add_handler(CallbackQueryHandler(handle_callback))
     application.add_error_handler(error_handler)
 
-    logger.info("Typing post bot started!")
+    logger.info("YouTube bot started!")
     application.run_polling()
 
 
