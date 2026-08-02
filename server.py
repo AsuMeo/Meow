@@ -17,9 +17,6 @@ API_VERSION = "5.199"
 FIREBASE_DB_URL = os.environ.get('FIREBASE_DB_URL', '')
 FIREBASE_API_KEY = os.environ.get('FIREBASE_API_KEY', '')
 
-# Persistent HTTP Session for fast connection pooling
-http_session = requests.Session()
-
 
 def firebase_get(path):
     """GET data from Firebase Realtime Database"""
@@ -27,7 +24,7 @@ def firebase_get(path):
         return None
     url = f"{FIREBASE_DB_URL}/{path}.json"
     try:
-        resp = http_session.get(url, timeout=5)
+        resp = requests.get(url, timeout=10)
         return resp.json()
     except Exception:
         return None
@@ -39,18 +36,18 @@ def firebase_put(path, data):
         return False
     url = f"{FIREBASE_DB_URL}/{path}.json"
     try:
-        resp = http_session.put(url, json=data, timeout=5)
+        resp = requests.put(url, json=data, timeout=10)
         return resp.status_code == 200
     except Exception:
         return False
 
 
 def vk_request(method, token, **params):
-    """Fast proxy request to VK API with HTTP session reuse"""
+    """Proxy request to VK API"""
     params['access_token'] = token
     params['v'] = API_VERSION
     try:
-        resp = http_session.get(f"{VK_API}/{method}", params=params, timeout=10)
+        resp = requests.get(f"{VK_API}/{method}", params=params, timeout=30)
         data = resp.json()
         return data.get('response', data.get('error'))
     except Exception as e:
@@ -70,14 +67,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .app{height:100vh;display:flex;flex-direction:column;position:relative;overflow:hidden}
 
 /* Login Screen */
-.login-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:100;animation:fadeIn 0.2s ease-out}
+.login-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:100}
+.login-screen.hidden{display:none!important}
 .login-screen h1{font-size:26px;margin-bottom:6px;font-weight:700;color:#fff}
 .login-screen p{color:#888;margin-bottom:24px;font-size:13px;text-align:center;max-width:320px}
 .badge-e2e{background:#1c1c1e;color:#8e8e93;border:1px solid #2c2c2e;padding:6px 12px;border-radius:14px;font-size:12px;font-weight:600;margin-bottom:20px;display:inline-flex;align-items:center;gap:6px}
-.token-input,.pass-input{width:100%;max-width:360px;padding:14px 16px;border:none;border-radius:14px;background:#161616;color:#fff;font-size:15px;margin-bottom:12px;outline:none;border:1px solid #2c2c2c;transition:border-color 0.2s}
+.token-input,.pass-input{width:100%;max-width:360px;padding:14px 16px;border:none;border-radius:14px;background:#161616;color:#fff;font-size:15px;margin-bottom:12px;outline:none;border:1px solid #2c2c2c}
 .token-input:focus,.pass-input:focus{border-color:#555}
 .token-input::placeholder,.pass-input::placeholder{color:#666}
-.btn{width:100%;max-width:360px;padding:14px;border:none;border-radius:14px;background:#fff;color:#000;font-size:16px;font-weight:600;cursor:pointer;margin-bottom:8px;transition:all 0.1s active}
+.btn{width:100%;max-width:360px;padding:14px;border:none;border-radius:14px;background:#fff;color:#000;font-size:16px;font-weight:600;cursor:pointer;margin-bottom:8px}
 .btn:active{transform:scale(0.97);opacity:.85}
 .btn-secondary{background:transparent;color:#fff;border:1px solid #333}
 .btn-green{background:#2c2c2e;color:#fff;border:1px solid #3a3a3c}
@@ -85,21 +83,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 /* Header */
 .header{height:56px;background:#0d0d0d;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #1c1c1c;flex-shrink:0;z-index:20}
-.header-back{width:42px;height:42px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;margin-right:8px;background:rgba(255,255,255,0.12);color:#fff;flex-shrink:0;transition:background 0.15s}
-.header-back:active{background:rgba(255,255,255,0.25)}
-.header-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;margin-right:10px;background:#222;cursor:pointer;flex-shrink:0}
+.header-back{width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;margin-right:6px;background:rgba(255,255,255,0.08);color:#fff;flex-shrink:0}
+.header-back:active{background:rgba(255,255,255,0.2)}
+.header-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;margin-right:10px;background:#222;cursor:pointer}
 .header-info{flex:1;min-width:0;cursor:pointer}
 .header-title{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .header-subtitle{font-size:12px;color:#888;display:flex;align-items:center;gap:4px}
+.header-subtitle.e2e-on{color:#8e8e93}
 .header-actions{display:flex;gap:6px;align-items:center}
-.header-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;color:#aaa;background:rgba(255,255,255,0.06);transition:all 0.15s}
-.header-btn:active{transform:scale(0.9);background:rgba(255,255,255,0.2)}
-.header-btn.active{color:#fff;background:rgba(255,255,255,0.2)}
+.header-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;color:#aaa;background:rgba(255,255,255,0.05)}
+.header-btn.active{color:#fff;background:rgba(255,255,255,0.15)}
 
 /* Dialogs */
 .dialogs-screen{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.dialogs-screen.hidden{display:none!important}
 .dialogs-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
-.dialog{display:flex;align-items:center;padding:12px 14px;cursor:pointer;border-bottom:1px solid #111;transition:background 0.15s}
+.dialog{display:flex;align-items:center;padding:12px 14px;cursor:pointer;border-bottom:1px solid #111}
 .dialog:active{background:#111}
 .dialog-avatar{width:50px;height:50px;border-radius:50%;object-fit:cover;margin-right:12px;flex-shrink:0;background:#222}
 .dialog-info{flex:1;min-width:0}
@@ -114,14 +113,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .chat-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;z-index:10;transform:translateX(100%);transition:transform 0.22s cubic-bezier(0.1, 0.9, 0.2, 1)}
 .chat-screen.active{transform:translateX(0)}
 .messages-wrapper{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column}
-.messages{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
+.messages{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch}
 
 /* Message styling */
 .msg-container{position:relative;display:flex;width:100%;align-items:center;touch-action:pan-y;margin-bottom:2px}
-.msg-swipe-bg{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;width:40px;opacity:0;transition:opacity 0.15s;color:#8e8e93;z-index:1}
+.msg-swipe-bg{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;width:40px;opacity:0;color:#8e8e93;z-index:1}
 .msg-swipe-right{right:-40px}
 
-.msg{max-width:82%;padding:8px 12px;border-radius:18px;font-size:14px;line-height:1.4;word-wrap:break-word;position:relative;transition:transform 0.15s, background-color 0.15s;will-change:transform}
+.msg{max-width:82%;padding:8px 12px;border-radius:18px;font-size:14px;line-height:1.4;word-wrap:break-word;position:relative}
 .msg-in{align-self:flex-start;background:#1c1c1e;border-bottom-left-radius:4px;color:#fff}
 .msg-out{align-self:flex-end;background:#2c2c2e;border-bottom-right-radius:4px;color:#fff}
 
@@ -133,10 +132,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .msg-text{color:#fff}
 .msg-time{font-size:10px;color:#888;margin-top:4px;text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:3px}
 
-.decrypting-shimmer{color:#888!important;font-style:italic}
+.msg-status{font-size:10px;margin-left:3px}
 
 /* Media Attachments */
-.msg-photo{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;object-fit:cover;cursor:pointer;background:transparent}
+.msg-photo{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;object-fit:cover;cursor:pointer;background:#111}
 .msg-video{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;background:#000}
 .msg-file{background:rgba(255,255,255,.05);padding:10px;border-radius:12px;margin-top:6px;display:flex;align-items:center;gap:10px;cursor:pointer}
 .msg-file-icon{font-size:20px;display:flex;align-items:center;justify-content:center;width:32px;height:32px;background:rgba(255,255,255,0.1);border-radius:50%}
@@ -144,40 +143,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .msg-file-name{font-size:13px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .msg-file-size{font-size:11px;color:#888}
 
-/* TG Circle Video Message (.mec) STRICTLY PURE ROUND CIRCLE */
-.tg-circle-container{
-    width: 200px;
-    height: 200px;
-    position: relative;
-    border-radius: 50% !important;
-    overflow: hidden !important;
-    margin: 6px 0;
-    background: transparent !important;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-    clip-path: circle(50% at 50% 50%);
-    -webkit-clip-path: circle(50% at 50% 50%);
-    transform: translateZ(0);
-    flex-shrink: 0;
-}
-.tg-circle-video{
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: cover !important;
-    border-radius: 50% !important;
-    background: transparent !important;
-    cursor: pointer;
-    display: block;
-}
-.tg-circle-overlay{
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    border-radius: 50% !important;
-    pointer-events: none;
-    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.2);
-}
+/* TG Circle Video Message (.mec) - CLEAN ROUND, NO SQUARES */
+.tg-circle-container{width:200px;height:200px;position:relative;border-radius:50%;overflow:hidden;margin-top:6px;background:#111;box-shadow:0 4px 15px rgba(0,0,0,0.5);transform:translateZ(0);-webkit-mask-image:-webkit-radial-gradient(circle, white 100%, black 100%)}
+.tg-circle-video{width:100%;height:100%;object-fit:cover;border-radius:50%;cursor:pointer;display:block}
+.tg-circle-overlay{position:absolute;top:0;left:0;width:100%;height:100%;border-radius:50%;pointer-events:none;box-shadow:inset 0 0 0 2px rgba(255,255,255,0.2)}
 
 /* TG Voice Message (.meg) */
 .tg-voice-container{display:flex;align-items:center;gap:10px;padding:6px 0;width:220px;user-select:none}
@@ -201,8 +170,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .input-attach{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;flex-shrink:0;color:#aaa}
 .message-input{flex:1;padding:10px 14px;border:none;border-radius:20px;background:#1c1c1e;color:#fff;font-size:14px;outline:none;resize:none;max-height:100px;font-family:inherit;line-height:1.4;border:1px solid #2a2a2c}
 .send-btn,.media-rec-btn{width:38px;height:38px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;border:none;color:#000}
+.send-btn:disabled{background:#222;color:#555}
 
-/* Voice Bar */
+/* Voice / Circle Recording UI Bar */
 .recording-bar{display:flex;align-items:center;flex:1;padding:0 12px;height:38px;background:#1c1c1e;border-radius:20px;gap:10px}
 .recording-dot{width:10px;height:10px;border-radius:50%;background:#ff3b30}
 .recording-timer{font-size:13px;font-weight:600;color:#fff;min-width:40px}
@@ -212,28 +182,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 /* TG Circle Camera Modal */
 .circle-recorder-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.circle-preview-box{
-    width: 260px;
-    height: 260px;
-    border-radius: 50% !important;
-    overflow: hidden !important;
-    position: relative;
-    box-shadow: 0 0 30px rgba(0,0,0,0.8);
-    border: 4px solid #fff;
-    background: #000;
-    clip-path: circle(50% at 50% 50%);
-    -webkit-clip-path: circle(50% at 50% 50%);
-}
-.circle-preview-video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);border-radius:50%!important}
-.circle-rec-controls{margin-top:24px;display:flex;align-items:center;justify-content:center;gap:16px}
+.circle-preview-box{width:260px;height:260px;border-radius:50%;overflow:hidden;position:relative;box-shadow:0 0 30px rgba(0,0,0,0.8);border:4px solid #fff;background:#000;-webkit-mask-image:-webkit-radial-gradient(circle, white 100%, black 100%)}
+.circle-preview-video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.circle-rec-controls{margin-top:24px;display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap}
 .circle-btn-action{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none}
 .circle-btn-sec{background:#2c2c2e;color:#fff;border:1px solid #3a3a3c}
 .circle-btn-sec.active{background:#fff;color:#000}
-.circle-btn-stop{background:#ff3b30;color:#fff;box-shadow:0 0 15px rgba(255,59,48,0.5)}
+.circle-btn-stop{background:#ff3b30;color:#fff}
 .circle-btn-cancel{background:#3a3a3c;color:#fff}
-
-/* Non-blocking Upload Progress Toast Banner */
-.upload-toast{position:fixed;top:62px;left:50%;transform:translateX(-50%);background:rgba(28,28,30,0.95);border:1px solid #3a3a3c;color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;z-index:500;display:flex;align-items:center;gap:8px;box-shadow:0 4px 16px rgba(0,0,0,0.5);pointer-events:none}
 
 /* Bottom Nav */
 .bottom-nav{height:50px;background:#0d0d0d;border-top:1px solid #1a1a1a;display:flex;justify-content:space-around;align-items:center;flex-shrink:0}
@@ -241,7 +197,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .nav-item.active{color:#fff}
 .nav-item span{font-size:10px}
 
-/* Context Menu */
+/* Context Menu / Message Actions Sheet */
 .action-sheet{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:250;display:flex;flex-direction:column;justify-content:flex-end}
 .action-sheet-content{background:#1c1c1e;border-top-left-radius:20px;border-top-right-radius:20px;padding:16px;display:flex;flex-direction:column;gap:8px}
 .action-sheet-item{padding:14px 16px;border-radius:12px;background:#2c2c2e;color:#fff;font-size:15px;font-weight:500;display:flex;align-items:center;gap:12px;cursor:pointer}
@@ -249,6 +205,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 /* Modals */
 .modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px}
+.modal.hidden{display:none!important}
 .modal-content{background:#161616;border-radius:20px;padding:24px;width:100%;max-width:380px;border:1px solid #282828}
 .modal-title{font-size:18px;font-weight:600;margin-bottom:10px;color:#fff}
 .modal-text{font-size:13px;color:#aaa;margin-bottom:20px;line-height:1.5}
@@ -257,19 +214,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 .file-input{display:none}
 .hidden{display:none!important}
-.loader{border:2px solid #333;border-top:2px solid #fff;border-radius:50%;width:14px;height:14px;animation:spin 0.6s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
+.loader{border:2px solid #333;border-top:2px solid #fff;border-radius:50%;width:16px;height:16px;animation:spin 0.6s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
 @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
 </style>
 </head>
 <body>
 <div class="app">
-
-<!-- Non-blocking Progress Banner -->
-<div class="upload-toast hidden" id="uploadToast">
-<span class="loader"></span>
-<span id="uploadToastText">Загрузка...</span>
-</div>
 
 <!-- Login Screen -->
 <div class="login-screen" id="loginScreen">
@@ -278,19 +228,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
 100% Client-Side Encryption
 </div>
-<p>Шифрование происходит прямо на твоём телефоне. Сервер не имеет доступа к фото и сообщениям.</p>
+<p>Шифрование происходит прямо на твоём устройстве. Ключ синхронизирован с Firebase.</p>
 <button class="btn btn-secondary" onclick="getToken()">1. Получить токен VK</button>
 <input type="text" class="token-input" id="tokenUrl" placeholder="Вставь ссылку с токеном из адресной строки...">
 <input type="password" class="pass-input" id="password" placeholder="Пароль для защиты ключей...">
 <button class="btn" onclick="login()">Войти</button>
 </div>
 
-<!-- Setup Encryption Modal (First-time key generation only) -->
+<!-- Setup Encryption Modal -->
 <div class="modal hidden" id="setupModal">
 <div class="modal-content">
-<div class="modal-title">Генерация RSA/AES ключей</div>
-<div class="modal-text" id="setupText">Генерируем уникальную пару ключей для нового аккаунта... Приватный ключ зашифруется с вашим паролем и сохранится в облачной базе.</div>
-<button class="btn btn-green" id="setupBtn" onclick="setupEncryption()">Создать ключи в облаке</button>
+<div class="modal-title">Облачные ключи E2EE</div>
+<div class="modal-text" id="setupText">Синхронизация или генерация защищенных ключей...</div>
+<button class="btn btn-green" id="setupBtn" onclick="setupEncryption()">Продолжить</button>
 </div>
 </div>
 
@@ -313,12 +263,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <!-- Dialogs Screen -->
 <div class="dialogs-screen hidden" id="dialogsScreen">
 <div class="header">
-<img class="header-avatar" id="headerAvatar" src="" alt="">
-<div class="header-info">
+<img class="header-avatar" id="headerAvatar" src="" alt="" onclick="logout()" title="Выйти">
+<div class="header-info" onclick="logout()" title="Выйти">
 <div class="header-title" id="headerTitle">VK</div>
-<div class="header-subtitle">
+<div class="header-subtitle e2e-on">
 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-Локальная защита
+Облачное E2EE
 </div>
 </div>
 <div class="header-actions">
@@ -345,18 +295,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <!-- Chat Screen -->
 <div class="chat-screen" id="chatScreen">
 <div class="header">
-<!-- EXPLICIT VISIBLE BACK BUTTON TO EXIT CHAT -->
-<div class="header-back" onclick="backToDialogs()" title="Выйти в список диалогов">
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+<div class="header-back" onclick="backToDialogs()" title="Назад в чаты">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
 </div>
-<img class="header-avatar" id="chatAvatar" src="" alt="" onclick="backToDialogs()">
-<div class="header-info" onclick="backToDialogs()">
+<img class="header-avatar" id="chatAvatar" src="" alt="" onclick="backToDialogs()" title="Назад в чаты">
+<div class="header-info" onclick="backToDialogs()" title="Назад в чаты">
 <div class="header-title" id="chatTitle"></div>
 <div class="header-subtitle" id="chatEncryptStatus">E2EE Ready</div>
 </div>
 <div class="header-actions">
-<div class="header-btn" onclick="backToDialogs()" title="Выйти из чата">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+<div class="header-btn" onclick="backToDialogs()" title="Назад в чаты">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
 </div>
 </div>
 </div>
@@ -418,38 +367,29 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </div>
 </div>
 
-<!-- Circle Video Camera Modal -->
+<!-- Circle Video Camera Preview Modal -->
 <div class="circle-recorder-modal hidden" id="circleModal">
 <div class="circle-preview-box">
 <video class="circle-preview-video" id="circleVideoPreview" autoplay muted playsinline></video>
 </div>
 <div class="recording-timer" id="circleTimer" style="margin-top:16px;font-size:18px">0:00</div>
 <div class="circle-rec-controls">
-
-<!-- Switch Camera -->
 <div class="circle-btn-action circle-btn-sec" onclick="toggleCircleCamera()" title="Сменить камеру">
 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0-4.418-3.582-8-8-8s-8 3.582-8 8"/><path d="M4 14c0 4.418 3.582 8 8 8s8-3.582 8-8"/><polyline points="1 7 4 10 7 7"/><polyline points="23 17 20 14 17 17"/></svg>
 </div>
-
-<!-- Toggle Flashlight/Torch -->
 <div class="circle-btn-action circle-btn-sec" id="circleTorchBtn" onclick="toggleCircleTorch()" title="Фонарик">
 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
 </div>
-
-<!-- Cancel -->
 <div class="circle-btn-action circle-btn-cancel" onclick="cancelCircleRecording()" title="Отмена">
 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
 </div>
-
-<!-- Stop & Send -->
 <div class="circle-btn-action circle-btn-stop" onclick="stopAndSendCircleRecording()" title="Отправить">
 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
 </div>
-
 </div>
 </div>
 
-<!-- Message Actions Sheet -->
+<!-- Action Sheet for Message Options -->
 <div class="action-sheet hidden" id="actionSheet" onclick="closeActionSheet(event)">
 <div class="action-sheet-content" onclick="event.stopPropagation()">
 <div class="action-sheet-item" onclick="triggerReplyFromSheet()">
@@ -473,38 +413,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </div>
 
 <script>
-/* =========================================================================
-   PURE CLIENT-SIDE CLOUD E2EE ENGINE (PBKDF2 + RSA-OAEP + AES-GCM)
-   ========================================================================= */
-
 const ENCRYPT_PREFIX = "ENC2:";
 let token = localStorage.getItem('vk_token');
 let password = localStorage.getItem('vk_pass');
 let currentPeer = null;
-let currentUser = null;
+let currentUser = JSON.parse(localStorage.getItem('vk_user') || 'null');
+let myVkId = currentUser ? currentUser.id : null;
 let dialogsData = [];
 let pollInterval = null;
 let encryptionEnabled = true;
-let myVkId = null;
 
-let localKeyPair = null; // { publicKey, privateKey, pubJwkStr }
-let peerKeysCache = {}; // peer_id -> public JWK
-let decryptedCache = {}; // id -> content
+let localKeyPair = null;
+let peerKeysCache = {};
+let decryptedCache = {};
 
-function showUploadProgress(text) {
-    const toast = document.getElementById('uploadToast');
-    const toastText = document.getElementById('uploadToastText');
-    if (toast && toastText) {
-        toastText.textContent = text || 'Загрузка...';
-        toast.classList.remove('hidden');
-    }
-}
+let replyToMsg = null;
+let editMsg = null;
+let selectedMsgForAction = null;
 
-function hideUploadProgress() {
-    const toast = document.getElementById('uploadToast');
-    if (toast) toast.classList.add('hidden');
-}
-
+// INSTANT NON-BLOCKING UI
 function bufToB64(buf) {
     let binary = '';
     const bytes = new Uint8Array(buf);
@@ -519,19 +446,13 @@ function b64ToBuf(b64) {
     return bytes.buffer;
 }
 
-// PBKDF2 Key Derivation
 async function deriveMasterKey(pass, saltStr) {
     const enc = new TextEncoder();
     const keyMaterial = await window.crypto.subtle.importKey(
         "raw", enc.encode(pass), "PBKDF2", false, ["deriveKey"]
     );
     return await window.crypto.subtle.deriveKey(
-        {
-            name: "PBKDF2",
-            salt: enc.encode(saltStr),
-            iterations: 100000,
-            hash: "SHA-256"
-        },
+        { name: "PBKDF2", salt: enc.encode(saltStr), iterations: 100000, hash: "SHA-256" },
         keyMaterial,
         { name: "AES-GCM", length: 256 },
         false,
@@ -555,66 +476,63 @@ async function decryptAESGCM(key, combinedBuf) {
     return await window.crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
 }
 
-// SMART CLOUD ENCRYPTION KEY INITIALIZATION
+// CLOUD CLOUD E2EE KEY MANAGEMENT (TG-STYLE)
 async function initClientCrypto() {
-    if (!myVkId || !password || !token) return false;
+    if (!myVkId || !password) return false;
     
-    const masterKey = await deriveMasterKey(password, myVkId + "_vk_e2ee_salt");
+    const masterKey = await deriveMasterKey(password, myVkId + "_vk_e2ee_salt_v2");
     
-    // Check keypair in Firebase Cloud
-    const res = await fetch(`/api/keys/${myVkId}`);
-    const stored = await res.json();
-    
-    if (stored && stored.public_key && stored.private_key_enc) {
-        try {
-            // Decrypt private key stored in Firebase Cloud
-            const privEncBuf = b64ToBuf(stored.private_key_enc);
-            const privDecBuf = await decryptAESGCM(masterKey, privEncBuf);
-            const privJwk = JSON.parse(new TextDecoder().decode(privDecBuf));
-            const pubJwk = JSON.parse(stored.public_key);
+    try {
+        const res = await fetch(`/api/keys/${myVkId}`);
+        const stored = await res.json();
+        
+        if (stored && stored.public_key && stored.private_key_enc) {
+            try {
+                const privEncBuf = b64ToBuf(stored.private_key_enc);
+                const privDecBuf = await decryptAESGCM(masterKey, privEncBuf);
+                const privJwk = JSON.parse(new TextDecoder().decode(privDecBuf));
+                const pubJwk = JSON.parse(stored.public_key);
 
-            const publicKey = await window.crypto.subtle.importKey(
-                "jwk", pubJwk, { name: "RSA-OAEP", hash: "SHA-256" }, true, ["encrypt"]
-            );
-            const privateKey = await window.crypto.subtle.importKey(
-                "jwk", privJwk, { name: "RSA-OAEP", hash: "SHA-256" }, true, ["decrypt"]
+                const publicKey = await window.crypto.subtle.importKey(
+                    "jwk", pubJwk, { name: "RSA-OAEP", hash: "SHA-256" }, true, ["encrypt"]
+                );
+                const privateKey = await window.crypto.subtle.importKey(
+                    "jwk", privJwk, { name: "RSA-OAEP", hash: "SHA-256" }, true, ["decrypt"]
+                );
+
+                localKeyPair = { publicKey, privateKey, pubJwkStr: stored.public_key };
+                return true;
+            } catch(e) {
+                console.error("Decryption failed with password:", e);
+                return false;
+            }
+        } else {
+            // Generate new cloud keys and persist in Firebase
+            const keyPair = await window.crypto.subtle.generateKey(
+                { name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
+                true, ["encrypt", "decrypt"]
             );
 
-            localKeyPair = { publicKey, privateKey, pubJwkStr: stored.public_key };
+            const pubJwk = await window.crypto.subtle.exportKey("jwk", keyPair.publicKey);
+            const privJwk = await window.crypto.subtle.exportKey("jwk", keyPair.privateKey);
+            const pubJwkStr = JSON.stringify(pubJwk);
+
+            const privEncBuf = await encryptAESGCM(masterKey, new TextEncoder().encode(JSON.stringify(privJwk)));
+            const privEncB64 = bufToB64(privEncBuf);
+
+            await fetch(`/api/keys/${myVkId}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ public_key: pubJwkStr, private_key_enc: privEncB64 })
+            });
+
+            localKeyPair = { publicKey: keyPair.publicKey, privateKey: keyPair.privateKey, pubJwkStr };
             return true;
-        } catch(e) {
-            console.error("Cloud Key Decryption Error:", e);
-            alert("Неверный пароль шифрования для этого аккаунта!");
-            return false;
         }
-    } else {
-        // No keys in Firebase -> Generate once
-        return null; // Signals setup needed
+    } catch(err) {
+        console.error("Cloud keys init error:", err);
+        return false;
     }
-}
-
-async function generateAndStoreKeys() {
-    const masterKey = await deriveMasterKey(password, myVkId + "_vk_e2ee_salt");
-    const keyPair = await window.crypto.subtle.generateKey(
-        { name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
-        true, ["encrypt", "decrypt"]
-    );
-
-    const pubJwk = await window.crypto.subtle.exportKey("jwk", keyPair.publicKey);
-    const privJwk = await window.crypto.subtle.exportKey("jwk", keyPair.privateKey);
-    const pubJwkStr = JSON.stringify(pubJwk);
-
-    const privEncBuf = await encryptAESGCM(masterKey, new TextEncoder().encode(JSON.stringify(privJwk)));
-    const privEncB64 = bufToB64(privEncBuf);
-
-    await fetch(`/api/keys/${myVkId}`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ public_key: pubJwkStr, private_key_enc: privEncB64 })
-    });
-
-    localKeyPair = { publicKey: keyPair.publicKey, privateKey: keyPair.privateKey, pubJwkStr };
-    return true;
 }
 
 async function getPeerPubKey(peerId) {
@@ -623,16 +541,18 @@ async function getPeerPubKey(peerId) {
         peerKeysCache[peerId] = localKeyPair.publicKey;
         return localKeyPair.publicKey;
     }
-    const res = await fetch(`/api/keys/${peerId}`);
-    const stored = await res.json();
-    if (stored && stored.public_key) {
-        const pubJwk = JSON.parse(stored.public_key);
-        const key = await window.crypto.subtle.importKey(
-            "jwk", pubJwk, { name: "RSA-OAEP", hash: "SHA-256" }, true, ["encrypt"]
-        );
-        peerKeysCache[peerId] = key;
-        return key;
-    }
+    try {
+        const res = await fetch(`/api/keys/${peerId}`);
+        const stored = await res.json();
+        if (stored && stored.public_key) {
+            const pubJwk = JSON.parse(stored.public_key);
+            const key = await window.crypto.subtle.importKey(
+                "jwk", pubJwk, { name: "RSA-OAEP", hash: "SHA-256" }, true, ["encrypt"]
+            );
+            peerKeysCache[peerId] = key;
+            return key;
+        }
+    } catch(e) {}
     return null;
 }
 
@@ -640,7 +560,6 @@ async function clientEncryptData(peerKey, plainBuf) {
     const sessionKey = await window.crypto.subtle.generateKey(
         { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]
     );
-
     const encPayload = await encryptAESGCM(sessionKey, plainBuf);
     const rawSession = await window.crypto.subtle.exportKey("raw", sessionKey);
 
@@ -656,34 +575,24 @@ async function clientEncryptData(peerKey, plainBuf) {
 
 async function clientDecryptData(encObj) {
     if (!localKeyPair) return null;
-    let rawSession = null;
-
     try {
-        rawSession = await window.crypto.subtle.decrypt({ name: "RSA-OAEP" }, localKeyPair.privateKey, b64ToBuf(encObj.k1));
-    } catch(e) {
+        let rawSession;
         try {
+            rawSession = await window.crypto.subtle.decrypt({ name: "RSA-OAEP" }, localKeyPair.privateKey, b64ToBuf(encObj.k1));
+        } catch(e) {
             rawSession = await window.crypto.subtle.decrypt({ name: "RSA-OAEP" }, localKeyPair.privateKey, b64ToBuf(encObj.k2));
-        } catch(e2) {
-            return null;
         }
+        const sessionKey = await window.crypto.subtle.importKey(
+            "raw", rawSession, { name: "AES-GCM" }, false, ["decrypt"]
+        );
+        return await decryptAESGCM(sessionKey, b64ToBuf(encObj.payload));
+    } catch(e) {
+        return null;
     }
-
-    const sessionKey = await window.crypto.subtle.importKey(
-        "raw", rawSession, { name: "AES-GCM" }, false, ["decrypt"]
-    );
-
-    return await decryptAESGCM(sessionKey, b64ToBuf(encObj.payload));
 }
 
-/* =========================================================================
-   UI & APP LOGIC
-   ========================================================================= */
-
+// AUTH & APP FLOW
 const AUTH_URL = 'https://oauth.vk.com/authorize?client_id=2685278&scope=messages,audio,photos,video,docs,notes,pages,status,wall,groups,email,stats,notifications,offline&redirect_uri=https://oauth.vk.com/blank.html&response_type=token';
-
-let replyToMsg = null;
-let editMsg = null;
-let selectedMsgForAction = null;
 
 function getToken() { window.open(AUTH_URL, '_blank'); }
 
@@ -691,9 +600,8 @@ async function login() {
     const url = document.getElementById('tokenUrl').value.trim();
     const pass = document.getElementById('password').value.trim();
     if (!url) { alert('Вставь ссылку с токеном'); return; }
-    if (!pass) { alert('Введи пароль для шифрования'); return; }
+    if (!pass) { alert('Придумай пароль для ключей'); return; }
 
-    showUploadProgress('Авторизация...');
     try {
         const res = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
         const data = await res.json();
@@ -704,42 +612,38 @@ async function login() {
         myVkId = data.user.id;
         password = pass;
 
-        // Save session locally so user NEVER gets logged out on refresh
         localStorage.setItem('vk_token', token);
         localStorage.setItem('vk_pass', pass);
         localStorage.setItem('vk_user', JSON.stringify(data.user));
 
         document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('setupModal').classList.remove('hidden');
+        document.getElementById('setupText').textContent = 'Подключение облачных ключей E2EE...';
 
-        // Check if user already has keys in Firebase Cloud
-        const hasKeys = await initClientCrypto();
-        if (hasKeys === true) {
-            // Keys exist and decrypted successfully -> direct login!
+        const ok = await initClientCrypto();
+        if (ok) {
+            document.getElementById('setupModal').classList.add('hidden');
             showDialogsScreen();
             loadDialogs();
             startPolling();
-        } else if (hasKeys === null) {
-            // First time login -> generate keys once
-            document.getElementById('setupModal').classList.remove('hidden');
+        } else {
+            alert('Неверный пароль шифрования для этого аккаунта!');
+            logout();
         }
-    } finally {
-        hideUploadProgress();
+    } catch(e) {
+        alert('Ошибка авторизации');
     }
 }
 
 async function setupEncryption() {
-    document.getElementById('setupText').innerHTML = '<span class="loader"></span>Генерация ключей...';
-    document.getElementById('setupBtn').disabled = true;
-
-    const ok = await generateAndStoreKeys();
+    const ok = await initClientCrypto();
     if (ok) {
         document.getElementById('setupModal').classList.add('hidden');
         showDialogsScreen();
         loadDialogs();
         startPolling();
     } else {
-        alert("Ошибка создания ключей!");
-        document.getElementById('setupBtn').disabled = false;
+        alert("Неверный пароль для существующих ключей!");
     }
 }
 
@@ -752,27 +656,28 @@ function showDialogsScreen() {
 }
 
 async function loadDialogs() {
-    const res = await fetch('/api/dialogs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
-    const data = await res.json();
-    if (data.error) return;
-    dialogsData = data.dialogs;
-    const list = document.getElementById('dialogsList'); list.innerHTML = '';
-    
-    for (let i = 0; i < data.dialogs.length; i++) {
-        const d = data.dialogs[i];
-        const div = document.createElement('div');
-        div.className = 'dialog';
-        div.onclick = () => openChat(i);
-        const time = d.date ? new Date(d.date * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : '';
+    try {
+        const res = await fetch('/api/dialogs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
+        const data = await res.json();
+        if (data.error) return;
+        dialogsData = data.dialogs;
+        const list = document.getElementById('dialogsList');
+        list.innerHTML = '';
         
-        let preview = d.last_message || '';
-        if (preview.startsWith(ENCRYPT_PREFIX)) {
-            preview = '🔒 Зашифрованное сообщение';
+        for (let i = 0; i < data.dialogs.length; i++) {
+            const d = data.dialogs[i];
+            const div = document.createElement('div');
+            div.className = 'dialog';
+            div.onclick = () => openChat(i);
+            const time = d.date ? new Date(d.date * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : '';
+            
+            let preview = d.last_message || '';
+            if (preview.startsWith(ENCRYPT_PREFIX)) preview = '🔒 Зашифрованное сообщение';
+            
+            div.innerHTML = `<img class="dialog-avatar" src="${d.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'"><div class="dialog-info"><div class="dialog-top"><div class="dialog-name">${escapeHtml(d.name)}</div><div class="dialog-time">${time}</div></div><div class="dialog-bottom"><div class="dialog-preview">${escapeHtml(preview)}</div>${d.unread > 0 ? `<div class="dialog-unread">${d.unread}</div>` : ''}</div></div>`;
+            list.appendChild(div);
         }
-        
-        div.innerHTML = `<img class="dialog-avatar" src="${d.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'"><div class="dialog-info"><div class="dialog-top"><div class="dialog-name">${escapeHtml(d.name)}</div><div class="dialog-time">${time}</div></div><div class="dialog-bottom"><div class="dialog-preview">${escapeHtml(preview)}</div>${d.unread > 0 ? `<div class="dialog-unread">${d.unread}</div>` : ''}</div></div>`;
-        list.appendChild(div);
-    }
+    } catch(e) {}
 }
 
 async function openChat(index) {
@@ -799,31 +704,32 @@ function backToDialogs() {
     document.getElementById('chatScreen').classList.remove('active');
     currentPeer = null;
     cancelReplyOrEdit();
+    loadDialogs();
 }
 
 async function loadMessages() {
     if (!currentPeer) return;
-    const res = await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, peer_id: currentPeer }) });
-    const data = await res.json();
-    const container = document.getElementById('messages');
-    
-    if (data.messages) {
-        const msgs = data.messages.reverse();
-        const msgIds = msgs.map(m => m.id).join(',');
-        if (container.getAttribute('data-msg-hash') === msgIds) {
-            return;
-        }
-        container.setAttribute('data-msg-hash', msgIds);
-        container.innerHTML = '';
+    try {
+        const res = await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, peer_id: currentPeer }) });
+        const data = await res.json();
+        const container = document.getElementById('messages');
         
-        for (const m of msgs) {
-            await renderMessageItem(container, m);
+        if (data.messages) {
+            const msgs = data.messages.reverse();
+            const msgIds = msgs.map(m => m.id).join(',');
+            if (container.getAttribute('data-msg-hash') === msgIds) return;
+            container.setAttribute('data-msg-hash', msgIds);
+            container.innerHTML = '';
+            
+            for (const m of msgs) {
+                renderMessageItem(container, m);
+            }
+            container.scrollTop = container.scrollHeight;
         }
-        container.scrollTop = container.scrollHeight;
-    }
+    } catch(e) {}
 }
 
-async function renderMessageItem(container, msg) {
+function renderMessageItem(container, msg) {
     const containerDiv = document.createElement('div');
     containerDiv.className = 'msg-container';
     
@@ -837,11 +743,7 @@ async function renderMessageItem(container, msg) {
     div.className = 'msg ' + (msg.out ? 'msg-out' : 'msg-in');
     div.id = 'msg-' + msg.id;
 
-    div.oncontextmenu = (e) => {
-        e.preventDefault();
-        openActionSheet(msg);
-    };
-
+    div.oncontextmenu = (e) => { e.preventDefault(); openActionSheet(msg); };
     attachSwipeToReply(containerDiv, div, msg);
 
     let html = '';
@@ -866,8 +768,7 @@ async function renderMessageItem(container, msg) {
             displayText = decryptedCache[msg.id];
             html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
         } else {
-            html += `<div class="msg-text"><span class="decrypting-shimmer">🔐 Расшифровка...</span></div>`;
-            
+            html += `<div class="msg-text">🔐 Расшифровка...</div>`;
             setTimeout(async () => {
                 try {
                     const encObj = JSON.parse(msg.text.substring(ENCRYPT_PREFIX.length));
@@ -876,13 +777,11 @@ async function renderMessageItem(container, msg) {
                         const plainText = new TextDecoder().decode(decBuf);
                         decryptedCache[msg.id] = plainText;
                         const textElem = document.getElementById('msg-' + msg.id)?.querySelector('.msg-text');
-                        if (textElem) {
-                            textElem.innerHTML = escapeHtml(plainText);
-                        }
+                        if (textElem) textElem.textContent = plainText;
                     }
                 } catch(e) {
                     const textElem = document.getElementById('msg-' + msg.id)?.querySelector('.msg-text');
-                    if (textElem) textElem.textContent = '🔒 Ошибка расшифровки';
+                    if (textElem) textElem.textContent = '🔒 Не удалось расшифровать';
                 }
             }, 10);
         }
@@ -890,7 +789,6 @@ async function renderMessageItem(container, msg) {
         html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
     }
 
-    // Attachments
     if (msg.attachments) {
         for (const a of msg.attachments) {
             if (a.type === 'photo') {
@@ -906,14 +804,15 @@ async function renderMessageItem(container, msg) {
                     const docId = `doc_${doc.owner_id}_${doc.id}`;
                     
                     if (ext === 'mec' || title.endsWith('.mec')) {
-                        // STRICT PURE ROUND CIRCLE - NO GRAY BOXES
-                        html += `<div class="tg-circle-container" id="${docId}"></div>`;
+                        html += `<div class="tg-circle-container" id="${docId}">
+                            <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#888;font-size:12px">Загрузка...</div>
+                        </div>`;
                     } else if (ext === 'meg' || title.endsWith('.meg')) {
                         html += `<div class="tg-voice-container" id="${docId}">
-                            <div class="tg-voice-play-btn"><span class="loader"></span></div>
+                            <div class="tg-voice-play-btn">▶</div>
                             <div class="tg-voice-wave-wrap">
                                 <div class="tg-voice-waveform"><div class="tg-voice-bar active" style="height:50%"></div></div>
-                                <div class="tg-voice-info"><span>🔒 Расшифровка...</span></div>
+                                <div class="tg-voice-info"><span>🎤 Голосовое</span></div>
                             </div>
                         </div>`;
                     } else {
@@ -961,10 +860,7 @@ function attachSwipeToReply(container, elem, msg) {
     elem.addEventListener('touchend', () => {
         if (!isDragging) return;
         isDragging = false;
-        if (currentX < -50) {
-            if (navigator.vibrate) navigator.vibrate(15);
-            setReplyToMessage(msg);
-        }
+        if (currentX < -50) setReplyToMessage(msg);
         elem.style.transform = 'translateX(0px)';
         if (swipeBg) swipeBg.style.opacity = '0';
         currentX = 0;
@@ -1002,32 +898,21 @@ function closeDeleteModal() {
     document.getElementById('deleteModal').classList.add('hidden');
 }
 
-// INSTANT OPTIMISTIC DELETE
 async function confirmDeleteMessage() {
     if (!selectedMsgForAction) return;
-    const targetId = selectedMsgForAction.id;
     const deleteForAll = document.getElementById('deleteForAllCheck').checked ? 1 : 0;
-    
     closeDeleteModal();
-
-    // OPTIMISTIC: Immediately remove element from DOM for instant feedback
-    const elem = document.getElementById(`msg-${targetId}`);
-    if (elem) elem.closest('.msg-container')?.remove();
-
-    showUploadProgress('Удаление...');
-
-    fetch('/api/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            token: token,
-            message_ids: targetId,
-            delete_for_all: deleteForAll
-        })
-    }).finally(() => {
-        hideUploadProgress();
+    
+    try {
+        await fetch('/api/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: token, message_ids: selectedMsgForAction.id, delete_for_all: deleteForAll })
+        });
+        const elem = document.getElementById(`msg-${selectedMsgForAction.id}`);
+        if (elem) elem.closest('.msg-container').remove();
         selectedMsgForAction = null;
-    });
+    } catch(e) {}
 }
 
 function setReplyToMessage(msg) {
@@ -1036,12 +921,10 @@ function setReplyToMessage(msg) {
     const title = document.getElementById('replyPreviewTitle');
     const text = document.getElementById('replyPreviewText');
     const author = msg.name || (msg.out ? 'Вы' : 'Собеседник');
-    
-    title.textContent = `Ответ на сообщение (${author})`;
+    title.textContent = `Ответ (${author})`;
     let previewText = msg.text || 'Вложение';
     if (previewText.startsWith(ENCRYPT_PREFIX)) previewText = '🔒 Зашифрованное сообщение';
     text.textContent = previewText;
-    
     document.getElementById('replyPreviewBar').classList.remove('hidden');
     document.getElementById('msgInput').focus();
 }
@@ -1051,11 +934,9 @@ function startEditingMessage(msg) {
     editMsg = msg;
     const title = document.getElementById('replyPreviewTitle');
     const text = document.getElementById('replyPreviewText');
-    
-    title.textContent = 'Редактирование сообщения';
+    title.textContent = 'Редактирование';
     let plainText = msg.text || '';
     if (decryptedCache[msg.id]) plainText = decryptedCache[msg.id];
-    
     text.textContent = plainText;
     document.getElementById('msgInput').value = plainText;
     document.getElementById('replyPreviewBar').classList.remove('hidden');
@@ -1071,11 +952,7 @@ function cancelReplyOrEdit() {
 
 function scrollToMsg(msgId) {
     const elem = document.getElementById(`msg-${msgId}`);
-    if (elem) {
-        elem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        elem.style.backgroundColor = '#3a3a3c';
-        setTimeout(() => { elem.style.backgroundColor = ''; }, 1000);
-    }
+    if (elem) elem.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 async function processEncryptedAttachment(elemId, url, extInfo) {
@@ -1090,32 +967,25 @@ async function processEncryptedAttachment(elemId, url, extInfo) {
     try {
         const resp = await fetch(`/api/proxy_file?url=${encodeURIComponent(url)}`);
         const encArrayBuf = await resp.arrayBuffer();
-
         const view = new DataView(encArrayBuf);
         const headerLen = view.getUint32(0);
         
         const headerJsonBytes = new Uint8Array(encArrayBuf, 4, headerLen);
-        const headerStr = new TextDecoder().decode(headerJsonBytes);
-        const header = JSON.parse(headerStr);
-
+        const header = JSON.parse(new TextDecoder().decode(headerJsonBytes));
         const encPayload = encArrayBuf.slice(4 + headerLen);
 
         const decPayloadBuf = await clientDecryptData({
-            k1: header.k1,
-            k2: header.k2,
-            payload: bufToB64(encPayload)
+            k1: header.k1, k2: header.k2, payload: bufToB64(encPayload)
         });
 
-        if (!decPayloadBuf) throw new Error("Decryption failed");
+        if (!decPayloadBuf) throw new Error();
 
         const blob = new Blob([decPayloadBuf], { type: header.mime || 'application/octet-stream' });
         const blobUrl = URL.createObjectURL(blob);
         decryptedCache[elemId] = { blobUrl, mime: header.mime, name: header.name, extInfo };
 
         renderDecryptedMedia(elem, decryptedCache[elemId]);
-
     } catch (e) {
-        console.error("Failed to decrypt media:", e);
         if (elem.querySelector('.msg-file-size')) elem.querySelector('.msg-file-size').textContent = 'Ошибка расшифровки';
     }
 }
@@ -1133,9 +1003,8 @@ function renderDecryptedMedia(elem, data) {
         video.src = data.blobUrl;
         video.loop = true;
         video.playsInline = true;
-        video.setAttribute('playsinline', '');
-        video.setAttribute('webkit-playsinline', '');
         video.autoplay = true;
+        video.muted = true;
 
         const overlay = document.createElement('div');
         overlay.className = 'tg-circle-overlay';
@@ -1153,27 +1022,13 @@ function renderDecryptedMedia(elem, data) {
     } else if (isVoice) {
         const container = document.createElement('div');
         container.className = 'tg-voice-container';
-
         const audio = new Audio(data.blobUrl);
         
         container.innerHTML = `
-            <div class="tg-voice-play-btn">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            </div>
+            <div class="tg-voice-play-btn">▶</div>
             <div class="tg-voice-wave-wrap">
-                <div class="tg-voice-waveform">
-                    <div class="tg-voice-bar active" style="height:40%"></div>
-                    <div class="tg-voice-bar active" style="height:70%"></div>
-                    <div class="tg-voice-bar active" style="height:100%"></div>
-                    <div class="tg-voice-bar active" style="height:60%"></div>
-                    <div class="tg-voice-bar" style="height:80%"></div>
-                    <div class="tg-voice-bar" style="height:50%"></div>
-                    <div class="tg-voice-bar" style="height:90%"></div>
-                </div>
-                <div class="tg-voice-info">
-                    <span class="v-time">0:00</span>
-                    <span>🎤 Голосовое</span>
-                </div>
+                <div class="tg-voice-waveform"><div class="tg-voice-bar active" style="height:100%"></div></div>
+                <div class="tg-voice-info"><span class="v-time">0:00</span><span>🎤 Голосовое</span></div>
             </div>
         `;
 
@@ -1185,28 +1040,23 @@ function renderDecryptedMedia(elem, data) {
             const s = Math.floor(audio.duration % 60).toString().padStart(2, '0');
             timeStr.textContent = `${m}:${s}`;
         };
-
         audio.ontimeupdate = () => {
             const cur = Math.floor(audio.currentTime);
             const m = Math.floor(cur / 60);
             const s = Math.floor(cur % 60).toString().padStart(2, '0');
             timeStr.textContent = `${m}:${s}`;
         };
-
-        audio.onended = () => {
-            playBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
-        };
+        audio.onended = () => { playBtn.textContent = '▶'; };
 
         playBtn.onclick = () => {
             if (audio.paused) {
                 audio.play();
-                playBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+                playBtn.textContent = '❚❚';
             } else {
                 audio.pause();
-                playBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+                playBtn.textContent = '▶';
             }
         };
-
         elem.replaceWith(container);
 
     } else if (data.mime.startsWith('image/')) {
@@ -1222,7 +1072,7 @@ function renderDecryptedMedia(elem, data) {
         elem.replaceWith(vid);
     } else {
         if (elem.querySelector('.msg-file-size')) {
-            elem.querySelector('.msg-file-size').textContent = 'Расшифровано (нажмите для скачивания)';
+            elem.querySelector('.msg-file-size').textContent = 'Скачать';
             elem.onclick = () => {
                 const a = document.createElement('a');
                 a.href = data.blobUrl;
@@ -1252,17 +1102,13 @@ function handleInputTyping() {
     }
 }
 
-// INSTANT FAST SEND MESSAGE
 async function sendMessage() {
     const input = document.getElementById('msgInput');
     const text = input.value.trim();
     if (!text || !currentPeer) return;
 
-    const btn = document.getElementById('sendBtn'); btn.disabled = true;
-    input.value = '';
-    handleInputTyping();
-
-    showUploadProgress('Отправка...');
+    const btn = document.getElementById('sendBtn'); 
+    btn.disabled = true;
 
     try {
         if (editMsg) {
@@ -1284,6 +1130,9 @@ async function sendMessage() {
 
             decryptedCache[editMsg.id] = text;
             cancelReplyOrEdit();
+            input.value = '';
+            btn.disabled = false;
+            handleInputTyping();
             loadMessages();
             return;
         }
@@ -1307,33 +1156,30 @@ async function sendMessage() {
             body: JSON.stringify(payload)
         });
 
-        cancelReplyOrEdit();
-        loadMessages();
-    } finally {
+        input.value = '';
         btn.disabled = false;
-        hideUploadProgress();
+        cancelReplyOrEdit();
+        handleInputTyping();
+        loadMessages();
+    } catch(e) {
+        btn.disabled = false;
     }
 }
 
 function getSupportedMimeType(kind) {
     if (kind === 'video') {
-        const types = ['video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4'];
-        for (let t of types) {
-            if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
-        }
+        const types = ['video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'];
+        for (let t of types) if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
         return '';
     } else {
-        const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac', 'audio/ogg'];
-        for (let t of types) {
-            if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
-        }
+        const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+        for (let t of types) if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
         return '';
     }
 }
 
 async function sendMediaBlob(blob, filename, mimeType) {
-    if (!currentPeer) { hideUploadProgress(); return; }
-
+    if (!currentPeer) return;
     try {
         let sent = false;
         if (encryptionEnabled) {
@@ -1343,28 +1189,17 @@ async function sendMediaBlob(blob, filename, mimeType) {
                 sent = true;
             }
         }
-
         if (!sent) {
-            showUploadProgress('Загрузка файла...');
             const formData = new FormData();
             formData.append('token', token);
             formData.append('peer_id', currentPeer);
             formData.append('file', blob, filename);
-
-            const res = await fetch('/api/upload_normal', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.error) alert('Ошибка отправки: ' + (data.error.error_msg || data.error));
+            await fetch('/api/upload_normal', { method: 'POST', body: formData });
         }
-    } catch(e) {
-        console.error('Upload error:', e);
-        alert('Ошибка отправки: ' + (e.message || e));
-    } finally {
-        hideUploadProgress();
-        loadMessages();
-    }
+    } catch(e) {}
+    loadMessages();
 }
 
-// RECORDING VOICE
 let voiceRecorder = null;
 let voiceChunks = [];
 let voiceTimerInterval = null;
@@ -1375,9 +1210,7 @@ async function startVoiceRecording() {
         const mimeType = getSupportedMimeType('audio');
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         voiceChunks = [];
-        const options = mimeType ? { mimeType } : {};
-        voiceRecorder = new MediaRecorder(stream, options);
-
+        voiceRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
         voiceRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) voiceChunks.push(e.data); };
         voiceRecorder.start(100);
 
@@ -1393,9 +1226,8 @@ async function startVoiceRecording() {
             const s = (voiceSeconds % 60).toString().padStart(2, '0');
             document.getElementById('voiceTimer').textContent = `${m}:${s}`;
         }, 1000);
-
     } catch(e) {
-        alert("Ошибка доступа к микрофону");
+        alert("Нет доступа к микрофону");
     }
 }
 
@@ -1408,26 +1240,18 @@ function cancelVoiceRecording() {
 
 async function stopAndSendVoiceRecording() {
     if (!voiceRecorder || voiceRecorder.state === 'inactive') return;
-    showUploadProgress('Отправка голосового...');
-
     voiceRecorder.onstop = async () => {
         if (voiceTimerInterval) clearInterval(voiceTimerInterval);
         document.getElementById('inputAreaVoice').classList.add('hidden');
         document.getElementById('inputAreaNormal').classList.remove('hidden');
 
         const blob = new Blob(voiceChunks, { type: voiceRecorder.mimeType || 'audio/webm' });
-        if (blob.size === 0) { hideUploadProgress(); alert('Пустая запись'); return; }
-
-        await sendMediaBlob(blob, `voice_${Date.now()}.meg`, blob.type || 'audio/webm');
+        if (blob.size > 0) await sendMediaBlob(blob, `voice_${Date.now()}.meg`, blob.type || 'audio/webm');
     };
-
-    if (voiceRecorder.state !== 'inactive') {
-        try { voiceRecorder.requestData(); } catch(e){}
-        voiceRecorder.stop();
-    }
+    try { voiceRecorder.requestData(); } catch(e){}
+    voiceRecorder.stop();
 }
 
-// RECORDING CIRCLE (.MEC)
 let circleRecorder = null;
 let circleChunks = [];
 let circleStream = null;
@@ -1440,8 +1264,7 @@ async function startCircleRecording() {
     try {
         currentFacingMode = 'user';
         isTorchOn = false;
-        const torchBtn = document.getElementById('circleTorchBtn');
-        if (torchBtn) torchBtn.classList.remove('active');
+        document.getElementById('circleTorchBtn')?.classList.remove('active');
 
         try {
             circleStream = await navigator.mediaDevices.getUserMedia({ 
@@ -1456,14 +1279,12 @@ async function startCircleRecording() {
         const videoElem = document.getElementById('circleVideoPreview');
         videoElem.srcObject = circleStream;
         videoElem.style.transform = (currentFacingMode === 'user') ? 'scaleX(-1)' : 'scaleX(1)';
-        await videoElem.play().catch(e => console.log(e));
+        await videoElem.play().catch(e => {});
 
         document.getElementById('circleModal').classList.remove('hidden');
 
         const mimeType = getSupportedMimeType('video');
-        const options = mimeType ? { mimeType } : {};
-
-        circleRecorder = new MediaRecorder(circleStream, options);
+        circleRecorder = new MediaRecorder(circleStream, mimeType ? { mimeType } : {});
         circleRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) circleChunks.push(e.data); };
         circleRecorder.start(100);
 
@@ -1476,9 +1297,8 @@ async function startCircleRecording() {
             const s = (circleSeconds % 60).toString().padStart(2, '0');
             document.getElementById('circleTimer').textContent = `${m}:${s}`;
         }, 1000);
-
     } catch(e) {
-        alert("Разрешите доступ к камере и микрофону в браузере!");
+        alert("Нет доступа к камере");
     }
 }
 
@@ -1486,48 +1306,30 @@ async function toggleCircleCamera() {
     currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
     isTorchOn = false;
     document.getElementById('circleTorchBtn')?.classList.remove('active');
-
     if (!circleStream) return;
 
     try {
-        let newVideoStream;
-        try {
-            newVideoStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: currentFacingMode, width: { ideal: 480 }, height: { ideal: 480 } }
-            });
-        } catch(e) {
-            newVideoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode } });
-        }
-
-        const newVideoTrack = newVideoStream.getVideoTracks()[0];
-        const oldVideoTrack = circleStream.getVideoTracks()[0];
-        if (oldVideoTrack) { oldVideoTrack.stop(); circleStream.removeTrack(oldVideoTrack); }
-        circleStream.addTrack(newVideoTrack);
-
+        let newStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: currentFacingMode, width: { ideal: 480 }, height: { ideal: 480 } }, audio: true
+        });
+        circleStream.getTracks().forEach(t => t.stop());
+        circleStream = newStream;
         const videoElem = document.getElementById('circleVideoPreview');
         videoElem.srcObject = circleStream;
         videoElem.style.transform = (currentFacingMode === 'user') ? 'scaleX(-1)' : 'scaleX(1)';
-    } catch(err) {
-        alert("Не удалось переключить камеру");
-    }
+    } catch(e) {}
 }
 
 async function toggleCircleTorch() {
     if (!circleStream) return;
-    const videoTrack = circleStream.getVideoTracks()[0];
-    if (!videoTrack) return;
-
+    const track = circleStream.getVideoTracks()[0];
+    if (!track) return;
     try {
         isTorchOn = !isTorchOn;
-        await videoTrack.applyConstraints({ advanced: [{ torch: isTorchOn }] }).then(() => {
-            document.getElementById('circleTorchBtn')?.classList.toggle('active', isTorchOn);
-        }).catch(() => {
-            isTorchOn = false;
-            document.getElementById('circleTorchBtn')?.classList.remove('active');
-            alert("Фонарик не поддерживается на этой камере");
-        });
-    } catch (e) {
-        alert("Фонарик не поддерживается на данном устройстве");
+        await track.applyConstraints({ advanced: [{ torch: isTorchOn }] });
+        document.getElementById('circleTorchBtn')?.classList.toggle('active', isTorchOn);
+    } catch(e) {
+        isTorchOn = false;
     }
 }
 
@@ -1540,31 +1342,22 @@ function cancelCircleRecording() {
 
 async function stopAndSendCircleRecording() {
     if (!circleRecorder || circleRecorder.state === 'inactive') return;
-    showUploadProgress('Отправка кружочка...');
-
     circleRecorder.onstop = async () => {
         if (circleTimerInterval) clearInterval(circleTimerInterval);
         if (circleStream) { circleStream.getTracks().forEach(t => t.stop()); circleStream = null; }
         document.getElementById('circleModal').classList.add('hidden');
 
         const blob = new Blob(circleChunks, { type: circleRecorder.mimeType || 'video/webm' });
-        if (blob.size === 0) { hideUploadProgress(); alert('Пустая запись'); return; }
-
-        await sendMediaBlob(blob, `circle_${Date.now()}.mec`, blob.type || 'video/webm');
+        if (blob.size > 0) await sendMediaBlob(blob, `circle_${Date.now()}.mec`, blob.type || 'video/webm');
     };
-
-    if (circleRecorder.state !== 'inactive') {
-        try { circleRecorder.requestData(); } catch(e){}
-        circleRecorder.stop();
-    }
+    try { circleRecorder.requestData(); } catch(e){}
+    circleRecorder.stop();
 }
 
 async function uploadEncryptedMedia(blob, filename, mimeType) {
     if (!currentPeer) return;
-    showUploadProgress('Шифрование и отправка...');
-
     const peerKey = await getPeerPubKey(currentPeer);
-    if (!peerKey) throw new Error("У собеседника нет публичного ключа!");
+    if (!peerKey) return;
 
     const fileArrayBuf = await blob.arrayBuffer();
     const encObj = await clientEncryptData(peerKey, fileArrayBuf);
@@ -1583,41 +1376,30 @@ async function uploadEncryptedMedia(blob, filename, mimeType) {
     u8.set(new Uint8Array(payloadBuf), 4 + headerBytes.byteLength);
 
     const encBlob = new Blob([resultBuf], { type: 'application/octet-stream' });
-
     let ext = 'enc';
     if (filename.endsWith('.mec') || mimeType.includes('mec')) ext = 'mec';
     else if (filename.endsWith('.meg') || mimeType.includes('meg')) ext = 'meg';
     else if (mimeType.startsWith('image/')) ext = 'meow';
     else if (mimeType.startsWith('video/')) ext = 'mur';
 
-    const vkFileName = `enc_${Date.now()}.${ext}`;
-
     const formData = new FormData();
     formData.append('token', token);
     formData.append('peer_id', currentPeer);
-    formData.append('file', encBlob, vkFileName);
+    formData.append('file', encBlob, `enc_${Date.now()}.${ext}`);
 
-    const resp = await fetch('/api/upload_encrypted_doc', { method: 'POST', body: formData });
-    const resJson = await resp.json();
-    if (resJson.error) alert("Ошибка: " + (resJson.error.error_msg || resJson.error));
+    await fetch('/api/upload_encrypted_doc', { method: 'POST', body: formData });
 }
 
 async function handleFile(e) {
     const file = e.target.files[0];
     if (!file || !currentPeer) return;
-
-    showUploadProgress('Отправка файла...');
-    try {
-        await sendMediaBlob(file, file.name, file.type || 'application/octet-stream');
-    } finally {
-        hideUploadProgress();
-        e.target.value = '';
-    }
+    await sendMediaBlob(file, file.name, file.type || 'application/octet-stream');
+    e.target.value = '';
 }
 
 function toggleEncrypt() {
     encryptionEnabled = !encryptionEnabled;
-    document.getElementById('encryptBtn')?.classList.toggle('active', encryptionEnabled);
+    document.getElementById('encryptBtn').classList.toggle('active', encryptionEnabled);
 }
 
 function startPolling() {
@@ -1639,26 +1421,18 @@ document.getElementById('msgInput').addEventListener('keypress', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
 
-// AUTO LOGIN & CLOUD KEY RESTORE ON PAGE RELOAD
+// AUTO LOGIN & SESSION RESTORE
 (async () => {
-    if (token && password && localStorage.getItem('vk_user')) {
-        currentUser = JSON.parse(localStorage.getItem('vk_user'));
-        myVkId = currentUser.id;
-        
+    if (token && password && currentUser && myVkId) {
         document.getElementById('loginScreen').classList.add('hidden');
         showDialogsScreen();
-
         const ok = await initClientCrypto();
-        if (ok === true) {
+        if (ok) {
             loadDialogs();
             startPolling();
-        } else if (ok === null) {
-            // First time key gen required
-            document.getElementById('setupModal').classList.remove('hidden');
         } else {
-            // Wrong password stored
-            localStorage.clear();
-            location.reload();
+            alert('Срок сессии или пароль изменились. Пожалуйста, войдите заново.');
+            logout();
         }
     }
 })();
@@ -1697,7 +1471,6 @@ def auth():
 
 @app.route('/api/keys/<vk_id>', methods=['GET'])
 def get_key(vk_id):
-    """Retrieve public key and encrypted private key for user from Firebase Cloud"""
     stored = firebase_get(f"keys/{vk_id}")
     if stored:
         return jsonify(stored)
@@ -1706,7 +1479,6 @@ def get_key(vk_id):
 
 @app.route('/api/keys/<vk_id>', methods=['POST'])
 def save_key(vk_id):
-    """Store public key and locally-encrypted private key in Firebase Cloud"""
     data = request.json
     data['created_at'] = datetime.now().isoformat()
     firebase_put(f"keys/{vk_id}", data)
@@ -1786,11 +1558,9 @@ def send_message():
     peer_id = request.json.get('peer_id')
     text = request.json.get('text', '')
     reply_to = request.json.get('reply_to')
-    
     params = {'peer_id': peer_id, 'message': text, 'random_id': 0}
     if reply_to:
         params['reply_to'] = reply_to
-
     result = vk_request('messages.send', token, **params)
     return jsonify({'result': result})
 
@@ -1816,11 +1586,9 @@ def delete_message():
 
 @app.route('/api/upload_encrypted_doc', methods=['POST'])
 def upload_encrypted_doc():
-    """Upload pre-encrypted file binary directly as VK Document attachment"""
     token = request.form.get('token')
     peer_id = request.form.get('peer_id')
     file = request.files.get('file')
-
     if not file:
         return jsonify({'error': 'No file'}), 400
 
@@ -1830,7 +1598,7 @@ def upload_encrypted_doc():
 
     upload_url = upload_server.get('upload_url')
     files = {'file': (file.filename, file.read(), 'application/octet-stream')}
-    upload_resp = http_session.post(upload_url, files=files, timeout=15).json()
+    upload_resp = requests.post(upload_url, files=files, timeout=30).json()
 
     save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=file.filename)
     if isinstance(save_result, dict) and 'doc' in save_result:
@@ -1844,11 +1612,9 @@ def upload_encrypted_doc():
 
 @app.route('/api/upload_normal', methods=['POST'])
 def upload_normal():
-    """Normal unencrypted upload proxy"""
     token = request.form.get('token')
     peer_id = request.form.get('peer_id')
     file = request.files.get('file')
-
     if not file:
         return jsonify({'error': 'No file'}), 400
 
@@ -1859,17 +1625,12 @@ def upload_normal():
         upload_server = vk_request('photos.getMessagesUploadServer', token, peer_id=peer_id)
         if isinstance(upload_server, dict) and 'error' in upload_server:
             return jsonify(upload_server), 400
-
         upload_url = upload_server.get('upload_url')
         files = {'photo': (filename, BytesIO(file_bytes), file.content_type or 'image/jpeg')}
-        upload_resp = http_session.post(upload_url, files=files, timeout=15).json()
-
+        upload_resp = requests.post(upload_url, files=files, timeout=30).json()
         save_result = vk_request('photos.saveMessagesPhoto', token,
-            photo=upload_resp.get('photo'),
-            server=upload_resp.get('server'),
-            hash=upload_resp.get('hash')
+            photo=upload_resp.get('photo'), server=upload_resp.get('server'), hash=upload_resp.get('hash')
         )
-
         if isinstance(save_result, list) and len(save_result) > 0:
             photo = save_result[0]
             attachment = f"photo{photo['owner_id']}_{photo['id']}"
@@ -1879,11 +1640,9 @@ def upload_normal():
     upload_server = vk_request('docs.getMessagesUploadServer', token, type='doc', peer_id=peer_id)
     if isinstance(upload_server, dict) and 'error' in upload_server:
         return jsonify(upload_server), 400
-
     upload_url = upload_server.get('upload_url')
     files = {'file': (filename, BytesIO(file_bytes), file.content_type or 'application/octet-stream')}
-    upload_resp = http_session.post(upload_url, files=files, timeout=15).json()
-
+    upload_resp = requests.post(upload_url, files=files, timeout=30).json()
     save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=filename)
     if isinstance(save_result, dict) and 'doc' in save_result:
         doc = save_result['doc']
@@ -1896,12 +1655,11 @@ def upload_normal():
 
 @app.route('/api/proxy_file')
 def proxy_file():
-    """Proxy encrypted attachments to bypass browser CORS on VK CDN"""
     url = request.args.get('url')
     if not url:
         return jsonify({'error': 'No URL'}), 400
     try:
-        resp = http_session.get(url, timeout=15)
+        resp = requests.get(url, timeout=30)
         return Response(resp.content, mimetype='application/octet-stream')
     except Exception as e:
         return jsonify({'error': str(e)}), 500
