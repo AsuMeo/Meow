@@ -136,14 +136,14 @@ HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>VK Client - Ultra Fast E2EE</title>
+<title>VK Client - E2EE</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#000;color:#fff;height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
 .app{height:100vh;display:flex;flex-direction:column;position:relative;overflow:hidden}
 
 /* Login Screen */
-.login-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:100;animation:fadeIn 0.2s ease-out}
+.login-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:800;animation:fadeIn 0.2s ease-out}
 .login-screen h1{font-size:26px;margin-bottom:6px;font-weight:700;color:#fff}
 .login-screen p{color:#888;margin-bottom:24px;font-size:13px;text-align:center;max-width:320px}
 .badge-e2e{background:#1c1c1e;color:#8e8e93;border:1px solid #2c2c2e;padding:6px 12px;border-radius:14px;font-size:12px;font-weight:600;margin-bottom:20px;display:inline-flex;align-items:center;gap:6px}
@@ -157,10 +157,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .btn-danger{background:#ff3b30;color:#fff}
 
 /* Header */
-.header{height:56px;background:#0d0d0d;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #1c1c1c;flex-shrink:0;z-index:20}
-.header-back{width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;margin-right:8px;background:rgba(255,255,255,0.12);color:#fff;flex-shrink:0;-webkit-tap-highlight-color:rgba(255,255,255,0.3)}
-.header-back svg{width:26px;height:26px;stroke:#fff;stroke-width:2.8px;fill:none}
-.header-back:active{background:rgba(255,255,255,0.3)}
+.header{height:56px;background:#0d0d0d;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #1c1c1c;flex-shrink:0}
+.header-back{width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;margin-right:6px;background:rgba(255,255,255,0.1);color:#fff;flex-shrink:0}
+.header-back:active{background:rgba(255,255,255,0.25)}
 .header-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;margin-right:10px;background:#222;flex-shrink:0;cursor:pointer}
 .header-info{flex:1;min-width:0;cursor:pointer}
 .header-title{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -172,8 +171,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .header-btn:active{background:rgba(255,255,255,0.15);color:#fff}
 .header-btn.active{color:#fff;background:rgba(255,255,255,0.15)}
 
-/* Dialogs */
-.dialogs-screen{flex:1;display:flex;flex-direction:column;overflow:hidden;animation:fadeIn 0.15s ease-out;position:relative}
+/* Dialogs Screen */
+.dialogs-screen{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;overflow:hidden;animation:fadeIn 0.15s ease-out}
 .dialogs-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .dialog{display:flex;align-items:center;padding:12px 14px;cursor:pointer;border-bottom:1px solid #111}
 .dialog:active{background:#111}
@@ -187,9 +186,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .dialog-unread{min-width:18px;height:18px;border-radius:50%;background:#fff;color:#000;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0}
 
 /* Navigation Drawer (Swipeable Side Menu) */
-.drawer-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:200;opacity:0;pointer-events:none;transition:opacity 0.25s ease}
+.drawer-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:400;opacity:0;pointer-events:none;transition:opacity 0.25s ease}
 .drawer-overlay.active{opacity:1;pointer-events:auto}
-.drawer{position:fixed;top:0;left:0;width:82%;max-width:320px;height:100%;background:#141416;z-index:201;transform:translateX(-100%);transition:transform 0.25s cubic-bezier(0.1,0.9,0.2,1);display:flex;flex-direction:column;box-shadow:5px 0 25px rgba(0,0,0,0.8);border-right:1px solid #222}
+.drawer{position:fixed;top:0;left:0;width:82%;max-width:320px;height:100%;background:#141416;z-index:401;transform:translateX(-100%);transition:transform 0.25s cubic-bezier(0.1,0.9,0.2,1);display:flex;flex-direction:column;box-shadow:5px 0 25px rgba(0,0,0,0.8);border-right:1px solid #222}
 .drawer.active{transform:translateX(0)}
 
 .drawer-header{padding:24px 18px;background:#1c1c1e;border-bottom:1px solid #28282a;display:flex;flex-direction:column;gap:12px;position:relative}
@@ -204,22 +203,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .drawer-item:active{background:rgba(255,255,255,0.08);color:#fff}
 .drawer-item svg{color:#aaa}
 
-/* Chat Screen */
-.chat-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;z-index:10;transform:translateX(100%);transition:transform 0.22s cubic-bezier(0.1, 0.9, 0.2, 1)}
+/* Chat Screen - MUST HAVE Z-INDEX HIGHER THAN DIALOGS SCREEN (z-index: 100) */
+.chat-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;z-index:100;transform:translateX(100%);transition:transform 0.22s cubic-bezier(0.1, 0.9, 0.2, 1)}
 .chat-screen.active{transform:translateX(0)}
 .messages-wrapper{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column}
 .messages{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch}
 
-/* Message styling */
-.msg-container{position:relative;display:flex;width:100%;align-items:center;touch-action:pan-y;margin-bottom:2px}
+/* Message styling - TELEGRAM STYLE BUBBLE SEPARATION */
+.msg-container{position:relative;display:flex;width:100%;align-items:flex-end;touch-action:pan-y;margin-bottom:4px}
 .msg-swipe-bg{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;width:40px;opacity:0;transition:opacity 0.15s;color:#8e8e93;z-index:1}
 .msg-swipe-right{right:-40px}
 
-.msg{max-width:82%;padding:8px 12px;border-radius:18px;font-size:14px;line-height:1.4;word-wrap:break-word;position:relative;animation:msgAppear 0.15s ease-out}
+.msg{max-width:78%;padding:9px 13px;border-radius:18px;font-size:14px;line-height:1.4;word-wrap:break-word;position:relative;animation:msgAppear 0.15s ease-out}
 @keyframes msgAppear{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
-.msg-in{align-self:flex-start;background:#1c1c1e;border-bottom-left-radius:4px;color:#fff}
-.msg-out{align-self:flex-end;background:#2c2c2e;border-bottom-right-radius:4px;color:#fff}
+/* INCOMING (LEFT, DARK GREY BUBBLE) */
+.msg-in{align-self:flex-start;background:#1f2936;border-bottom-left-radius:4px;color:#fff;margin-right:auto}
+/* OUTGOING (RIGHT, BLUE-GREY BUBBLE) */
+.msg-out{align-self:flex-end;background:#2b5278;border-bottom-right-radius:4px;color:#fff;margin-left:auto}
 
 /* PURE CIRCLE VIDEO WRAPPER */
 .msg-circle-mode{background:transparent !important;padding:0 !important;border-radius:0 !important;box-shadow:none !important;max-width:200px !important}
@@ -229,9 +230,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .msg-reply-name{font-weight:600;color:#aaa;margin-bottom:2px;font-size:11px}
 .msg-reply-text{color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-.msg-author{font-size:11px;color:#aaa;font-weight:600;margin-bottom:2px}
+.msg-author{font-size:11px;color:#82b1ff;font-weight:600;margin-bottom:3px}
 .msg-text{color:#fff}
-.msg-time{font-size:10px;color:#888;margin-top:4px;text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:3px}
+.msg-time{font-size:10px;color:rgba(255,255,255,0.6);margin-top:4px;text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:3px}
 
 .decrypting-shimmer{color:#888;font-style:italic}
 
@@ -276,7 +277,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .recording-cancel{font-size:13px;color:#ff3b30;cursor:pointer;font-weight:500;padding:4px 8px;border-radius:12px}
 
 /* TG Circle Camera Modal */
-.circle-recorder-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.circle-recorder-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);z-index:700;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .circle-preview-box{width:260px;height:260px;border-radius:50%;overflow:hidden;position:relative;box-shadow:0 0 30px rgba(0,0,0,0.8);border:4px solid #fff;background:#000}
 .circle-preview-video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
 .circle-rec-controls{margin-top:24px;display:flex;align-items:center;justify-content:center;gap:16px}
@@ -287,7 +288,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .circle-btn-cancel{background:#3a3a3c;color:#fff}
 
 /* Global Upload Progress Toast */
-.upload-toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(28,28,30,0.95);border:1px solid #3a3a3c;color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;z-index:500;display:flex;align-items:center;gap:10px;box-shadow:0 4px 16px rgba(0,0,0,0.5)}
+.upload-toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(28,28,30,0.95);border:1px solid #3a3a3c;color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;z-index:900;display:flex;align-items:center;gap:10px;box-shadow:0 4px 16px rgba(0,0,0,0.5)}
 
 /* Bottom Nav */
 .bottom-nav{height:50px;background:#0d0d0d;border-top:1px solid #1a1a1a;display:flex;justify-content:space-around;align-items:center;flex-shrink:0}
@@ -296,13 +297,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .nav-item span{font-size:10px}
 
 /* Action Sheet */
-.action-sheet{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:250;display:flex;flex-direction:column;justify-content:flex-end}
+.action-sheet{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:500;display:flex;flex-direction:column;justify-content:flex-end}
 .action-sheet-content{background:#1c1c1e;border-top-left-radius:20px;border-top-right-radius:20px;padding:16px;display:flex;flex-direction:column;gap:8px}
 .action-sheet-item{padding:14px 16px;border-radius:12px;background:#2c2c2e;color:#fff;font-size:15px;font-weight:500;display:flex;align-items:center;gap:12px;cursor:pointer}
 .action-sheet-item.danger{color:#ff3b30}
 
 /* Modals */
-.modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:300;padding:20px}
+.modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:600;padding:20px}
 .modal-content{background:#161616;border-radius:20px;padding:24px;width:100%;max-width:380px;border:1px solid #282828}
 .modal-title{font-size:18px;font-weight:600;margin-bottom:10px;color:#fff}
 .modal-text{font-size:13px;color:#aaa;margin-bottom:20px;line-height:1.5}
@@ -414,7 +415,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <img class="header-avatar" id="headerAvatar" src="" alt="" onclick="openDrawer()">
 <div class="header-info" onclick="openDrawer()">
 <div class="header-title" id="headerTitle">VK</div>
-<div class="header-subtitle">Защита активна</div>
+<div class="header-subtitle">Сообщения</div>
 </div>
 <div class="header-actions">
 <div class="header-btn active" id="encryptBtn" onclick="toggleEncrypt()" title="Локальное шифрование">
@@ -444,16 +445,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <!-- Chat Screen -->
 <div class="chat-screen" id="chatScreen">
 <div class="header">
-<!-- EXPLICIT VISIBLE SVG ARROW BACK BUTTON BEFORE AVATAR -->
+<!-- EXPLICIT VISIBLE ARROW BACK BUTTON BEFORE AVATAR -->
 <div class="header-back" onclick="backToDialogs()" title="Назад к диалогам">
-<svg viewBox="0 0 24 24">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
 <line x1="19" y1="12" x2="5" y2="12"></line>
 <polyline points="12 19 5 12 12 5"></polyline>
 </svg>
 </div>
 <img class="header-avatar" id="chatAvatar" src="" alt="" onclick="backToDialogs()">
 <div class="header-info" onclick="backToDialogs()">
-<div class="header-title" id="chatTitle"></div>
+<div class="header-title" id="chatTitle">...</div>
 <div class="header-subtitle" id="chatEncryptStatus">в сети</div>
 </div>
 </div>
@@ -875,7 +876,7 @@ async function saveProfileChanges() {
     const lastName = document.getElementById('editLastName').value.trim();
     const statusText = document.getElementById('editStatusInput').value.trim();
 
-    showUploadProgress('Сохранение...');
+    showUploadProgress('Сохранение в VK...');
     try {
         const res = await fetch('/api/profile/update', {
             method: 'POST',
@@ -884,7 +885,7 @@ async function saveProfileChanges() {
         });
         const data = await res.json();
         if (data.ok) {
-            currentUser.name = `${firstName} ${lastName}`.trim();
+            if (firstName || lastName) currentUser.name = `${firstName} ${lastName}`.trim();
             currentUser.status = statusText;
             localStorage.setItem('vk_user', JSON.stringify(currentUser));
             document.getElementById('headerTitle').textContent = currentUser.name;
@@ -961,6 +962,8 @@ async function loadDialogs() {
 
 async function openChat(index) {
     const d = dialogsData[index]; currentPeer = d.id;
+    
+    // Explicitly set PEER name and PEER photo in chat header
     document.getElementById('chatTitle').textContent = d.name;
     document.getElementById('chatAvatar').src = d.photo || 'https://vk.com/images/camera_100.png';
     document.getElementById('chatScreen').classList.add('active');
@@ -1040,9 +1043,17 @@ async function loadMessages() {
     } catch(e){}
 }
 
+/* RENDER MESSAGE ITEM WITH PROPER BUBBLE SEPARATION (LEFT = INCOMING, RIGHT = OUTGOING) */
 function renderMessageItem(container, msg) {
     const containerDiv = document.createElement('div');
     containerDiv.className = 'msg-container';
+    
+    // Explicit flex alignment for bubbles (TG Style)
+    if (msg.out) {
+        containerDiv.style.justifyContent = 'flex-end';
+    } else {
+        containerDiv.style.justifyContent = 'flex-start';
+    }
     
     const isEncrypted = msg.text && msg.text.startsWith(ENCRYPT_PREFIX);
     
@@ -1945,7 +1956,7 @@ def peer_status():
     if isinstance(user_info, list) and len(user_info) > 0:
         u = user_info[0]
         online = u.get('online', 0)
-        sex = u.get('sex', 1)
+        sex = u.get('sex', 1)  # 1 = female, 2 = male
         
         if online == 1:
             return jsonify({'status_text': 'в сети', 'online': True})
@@ -1964,8 +1975,8 @@ def peer_status():
                 formatted_time = dt.strftime('%H:%M')
                 return jsonify({'status_text': f'{verb} в сети вчера в {formatted_time}', 'online': False})
             else:
-                        formatted_date = dt.strftime('%d.%m в %H:%M')
-                        return jsonify({'status_text': f'{verb} в сети {formatted_date}', 'online': False})
+                formatted_date = dt.strftime('%d.%m в %H:%M')
+                return jsonify({'status_text': f'{verb} в сети {formatted_date}', 'online': False})
 
     return jsonify({'status_text': 'офлайн', 'online': False})
 
@@ -1982,14 +1993,17 @@ def set_typing():
 @app.route('/api/profile/update', methods=['POST'])
 def update_profile():
     token = request.json.get('token')
-    first_name = request.json.get('first_name')
-    last_name = request.json.get('last_name')
-    status_text = request.json.get('status', '')
+    first_name = request.json.get('first_name', '').strip()
+    last_name = request.json.get('last_name', '').strip()
+    status_text = request.json.get('status', '').strip()
 
-    vk_request('account.saveProfileInfo', token, first_name=first_name, last_name=last_name)
-    vk_request('status.set', token, text=status_text)
+    status_res = vk_request('status.set', token, text=status_text)
     
-    return jsonify({'ok': True})
+    profile_res = None
+    if first_name and last_name:
+        profile_res = vk_request('account.saveProfileInfo', token, first_name=first_name, last_name=last_name)
+    
+    return jsonify({'ok': True, 'status_res': status_res, 'profile_res': profile_res})
 
 
 @app.route('/api/profile/upload_avatar', methods=['POST'])
@@ -2117,7 +2131,7 @@ def upload_normal():
             return jsonify({'ok': True})
 
     upload_server = vk_request('docs.getMessagesUploadServer', token, type='doc', peer_id=peer_id)
-    if isinstance(upload_server, dict) and 'error_link' in upload_server or (isinstance(upload_server, dict) and 'error' in upload_server):
+    if isinstance(upload_server, dict) and 'error' in upload_server:
         return jsonify(upload_server), 400
 
     upload_url = upload_server.get('upload_url')
