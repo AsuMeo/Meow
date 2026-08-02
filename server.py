@@ -60,14 +60,14 @@ HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>VK Client - E2EE TG Style</title>
+<title>VK Client - Instant E2EE</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#000;color:#fff;height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
 .app{height:100vh;display:flex;flex-direction:column;position:relative}
 
 /* Login */
-.login-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:100;animation:fadeIn .3s ease}
+.login-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:100;animation:fadeIn .2s ease}
 .login-screen h1{font-size:26px;margin-bottom:6px;font-weight:700;color:#fff}
 .login-screen p{color:#888;margin-bottom:24px;font-size:13px;text-align:center;max-width:320px}
 .badge-e2e{background:#1a1a1a;color:#fff;border:1px solid #333;padding:5px 12px;border-radius:14px;font-size:12px;font-weight:600;margin-bottom:20px;display:inline-flex;align-items:center;gap:6px}
@@ -107,17 +107,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .dialog-unread{min-width:18px;height:18px;border-radius:50%;background:#fff;color:#000;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0}
 
 /* Chat Screen */
-.chat-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;z-index:10;transform:translateX(100%);transition:transform .25s cubic-bezier(0.32, 0.72, 0, 1)}
+.chat-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;z-index:10;transform:translateX(100%);transition:transform .22s cubic-bezier(0.2, 0.9, 0.1, 1)}
 .chat-screen.active{transform:translateX(0)}
-.messages{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:6px;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
+.messages{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:6px;-webkit-overflow-scrolling:touch}
 
 /* Message Item & Swiping */
-.msg-wrapper{position:relative;width:100%;display:flex;flex-direction:column;overflow:hidden;user-select:none;-webkit-user-select:none}
-.msg-reply-indicator{position:absolute;left:-40px;top:50%;transform:translateY(-50%);width:28px;height:28px;border-radius:50%;background:#333;display:flex;align-items:center;justify-content:center;color:#fff;transition:opacity .2s;opacity:0}
-.msg{max-width:82%;padding:8px 12px;border-radius:16px;font-size:14px;line-height:1.4;word-wrap:break-word;position:relative;transition:transform .1s linear;background:#1c1c1e;color:#fff}
+.msg-wrapper{position:relative;width:100%;display:flex;flex-direction:column;user-select:none;-webkit-user-select:none}
+.msg-reply-indicator{position:absolute;left:-36px;top:50%;transform:translateY(-50%);width:26px;height:26px;border-radius:50%;background:#333;display:flex;align-items:center;justify-content:center;color:#fff;opacity:0;transition:opacity .15s}
+.msg{max-width:82%;padding:8px 12px;border-radius:16px;font-size:14px;line-height:1.4;word-wrap:break-word;position:relative;background:#1c1c1e;color:#fff;transition:transform .08s linear}
 .msg-in{align-self:flex-start;background:#1c1c1e;border-bottom-left-radius:4px}
 .msg-out{align-self:flex-end;background:#2c2c2e;border-bottom-right-radius:4px}
-/* Encrypted messages look EXACTLY like normal messages (no green tint) */
+
+/* Standard Colors - NO GREEN TINT */
 .msg-author{font-size:11px;color:#aaa;font-weight:600;margin-bottom:3px}
 .msg-text{color:#fff;word-break:break-word}
 .msg-time{font-size:10px;color:#888;margin-top:4px;text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:3px}
@@ -127,7 +128,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .msg-reply-author{font-weight:600;color:#aaa;margin-bottom:1px}
 .msg-reply-text{color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-/* Photos & Normal Attachments */
+/* Photos & Attachments */
 .msg-photo{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;object-fit:cover;cursor:pointer;background:#111}
 .msg-file{background:rgba(255,255,255,.05);padding:10px;border-radius:10px;margin-top:6px;display:flex;align-items:center;gap:10px}
 .msg-file-icon{font-size:20px}
@@ -153,15 +154,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .voice-bar.played{background:#fff}
 .voice-meta{display:flex;justify-content:space-between;font-size:11px;color:#aaa}
 
-/* Reply Preview Bar above input */
-.reply-banner{background:#111;border-top:1px solid #1c1c1c;padding:6px 12px;display:flex;align-items:center;justify-content:space-between;animation:slideUp .2s ease}
+/* Reply Preview Bar */
+.reply-banner{background:#111;border-top:1px solid #1c1c1c;padding:6px 12px;display:flex;align-items:center;justify-content:space-between;animation:slideUp .18s ease}
 .reply-banner-info{border-left:2px solid #fff;padding-left:8px;min-width:0;flex:1}
 .reply-banner-title{font-size:12px;font-weight:600;color:#fff}
 .reply-banner-text{font-size:12px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .reply-banner-close{width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#888}
 
-/* Editing Banner */
-.edit-banner{background:#111;border-top:1px solid #1c1c1c;padding:6px 12px;display:flex;align-items:center;justify-content:space-between;animation:slideUp .2s ease}
+/* Edit Banner */
+.edit-banner{background:#111;border-top:1px solid #1c1c1c;padding:6px 12px;display:flex;align-items:center;justify-content:space-between;animation:slideUp .18s ease}
 .edit-banner-title{font-size:12px;font-weight:600;color:#fff;display:flex;align-items:center;gap:4px}
 
 /* Input Area */
@@ -174,13 +175,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .send-btn:disabled{background:#222;color:#555}
 
 /* Recording Overlays */
-.recording-bar{position:absolute;top:0;left:0;width:100%;height:100%;background:#0d0d0d;display:flex;align-items:center;padding:0 12px;gap:12px;z-index:20;animation:fadeIn .2s ease}
+.recording-bar{position:absolute;top:0;left:0;width:100%;height:100%;background:#0d0d0d;display:flex;align-items:center;padding:0 12px;gap:12px;z-index:20;animation:fadeIn .15s ease}
 .recording-dot{width:12px;height:12px;border-radius:50%;background:#e53935;animation:pulseRed 1s infinite}
-.recording-timer{font-size:15px;font-weight:600;color:#fff;font-mono:true;flex:1}
+.recording-timer{font-size:15px;font-weight:600;color:#fff;flex:1}
 .recording-cancel{color:#e53935;cursor:pointer;font-size:14px;font-weight:500;padding:8px}
 
-/* Video Note Camera Preview Modal */
-.video-note-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:300;animation:fadeIn .2s ease}
+/* Video Note Recorder Modal */
+.video-note-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:300;animation:fadeIn .18s ease}
 .vnote-preview-wrap{position:relative;width:260px;height:260px;border-radius:50%;overflow:hidden;border:3px solid #fff;box-shadow:0 0 30px rgba(255,255,255,.2);margin-bottom:30px;background:#111}
 .vnote-preview-video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
 .vnote-controls{display:flex;align-items:center;gap:24px}
@@ -198,12 +199,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .nav-item span{font-size:10px}
 
 /* Modals & Context Action Sheets */
-.modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:250;padding:20px;animation:fadeIn .2s ease}
+.modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:250;padding:20px;animation:fadeIn .15s ease}
 .modal-content{background:#161616;border-radius:20px;padding:22px;width:100%;max-width:360px;border:1px solid #282828}
 .modal-title{font-size:18px;font-weight:600;margin-bottom:10px;color:#fff}
 .modal-text{font-size:13px;color:#aaa;margin-bottom:16px;line-height:1.5}
 
-.context-sheet{position:fixed;bottom:0;left:0;width:100%;background:#161616;border-top-left-radius:20px;border-top-right-radius:20px;padding:16px;z-index:220;border-top:1px solid #282828;animation:slideUp .25s ease}
+.context-sheet{position:fixed;bottom:0;left:0;width:100%;background:#161616;border-top-left-radius:20px;border-top-right-radius:20px;padding:16px;z-index:220;border-top:1px solid #282828;animation:slideUp .2s ease}
 .context-option{padding:14px 16px;display:flex;align-items:center;gap:12px;font-size:15px;color:#fff;cursor:pointer;border-radius:12px;transition:background .15s}
 .context-option:active{background:#222}
 .context-option.danger{color:#e53935}
@@ -216,13 +217,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .file-input{display:none}
 .hidden{display:none!important}
 .loader{border:2px solid #333;border-top:2px solid #fff;border-radius:50%;width:16px;height:16px;animation:spin .8s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
-.shimmer-text{background:linear-gradient(90deg, #666 0%, #fff 50%, #666 100%);background-size:200% 100%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 1.5s infinite}
 
 @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 @keyframes pulseRed{0%{transform:scale(1);opacity:1}50%{transform:scale(1.3);opacity:.5}100%{transform:scale(1);opacity:1}}
-@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 </style>
 </head>
 <body>
@@ -235,10 +234,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
 100% Client-Side Encryption
 </div>
-<p>Шифрование происходит локально на телефоне. Сервер не имеет доступа к фото, видео и голосовым.</p>
+<p>Шифрование происходит локально на телефоне. Сервер не имеет доступа к вашим данным.</p>
 <button class="btn btn-secondary" onclick="getToken()">1. Получить токен VK</button>
-<input type="text" class="token-input" id="tokenUrl" placeholder="Вставь ссылку с токеном...">
-<input type="password" class="pass-input" id="password" placeholder="Пароль для защиты ключей...">
+<input type="text" class="token-input" id="tokenUrl" placeholder="Вставьте ссылку с токеном...">
+<input type="password" class="pass-input" id="password" placeholder="Пароль шифрования...">
 <button class="btn" onclick="login()">Войти</button>
 </div>
 
@@ -246,7 +245,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <div class="modal hidden" id="setupModal">
 <div class="modal-content">
 <div class="modal-title">Генерация RSA/AES ключей</div>
-<div class="modal-text" id="setupText">Генерируем ключи в вашем браузере... Приватный ключ шифруется локально на вашем смартфоне.</div>
+<div class="modal-text" id="setupText">Генерируем ключи в вашем браузере... Приватный ключ шифруется локально на вашем устройстве.</div>
 <button class="btn btn-green" id="setupBtn" onclick="setupEncryption()">Создать ключи на телефоне</button>
 </div>
 </div>
@@ -352,7 +351,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </div>
 </div>
 
-<!-- Video Note Camera Recorder Modal (TG Style "Кружочек") -->
+<!-- Video Note Recorder Modal (TG Style "Кружочек") -->
 <div class="video-note-modal hidden" id="videoNoteModal">
 <div class="vnote-timer" id="vnoteTimer">0:00</div>
 <div class="vnote-preview-wrap">
@@ -369,7 +368,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </div>
 </div>
 
-<!-- Message Context Menu Action Sheet -->
+<!-- Context Menu -->
 <div class="modal hidden" id="contextModal" onclick="closeContextMenu()">
 <div class="context-sheet" onclick="event.stopPropagation()">
 <div class="context-option" onclick="replySelectedMessage()">
@@ -424,7 +423,10 @@ let localKeyPair = null;
 let peerKeysCache = {};
 let decryptedCache = {};
 
-// Message State Management
+let lastRenderedPeer = null;
+let lastMessagesHash = "";
+
+// Action State
 let selectedMsg = null;
 let replyingMsg = null;
 let editingMsg = null;
@@ -666,13 +668,15 @@ async function openChat(index) {
     const peerKey = await getPeerPubKey(currentPeer);
     const status = document.getElementById('chatEncryptStatus');
     if (peerKey) {
-        status.textContent = '🔒 E2EE Защита активна';
+        status.textContent = '🔒 Защищено (E2EE)';
         status.style.color = '#fff';
     } else {
         status.textContent = 'Обычный чат';
         status.style.color = '#888';
     }
 
+    lastRenderedPeer = null;
+    lastMessagesHash = "";
     cancelReply();
     cancelEdit();
     loadMessages();
@@ -687,17 +691,32 @@ async function loadMessages() {
     if (!currentPeer) return;
     const res = await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, peer_id: currentPeer }) });
     const data = await res.json();
-    const container = document.getElementById('messages'); container.innerHTML = '';
-    if (data.messages) {
-        const msgs = data.messages.reverse();
-        for (const m of msgs) {
-            await renderMessageItem(container, m);
-        }
+    if (data.error || !data.messages) return;
+
+    const msgs = data.messages.reverse();
+    const currentHash = currentPeer + "_" + msgs.map(m => m.id + "_" + (m.text||'')).join("|");
+
+    if (lastRenderedPeer === currentPeer && lastMessagesHash === currentHash) {
+        return; // No change, don't wipe DOM!
     }
-    container.scrollTop = container.scrollHeight;
+
+    lastRenderedPeer = currentPeer;
+    lastMessagesHash = currentHash;
+
+    const container = document.getElementById('messages');
+    const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 120;
+
+    container.innerHTML = '';
+    for (const m of msgs) {
+        renderMessageItemSync(container, m);
+    }
+
+    if (isAtBottom) {
+        container.scrollTop = container.scrollHeight;
+    }
 }
 
-async function renderMessageItem(container, msg) {
+function renderMessageItemSync(container, msg) {
     const wrapper = document.createElement('div');
     wrapper.className = 'msg-wrapper';
 
@@ -714,7 +733,6 @@ async function renderMessageItem(container, msg) {
     let html = '';
     if (!msg.out && msg.name) html += `<div class="msg-author">${escapeHtml(msg.name)}</div>`;
 
-    // Render replied message snippet if exists
     if (msg.reply_message) {
         const rm = msg.reply_message;
         const rName = rm.from_id === myVkId ? 'Вы' : (rm.name || 'Собеседник');
@@ -726,30 +744,17 @@ async function renderMessageItem(container, msg) {
     let displayText = msg.text || '';
     if (isEncrypted) {
         if (decryptedCache[msg.id]) {
-            displayText = decryptedCache[msg.id];
+            displayText = escapeHtml(decryptedCache[msg.id]);
         } else {
-            displayText = '<span class="shimmer-text">🔒 Расшифровка...</span>';
-            setTimeout(async () => {
-                try {
-                    const encObj = JSON.parse(msg.text.substring(ENCRYPT_PREFIX.length));
-                    const decBuf = await clientDecryptData(encObj);
-                    if (decBuf) {
-                        const plainText = new TextDecoder().decode(decBuf);
-                        decryptedCache[msg.id] = plainText;
-                        const textElem = document.querySelector(`#msg-${msg.id} .msg-text`);
-                        if (textElem) textElem.textContent = plainText;
-                    }
-                } catch(e) {
-                    const textElem = document.querySelector(`#msg-${msg.id} .msg-text`);
-                    if (textElem) textElem.textContent = '🔒 Не удалось расшифровать';
-                }
-            }, 10);
+            displayText = '🔒 Расшифровка...';
+            clientDecryptTextAsync(msg.id, msg.text);
         }
+    } else {
+        displayText = escapeHtml(displayText);
     }
 
-    html += `<div class="msg-text">${isEncrypted ? displayText : escapeHtml(displayText)}</div>`;
+    html += `<div class="msg-text" id="msg-text-${msg.id}">${displayText}</div>`;
 
-    // Attachments Processing
     if (msg.attachments) {
         for (const a of msg.attachments) {
             if (a.type === 'photo') {
@@ -759,19 +764,17 @@ async function renderMessageItem(container, msg) {
             if (a.type === 'doc') {
                 const doc = a.doc;
                 const docId = `doc_${doc.owner_id}_${doc.id}`;
+                const fileUrl = doc.url || '';
                 
                 if (doc.title && (doc.title.startsWith('enc_') || doc.ext === 'meow' || doc.ext === 'mur' || doc.ext === 'mec' || doc.ext === 'meg' || doc.ext === 'enc')) {
                     if (doc.ext === 'mec' || doc.title.includes('.mec')) {
-                        // TG Style Video Note ("Кружочек") Placeholder
                         html += `<div class="video-note-container" id="${docId}"><div class="video-note-overlay"><div class="loader"></div></div></div>`;
                     } else if (doc.ext === 'meg' || doc.title.includes('.meg')) {
-                        // TG Style Voice Message ("Голосовое") Placeholder
-                        html += `<div class="voice-message-container" id="${docId}"><div class="voice-play-btn"><span class="loader" style="margin:0;border-top-color:#000"></span></div><div class="voice-waveform-wrap"><div class="shimmer-text" style="font-size:12px">Расшифровка аудио...</div></div></div>`;
+                        html += `<div class="voice-message-container" id="${docId}"><div class="voice-play-btn"><span class="loader" style="margin:0;border-top-color:#000"></span></div><div class="voice-waveform-wrap"><div style="font-size:12px;color:#aaa">Расшифровка...</div></div></div>`;
                     } else {
-                        // General encrypted file / photo placeholder
-                        html += `<div class="msg-file" id="${docId}"><span class="msg-file-icon">🔒</span><div class="msg-file-info"><div class="msg-file-name">Зашифрованный файл</div><div class="msg-file-size shimmer-text">Расшифровка...</div></div></div>`;
+                        html += `<div class="msg-file" id="${docId}"><span class="msg-file-icon">🔒</span><div class="msg-file-info"><div class="msg-file-name">Зашифрованный файл</div><div class="msg-file-size">Расшифровка...</div></div></div>`;
                     }
-                    setTimeout(() => processEncryptedAttachment(docId, doc.url), 10);
+                    processEncryptedAttachment(docId, fileUrl);
                 } else {
                     html += `<div class="msg-file"><span class="msg-file-icon">📎</span><div class="msg-file-info"><div class="msg-file-name">${escapeHtml(doc.title || 'Файл')}</div><div class="msg-file-size">${(doc.size / 1024).toFixed(1)} KB</div></div></div>`;
                 }
@@ -785,13 +788,30 @@ async function renderMessageItem(container, msg) {
     div.innerHTML = html;
     wrapper.appendChild(div);
 
-    // Setup Swipe to Reply & Context Menu on message
     setupSwipeAndTouch(wrapper, div, msg);
-
     container.appendChild(wrapper);
 }
 
-// Swipe to Reply & Tap/Long-Press Context Menu Handler
+async function clientDecryptTextAsync(msgId, encryptedTextStr) {
+    try {
+        const jsonStr = encryptedTextStr.substring(ENCRYPT_PREFIX.length);
+        const encObj = JSON.parse(jsonStr);
+        const decBuf = await clientDecryptData(encObj);
+        if (decBuf) {
+            const plainText = new TextDecoder().decode(decBuf);
+            decryptedCache[msgId] = plainText;
+            const textElem = document.getElementById(`msg-text-${msgId}`);
+            if (textElem) textElem.textContent = plainText;
+        } else {
+            const textElem = document.getElementById(`msg-text-${msgId}`);
+            if (textElem) textElem.textContent = '🔒 Не удалось расшифровать';
+        }
+    } catch(e) {
+        const textElem = document.getElementById(`msg-text-${msgId}`);
+        if (textElem) textElem.textContent = '🔒 Ошибка расшифровки';
+    }
+}
+
 function setupSwipeAndTouch(wrapper, div, msg) {
     let startX = 0, startY = 0;
     let currentX = 0;
@@ -807,7 +827,7 @@ function setupSwipeAndTouch(wrapper, div, msg) {
         longPressTimer = setTimeout(() => {
             if (!isSwiping) {
                 openContextMenu(msg);
-                if (navigator.vibrate) navigator.vibrate(40);
+                if (navigator.vibrate) navigator.vibrate(30);
             }
         }, 450);
     }, {passive: true});
@@ -825,9 +845,7 @@ function setupSwipeAndTouch(wrapper, div, msg) {
                 div.style.transition = 'none';
 
                 const ind = wrapper.querySelector('.msg-reply-indicator');
-                if (ind) {
-                    ind.style.opacity = Math.min(currentX / 50, 1);
-                }
+                if (ind) ind.style.opacity = Math.min(currentX / 50, 1);
             }
         } else {
             clearTimeout(longPressTimer);
@@ -836,7 +854,7 @@ function setupSwipeAndTouch(wrapper, div, msg) {
 
     div.addEventListener('touchend', e => {
         clearTimeout(longPressTimer);
-        div.style.transition = 'transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+        div.style.transition = 'transform 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
         div.style.transform = 'translateX(0px)';
 
         const ind = wrapper.querySelector('.msg-reply-indicator');
@@ -844,11 +862,10 @@ function setupSwipeAndTouch(wrapper, div, msg) {
 
         if (currentX > 45) {
             setReply(msg);
-            if (navigator.vibrate) navigator.vibrate(30);
+            if (navigator.vibrate) navigator.vibrate(25);
         }
     });
 
-    // Right click for desktop context menu
     div.addEventListener('contextmenu', e => {
         e.preventDefault();
         openContextMenu(msg);
@@ -860,16 +877,21 @@ function setupSwipeAndTouch(wrapper, div, msg) {
    ========================================================================= */
 
 async function processEncryptedAttachment(elemId, url) {
-    const elem = document.getElementById(elemId);
-    if (!elem) return;
+    if (!url) {
+        const elem = document.getElementById(elemId);
+        if (elem && elem.querySelector('.msg-file-size')) elem.querySelector('.msg-file-size').textContent = 'Ссылка недоступна';
+        return;
+    }
 
     if (decryptedCache[elemId]) {
-        renderDecryptedMedia(elem, decryptedCache[elemId]);
+        const elem = document.getElementById(elemId);
+        if (elem) renderDecryptedMedia(elem, decryptedCache[elemId]);
         return;
     }
 
     try {
         const resp = await fetch(`/api/proxy_file?url=${encodeURIComponent(url)}`);
+        if (!resp.ok) throw new Error("Proxy fetch error");
         const encArrayBuf = await resp.arrayBuffer();
 
         const view = new DataView(encArrayBuf);
@@ -890,17 +912,18 @@ async function processEncryptedAttachment(elemId, url) {
 
         const blob = new Blob([decPayloadBuf], { type: header.mime || 'application/octet-stream' });
         const blobUrl = URL.createObjectURL(blob);
-        decryptedCache[elemId] = { blobUrl, mime: header.mime, name: header.name, ext: header.name?.split('.').pop() };
+        decryptedCache[elemId] = { blobUrl, mime: header.mime, name: header.name, ext: (header.name||'').split('.').pop().toLowerCase() };
 
-        renderDecryptedMedia(elem, decryptedCache[elemId]);
+        const elem = document.getElementById(elemId);
+        if (elem) renderDecryptedMedia(elem, decryptedCache[elemId]);
     } catch (e) {
         console.error("Failed to decrypt media:", e);
-        if (elem.querySelector('.msg-file-size')) elem.querySelector('.msg-file-size').textContent = 'Ошибка расшифровки';
+        const elem = document.getElementById(elemId);
+        if (elem && elem.querySelector('.msg-file-size')) elem.querySelector('.msg-file-size').textContent = 'Ошибка расшифровки';
     }
 }
 
 function renderDecryptedMedia(elem, data) {
-    // 1. TG Style Video Note ("Кружочек" .mec)
     if (data.ext === 'mec' || (data.mime && data.mime.startsWith('video/') && elem.classList.contains('video-note-container'))) {
         elem.innerHTML = `
             <video class="video-note-player" src="${data.blobUrl}" loop playsinline muted></video>
@@ -929,7 +952,6 @@ function renderDecryptedMedia(elem, data) {
         return;
     }
 
-    // 2. TG Style Voice Message ("Голосовое" .meg)
     if (data.ext === 'meg' || (data.mime && data.mime.startsWith('audio/'))) {
         const audio = new Audio(data.blobUrl);
         elem.innerHTML = `
@@ -945,10 +967,9 @@ function renderDecryptedMedia(elem, data) {
             </div>
         `;
 
-        // Render Waveform bars
         const wf = elem.querySelector(`#vw-${elem.id}`);
         const barHeights = [10,18,14,24,30,18,12,20,28,16,22,14,26,18,12,22,16,10,24,18];
-        barHeights.forEach((h, idx) => {
+        barHeights.forEach((h) => {
             const b = document.createElement('div');
             b.className = 'voice-bar';
             b.style.height = h + 'px';
@@ -995,7 +1016,6 @@ function renderDecryptedMedia(elem, data) {
         return;
     }
 
-    // 3. Normal Images & Video
     if (data.mime.startsWith('image/')) {
         const img = document.createElement('img');
         img.className = 'msg-photo';
@@ -1008,7 +1028,7 @@ function renderDecryptedMedia(elem, data) {
         vid.controls = true;
         elem.replaceWith(vid);
     } else {
-        elem.querySelector('.msg-file-size').textContent = 'Расшифровано (нажмите для скачивания)';
+        elem.querySelector('.msg-file-size').textContent = 'Расшифровано (скачать)';
         elem.onclick = () => {
             const a = document.createElement('a');
             a.href = data.blobUrl;
@@ -1107,7 +1127,6 @@ async function sendMessage() {
     }
 
     if (editingMsg) {
-        // Edit existing message
         await fetch('/api/edit', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -1115,7 +1134,6 @@ async function sendMessage() {
         });
         cancelEdit();
     } else {
-        // Send new message
         const replyId = replyingMsg ? replyingMsg.id : null;
         await fetch('/api/send', {
             method: 'POST',
@@ -1128,6 +1146,7 @@ async function sendMessage() {
     input.value = '';
     btn.disabled = false;
     toggleInputIcons();
+    lastMessagesHash = ""; // force reload
     loadMessages();
 }
 
@@ -1248,7 +1267,6 @@ async function sendVideoNote() {
     }
 }
 
-/* Helper to encrypt & upload media Blob (.mec / .meg / files) */
 async function uploadEncryptedMedia(blob, filename) {
     if (!currentPeer) return;
     const peerKey = await getPeerPubKey(currentPeer);
@@ -1278,6 +1296,7 @@ async function uploadEncryptedMedia(blob, filename) {
     formData.append('file', encBlob, filename);
 
     await fetch('/api/upload_encrypted_doc', { method: 'POST', body: formData });
+    lastMessagesHash = "";
     loadMessages();
 }
 
@@ -1299,6 +1318,7 @@ async function handleFile(e) {
     formData.append('peer_id', currentPeer);
     formData.append('file', file);
     await fetch('/api/upload_normal', { method: 'POST', body: formData });
+    lastMessagesHash = "";
     loadMessages();
 }
 
@@ -1356,6 +1376,7 @@ async function confirmDeleteMessage() {
         })
     });
     closeDeleteModal();
+    lastMessagesHash = "";
     loadMessages();
 }
 
