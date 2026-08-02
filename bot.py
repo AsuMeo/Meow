@@ -11,6 +11,9 @@ logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 
+# Храним связь: message_id поста канала -> данные
+channel_posts = {}
+
 def create_sticker_image(name, text, avatar_url=None):
     width, height = 512, 256
     img = Image.new("RGB", (width, height), "#1a1a2e")
@@ -84,13 +87,33 @@ def create_sticker_image(name, text, avatar_url=None):
     webp_buffer.seek(0)
     return webp_buffer
 
+async def handle_channel_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Запоминаем посты канала"""
+    if update.channel_post:
+        post = update.channel_post
+        channel_posts[post.message_id] = {
+            'chat_id': post.chat_id,
+            'text': post.text or post.caption or "",
+            'date': post.date
+        }
+        logger.info("New channel post: " + str(post.message_id))
+
 async def handle_comment(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обрабатывает комментарии в чате обсуждения"""
     message = update.message
     if not message:
         return
 
     if message.from_user and message.from_user.is_bot:
         return
+
+    # Проверяем, что это комментарий к посту канала (есть reply_to_message)
+    if not message.reply_to_message:
+        return
+
+    # reply_to_message в чате комментариев указывает на пост канала
+    post_msg = message.reply_to_message
+    post_id = post_msg.message_id
 
     user = message.from_user
     name = user.full_name or user.username or "Anonymous"
@@ -107,28 +130,27 @@ async def handle_comment(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     sticker_img = create_sticker_image(name, text, avatar_url)
 
+    # Удаляем оригинальный комментарий
     try:
         await message.delete()
     except Exception as e:
         logger.error("Delete error: " + str(e))
 
-    reply_id = None
-    if message.reply_to_message:
-        reply_id = message.reply_to_message.message_id
-
+    # Отправляем стикер как ответ на тот же пост канала
     try:
         await context.bot.send_photo(
             chat_id=message.chat_id,
             photo=sticker_img,
-            reply_to_message_id=reply_id
+            reply_to_message_id=post_id
         )
+        logger.info("Sent anonymous sticker for post: " + str(post_id))
     except Exception as e:
         logger.error("Send error: " + str(e))
         msg_text = "Comment from " + name + ": " + text
         await context.bot.send_message(
             chat_id=message.chat_id,
             text=msg_text,
-            reply_to_message_id=reply_id
+            reply_to_message_id=post_id
         )
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -140,8 +162,14 @@ def main():
         return
 
     application = Application.builder().token(BOT_TOKEN).build()
+
+    # Отслеживаем посты канала
+    application.add_handler(MessageHandler(filters.ChatType.CHANNEL, handle_channel_post))
+
+    # Отслеживаем комментарии в чатах обсуждения (группах)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, handle_comment))
     application.add_handler(MessageHandler(filters.PHOTO & filters.ChatType.GROUPS, handle_comment))
+
     application.add_error_handler(error_handler)
 
     logger.info("Anonymous comment bot started!")
