@@ -13,19 +13,39 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 LINK_PATTERN = re.compile(r'https?://|www\.|t\.me/|@[\w_]+')
 
-def create_sticker_image(name, text, avatar_url=None, media_type=None):
-    # Максимально крупно, как в ТГ
+ALLOWED_STICKER_SETS = {
+    "KotikSAO", "SofiMy", "AsunaMe", "PinKa999", "KiraIArtyom6",
+    "SARCAETSx", "Sarka01", "Podkaty01", "Kotayta993", "Xary01",
+    "SamiMe01", "YumiMe01", "KiritoMe01", "StefanMe01", "KirAsu01",
+    "MikuMe01", "Ylubawka", "KotTyanki", "MitaMe01", "YutaMe01",
+    "Hikaru169", "LinehMe01", "AsunaCarnage", "KittyMe01", "AsunaSad01",
+    "AsunaTyan", "Kirito55", "AsunaYuuki8", "SAOManga", "JonhDavy",
+    "KiritoAsunaYukki", "MeowSao"
+}
+
+ALLOWED_EMOJI_SETS = {
+    "SofiMe01", "KiraIArtem", "SARCAETS", "Sarka993", "NozhiMeow",
+    "Kotyataaa993", "XaryEmoji", "Sami01Emoji", "MikuMeEmoji",
+    "YlubawkaEmoji", "MitaMeEmoji", "AsuMeoArt", "YutaEmoji01",
+    "HikaryEmoji01", "LineMeEmoji", "KittyMe01Emoji", "AsunaChanEmoji",
+    "AsunaMeow"
+}
+
+
+def create_sticker_image(name, text, avatar_url=None, media_type=None, media_file=None):
     avatar_size = 140
     margin = 24
     text_x = avatar_size + margin * 2
     max_text_width = 512 - text_x - margin
 
     try:
-        font_name = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 32)
-        font_text = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 30)
+        font_name = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
+        font_text = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 34)
+        font_media = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 28)
     except:
         font_name = ImageFont.load_default()
         font_text = ImageFont.load_default()
+        font_media = ImageFont.load_default()
 
     temp_img = Image.new("RGB", (1, 1))
     temp_draw = ImageDraw.Draw(temp_img)
@@ -51,13 +71,27 @@ def create_sticker_image(name, text, avatar_url=None, media_type=None):
 
     lines = lines[:4]
     if len(words) > sum(len(l.split()) for l in lines):
-        lines[-1] = lines[-1][:18] + "..."
+        lines[-1] = lines[-1][:16] + "..."
 
-    line_height = 40
+    line_height = 44
     text_height = len(lines) * line_height
-    name_height = 42
+    name_height = 46
 
-    content_height = max(avatar_size + margin * 2, name_height + text_height + margin * 3)
+    # Если есть медиа-файл — добавляем его в стикер
+    media_height = 0
+    media_img = None
+    if media_file:
+        try:
+            media_img = Image.open(io.BytesIO(media_file)).convert("RGBA")
+            # Масштабируем медиа
+            max_media_w = 512 - text_x - margin
+            max_media_h = 200
+            media_img.thumbnail((max_media_w, max_media_h), Image.LANCZOS)
+            media_height = media_img.height + 10
+        except:
+            media_img = None
+
+    content_height = max(avatar_size + margin * 2, name_height + text_height + media_height + margin * 3)
     height = min(content_height, 512)
     width = 512
 
@@ -96,14 +130,20 @@ def create_sticker_image(name, text, avatar_url=None, media_type=None):
         text_h = bbox[3] - bbox[1]
         draw.text((avatar_x + (avatar_size - text_w)//2, avatar_y + (avatar_size - text_h)//2 - 6), initial, fill="white", font=font_init)
 
-    # Имя — синее как в ТГ для обычного пользователя
+    # Имя
     draw.text((text_x, margin + 8), name, fill="#53a9ff", font=font_name)
 
-    # Текст — белый, очень крупный
+    # Текст
     text_y = margin + name_height + 14
     for line in lines:
         draw.text((text_x, text_y), line, fill="white", font=font_text)
         text_y += line_height
+
+    # Медиа без обводки
+    if media_img:
+        media_x = text_x
+        media_y = text_y + 5
+        img.paste(media_img, (media_x, media_y), media_img)
 
     webp_buffer = io.BytesIO()
     img.save(webp_buffer, format="WEBP")
@@ -151,11 +191,50 @@ async def handle_comment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = message.from_user
     name = user.full_name or user.username or "Anonymous"
 
-    media_type = None
+    # Проверяем стикеры
     if message.sticker:
-        media_type = "Sticker"
-    elif message.photo:
+        sticker_set = message.sticker.set_name
+        if sticker_set:
+            # Проверяем разрешённые наборы
+            is_allowed = False
+            for allowed in ALLOWED_STICKER_SETS:
+                if allowed.lower() in sticker_set.lower():
+                    is_allowed = True
+                    break
+            for allowed in ALLOWED_EMOJI_SETS:
+                if allowed.lower() in sticker_set.lower():
+                    is_allowed = True
+                    break
+
+            if not is_allowed:
+                try:
+                    await message.delete()
+                    await context.bot.send_message(
+                        chat_id=message.chat_id,
+                        text="🚫 " + name + ", этот стикер запрещён!"
+                    )
+                except:
+                    pass
+                return
+
+    # Получаем медиа
+    media_file = None
+    media_type = None
+    if message.photo:
         media_type = "Photo"
+        try:
+            photo = message.photo[-1]  # самое большое фото
+            file = await context.bot.get_file(photo.file_id)
+            media_file = file.download_as_bytearray()
+        except Exception as e:
+            logger.error("Photo download error: " + str(e))
+    elif message.sticker:
+        media_type = "Sticker"
+        try:
+            file = await context.bot.get_file(message.sticker.file_id)
+            media_file = file.download_as_bytearray()
+        except Exception as e:
+            logger.error("Sticker download error: " + str(e))
 
     text = message.text or message.caption or ""
 
@@ -171,7 +250,7 @@ async def handle_comment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error("Avatar load error: " + str(e))
 
-    sticker_img = create_sticker_image(name, text, avatar_url, media_type)
+    sticker_img = create_sticker_image(name, text, avatar_url, media_type, media_file)
 
     try:
         await message.delete()
@@ -208,7 +287,7 @@ def main():
         handle_comment
     ))
     application.add_error_handler(error_handler)
-    logger.info("Bot v7 started!")
+    logger.info("Bot v8 started!")
     application.run_polling()
 
 
