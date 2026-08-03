@@ -459,7 +459,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 
 .msg-photo{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;object-fit:cover;cursor:pointer;background:#111;border:none!important;outline:none!important;box-shadow:none!important}
 .msg-video{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;background:#000;border:none!important;outline:none!important;box-shadow:none!important}
-.msg-file{background:rgba(255,255,255,.05);padding:10px;border-radius:12px;margin-top:6px;display:flex;align-items:center;gap:10px;cursor:pointer}
+.msg-file{background:rgba(255,255,255,.05);padding:10px;border-radius:12px;margin-top:6px;display:flex;align-items:center;gap:10px;cursor:pointer;color:#aaa}
 
 /* Input Bar & Actions */
 .input-area-wrapper{background:#0d0d0d;border-top:1px solid #1a1a1a;display:flex;flex-direction:column;flex-shrink:0;z-index:15}
@@ -563,7 +563,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 
 <div class="drawer-item" onclick="toggleStealthRead()">
 <div class="drawer-item-left">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
 <span>Режим «Не читать»</span>
 </div>
 <label class="switch" onclick="event.stopPropagation()">
@@ -574,7 +574,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 
 <div class="drawer-item" onclick="toggleSoundNotifications()">
 <div class="drawer-item-left">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
 <span>Звук уведомлений</span>
 </div>
 <label class="switch" onclick="event.stopPropagation()">
@@ -585,7 +585,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 
 <div class="drawer-item" onclick="toggleEncryptionMode()">
 <div class="drawer-item-left">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
 <span>Шифрование E2EE</span>
 </div>
 <label class="switch" onclick="event.stopPropagation()">
@@ -596,7 +596,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 
 <div class="drawer-item" onclick="clearAppCache()">
 <div class="drawer-item-left">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
 <span id="cacheSizeText">Очистить кэш (0.0 MB)</span>
 </div>
 </div>
@@ -615,7 +615,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 </div>
 <div class="drawer-item" onclick="openEncryptModal(); closeDrawer();">
 <div class="drawer-item-left">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
 <span>Облачное E2EE Шифрование</span>
 </div>
 </div>
@@ -632,9 +632,9 @@ input:checked + .slider:before{transform:translateX(20px)}
 <!-- Encryption & Keys Modal -->
 <div class="modal hidden" id="encryptModal">
 <div class="encrypt-modal-content">
-<div class="modal-title">🔐 Облачное E2EE шифрование</div>
+<div class="modal-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Облачное E2EE шифрование</div>
 <div class="warning-box">
-☁️ Ваши зашифрованные ключи надежно сохранены в <b>Firebase Realtime Database</b> и защищены вашим мастер-паролем. Вход с любого устройства восстановит доступ к вашим чатам!
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>Ваши зашифрованные ключи надежно сохранены в <b>Firebase Realtime Database</b> и защищены вашим мастер-паролем. Вход с любого устройства восстановит доступ к вашим чатам!
 </div>
 <div class="modal-text" style="margin-bottom:10px">Отпечаток устройства (Delfan Fingerprint):</div>
 <div class="delfan-box" id="delfanFingerprint">Вычисление отпечатка...</div>
@@ -828,7 +828,7 @@ Kate Mobile API • Cloud Realtime E2EE
 </div>
 <div class="header-actions">
 <div class="header-btn active" id="encryptBtn" onclick="openEncryptModal()" title="Шифрование E2EE">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
 </div>
 </div>
 </div>
@@ -879,9 +879,9 @@ Kate Mobile API • Cloud Realtime E2EE
 </div>
 <div class="header-actions">
 <button class="header-btn" id="searchChatBtn" onclick="toggleChatSearch()" title="Поиск по сообщениям">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
 </button>
-<button class="mark-read-btn hidden" id="manualMarkReadBtn" onclick="manualMarkChatAsRead()">✓✓ Прочитать</button>
+<button class="mark-read-btn hidden" id="manualMarkReadBtn" onclick="manualMarkChatAsRead()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align:middle;margin-right:4px"><polyline points="20 6 9 17 4 12"/></svg>Прочитать</button>
 </div>
 </div>
 
@@ -898,7 +898,7 @@ Kate Mobile API • Cloud Realtime E2EE
 
 <div class="pinned-msg-bar hidden" id="pinnedMsgBar">
 <div class="pinned-msg-info" onclick="scrollToPinnedMsg()">
-<div class="pinned-msg-title">📌 Закрепленное сообщение</div>
+<div class="pinned-msg-title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14l-1.5-7h-11z"/><path d="M9 10V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6"/></svg>Закрепленное сообщение</div>
 <div class="pinned-msg-text" id="pinnedMsgText">...</div>
 </div>
 <div class="pinned-msg-close" onclick="unpinCurrentMessage()">
@@ -1284,7 +1284,7 @@ async function importKeysFile(e) {
 }
 
 async function regenerateKeysPrompt() {
-    if (confirm('⚠️ Вы уверены, что хотите обновить пароль и пересоздать ключи E2EE?')) {
+    if (confirm('ВНИМАНИЕ: Вы уверены, что хотите обновить пароль и пересоздать ключи E2EE?')) {
         localStorage.removeItem('vk_pass');
         const newPass = prompt('Введите новый мастер-пароль для шифрования:');
         if (!newPass) return;
@@ -1681,21 +1681,21 @@ function buildDialogPreviewHTML(d) {
     }
 
     if (rawText.startsWith(ENCRYPT_PREFIX)) {
-        return `<span class="dialog-preview-wrap" id="dialog-dec-${d.id}">🔒 Зашифрованное сообщение</span>`;
+        return `<span class="dialog-preview-wrap" id="dialog-dec-${d.id}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Зашифрованное сообщение</span>`;
     }
 
     if (isCircle) {
-        return `<span class="dialog-preview-wrap">🎥 Кружочек</span>`;
+        return `<span class="dialog-preview-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" style="vertical-align:middle;margin-right:4px;flex-shrink:0"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>Кружочек</span>`;
     } else if (isVoice) {
-        return `<span class="dialog-preview-wrap">🎤 Голосовое сообщение</span>`;
+        return `<span class="dialog-preview-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" style="vertical-align:middle;margin-right:4px;flex-shrink:0"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>Голосовое</span>`;
     } else if (photoUrl) {
-        return `<span class="dialog-preview-wrap"><img class="dialog-preview-thumb" src="${photoUrl}" onerror="this.style.display='none'">📷 Фото ${escapeHtml(rawText)}</span>`;
+        return `<span class="dialog-preview-wrap"><img class="dialog-preview-thumb" src="${photoUrl}" onerror="this.style.display='none'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" style="vertical-align:middle;margin-right:4px;flex-shrink:0"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Фото ${escapeHtml(rawText)}</span>`;
     } else if (videoUrl) {
-        return `<span class="dialog-preview-wrap"><img class="dialog-preview-thumb" src="${videoUrl}" onerror="this.style.display='none'">📹 Видео ${escapeHtml(rawText)}</span>`;
+        return `<span class="dialog-preview-wrap"><img class="dialog-preview-thumb" src="${videoUrl}" onerror="this.style.display='none'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" style="vertical-align:middle;margin-right:4px;flex-shrink:0"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>Видео ${escapeHtml(rawText)}</span>`;
     } else if (atts.find(a => a.type === 'doc' && ((a.doc?.ext || '').toLowerCase() === 'mst' || (a.doc?.title || '').toLowerCase().endsWith('.mst')))) {
-        return `<span class="dialog-preview-wrap">🎨 Стикер</span>`;
+        return `<span class="dialog-preview-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" style="vertical-align:middle;margin-right:4px;flex-shrink:0"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Стикер</span>`;
     } else if (atts.find(a => a.type === 'doc' && ((a.doc?.ext || '').toLowerCase() === 'mmu' || (a.doc?.title || '').toLowerCase().endsWith('.mmu')))) {
-        return `<span class="dialog-preview-wrap">🎵 Музыка</span>`;
+        return `<span class="dialog-preview-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" style="vertical-align:middle;margin-right:4px;flex-shrink:0"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Музыка</span>`;
     }
 
     return `<span class="dialog-preview-wrap">${escapeHtml(rawText || 'Сообщение')}</span>`;
@@ -1711,7 +1711,7 @@ async function fastDecryptDialogPreviews(dialogs) {
                     if (decBuf) {
                         const plainText = new TextDecoder().decode(decBuf);
                         const elem = document.getElementById(`dialog-dec-${d.id}`);
-                        if (elem) elem.innerHTML = `🔒 ${escapeHtml(plainText)}`;
+                        if (elem) elem.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>${escapeHtml(plainText)}`;
                     }
                 } catch(e){}
             }, 5);
@@ -1817,7 +1817,7 @@ function renderDialogsListFiltered() {
                     ${d.unread > 0 ? `<div class="dialog-unread-blue">${d.unread}</div>` : ''}
                 </div>
             </div>
-            ${isPinned ? '<div class="dialog-pin-icon">📌</div>' : ''}
+            ${isPinned ? '<div class="dialog-pin-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14l-1.5-7h-11z"/><path d="M9 10V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6"/></svg></div>' : ''}
         `;
         list.appendChild(div);
     }
@@ -1992,7 +1992,10 @@ function openChatByObject(d) {
     document.getElementById('chatScreen').classList.add('active');
 
     renderedMsgIds.clear();
+    decryptedCache = {}; // Очищаем кэш расшифровки при входе в чат
     document.getElementById('messages').innerHTML = '';
+    messagesOffset = 0;
+    allMessagesLoaded = false;
 
     const markBtn = document.getElementById('manualMarkReadBtn');
     if (stealthRead && d.unread > 0) {
@@ -2212,7 +2215,7 @@ function renderMessageItem(containerOrFragment, msg) {
         const rMsg = msg.reply_message;
         const rAuthor = rMsg.name || (rMsg.from_id === myVkId ? 'Вы' : 'Собеседник');
         let rText = rMsg.text || 'Вложение';
-        if (rText.startsWith(ENCRYPT_PREFIX)) rText = '🔒 Зашифрованное сообщение';
+        if (rText.startsWith(ENCRYPT_PREFIX)) rText = '[Зашифрованное]';
         html += `<div class="msg-reply-quote" onclick="scrollToMsg('${rMsg.id}')">
             <div class="msg-reply-name">${escapeHtml(rAuthor)}</div>
             <div class="msg-reply-text">${escapeHtml(rText)}</div>
@@ -2230,7 +2233,7 @@ function renderMessageItem(containerOrFragment, msg) {
             displayText = decryptedCache[msg.id];
             html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
         } else {
-            html += `<div class="msg-text"><span class="decrypting-shimmer">🔐 Расшифровка...</span></div>`;
+            html += `<div class="msg-text"><span class="decrypting-shimmer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Расшифровка...</span></div>`;
             setTimeout(async () => {
                 try {
                     const encObj = JSON.parse(msg.text.substring(ENCRYPT_PREFIX.length));
@@ -2243,7 +2246,7 @@ function renderMessageItem(containerOrFragment, msg) {
                     }
                 } catch(e) {
                     const textElem = document.getElementById('msg-' + msg.id)?.querySelector('.msg-text');
-                    if (textElem) textElem.textContent = '🔒 Не удалось расшифровать';
+                    if (textElem) textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Не удалось расшифровать';
                 }
             }, 10);
         }
@@ -2294,7 +2297,7 @@ function renderMessageItem(containerOrFragment, msg) {
                             <div class="tg-voice-bar active" style="height:100%"></div>
                             <div class="tg-voice-bar" style="height:60%"></div>
                         </div>
-                        <div class="tg-voice-info"><span>🎤 Голосовое</span></div>
+                        <div class="tg-voice-info"><span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>Голосовое</span></div>
                     </div>
                 </div>`;
 
@@ -2322,7 +2325,7 @@ function renderMessageItem(containerOrFragment, msg) {
                             <div class="tg-voice-play-btn"><span class="loader"></span></div>
                             <div class="tg-voice-wave-wrap">
                                 <div class="tg-voice-waveform"><div class="tg-voice-bar active" style="height:50%"></div></div>
-                                <div class="tg-voice-info"><span>🎤 Голосовое...</span></div>
+                                <div class="tg-voice-info"><span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>Голосовое...</span></div>
                             </div>
                         </div>`;
                     } else if (ext === 'mst' || title.endsWith('.mst')) {
@@ -2332,11 +2335,11 @@ function renderMessageItem(containerOrFragment, msg) {
                             <div class="tg-voice-play-btn"><span class="loader"></span></div>
                             <div class="tg-voice-wave-wrap">
                                 <div class="tg-voice-waveform"><div class="tg-voice-bar active" style="height:50%"></div></div>
-                                <div class="tg-voice-info"><span>🎵 Музыка...</span></div>
+                                <div class="tg-voice-info"><span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Музыка...</span></div>
                             </div>
                         </div>`;
                     } else {
-                        html += `<div class="msg-file" id="${docId}"><span class="msg-file-icon">🔒</span><div class="msg-file-info"><div class="msg-file-name">Зашифрованный файл</div><div class="msg-file-size">Загрузка...</div></div></div>`;
+                        html += `<div class="msg-file" id="${docId}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-right:8px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><div class="msg-file-info"><div class="msg-file-name">Зашифрованный файл</div><div class="msg-file-size">Загрузка...</div></div></div>`;
                     }
 
                     setTimeout(() => processEncryptedAttachment(docId, doc.url, ext || title), 10);
@@ -2545,7 +2548,7 @@ function setReplyToMessage(msg) {
     
     title.textContent = `Ответ на сообщение (${author})`;
     let previewText = msg.text || 'Вложение';
-    if (previewText.startsWith(ENCRYPT_PREFIX)) previewText = '🔒 Зашифрованное сообщение';
+    if (previewText.startsWith(ENCRYPT_PREFIX)) previewText = '[Зашифрованное]';
     text.textContent = previewText;
     
     document.getElementById('replyPreviewBar').classList.remove('hidden');
@@ -2704,7 +2707,7 @@ function renderDecryptedMedia(elem, data) {
                 </div>
                 <div class="tg-voice-info">
                     <span class="v-time">0:00</span>
-                    <span>🎤 Голосовое</span>
+                    <span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>Голосовое</span>
                 </div>
             </div>
         `;
@@ -2794,7 +2797,7 @@ function renderDecryptedMedia(elem, data) {
                 </div>
                 <div class="tg-voice-info">
                     <span class="v-time">0:00</span>
-                    <span>🎵 Музыка</span>
+                    <span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Музыка</span>
                 </div>
             </div>
         `;
@@ -3206,28 +3209,32 @@ async function createStickerFromPhoto() {
 
         showUploadProgress('Создание стикера...');
         try {
-            // Resize and create sticker
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            const img = new Image();
-            img.onload = async () => {
-                const size = 512;
-                canvas.width = size;
-                canvas.height = size;
+            const blob = await new Promise((resolve, reject) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                img.onload = () => {
+                    const size = 512;
+                    canvas.width = size;
+                    canvas.height = size;
 
-                // Center crop to square
-                const minDim = Math.min(img.width, img.height);
-                const sx = (img.width - minDim) / 2;
-                const sy = (img.height - minDim) / 2;
-                ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size);
+                    const minDim = Math.min(img.width, img.height);
+                    const sx = (img.width - minDim) / 2;
+                    const sy = (img.height - minDim) / 2;
+                    ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size);
 
-                canvas.toBlob(async (blob) => {
-                    await sendMediaBlob(blob, `sticker_${Date.now()}.mst`, 'image/png');
-                }, 'image/png');
-            };
-            img.src = URL.createObjectURL(file);
+                    canvas.toBlob((b) => {
+                        if (b) resolve(b);
+                        else reject(new Error('Canvas toBlob failed'));
+                    }, 'image/png');
+                };
+                img.onerror = reject;
+                img.src = URL.createObjectURL(file);
+            });
+
+            await sendMediaBlob(blob, `sticker_${Date.now()}.mst`, 'image/png');
         } catch(err) {
-            alert('Ошибка создания стикера');
+            alert('Ошибка создания стикера: ' + err.message);
             hideUploadProgress();
         }
     };
@@ -3517,7 +3524,7 @@ async function openLikesModal(ownerId, postId) {
                 list.appendChild(item);
             }
         } else {
-            list.innerHTML = '<div style="color:#666;text-align:center;padding:40px">Пока никто не оценил</div>';
+            list.innerHTML = '<div style="color:#666;text-align:center;padding:40px"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1.5" style="display:block;margin:0 auto 8px"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>Пока никто не оценил</div>';
         }
         document.getElementById('commentsModal').classList.add('active');
     } catch(e){}
@@ -3552,7 +3559,7 @@ async function openCommentsModal(ownerId, postId) {
                 list.appendChild(item);
             }
         } else {
-            list.innerHTML = '<div style="color:#666;text-align:center;padding:40px">Комментариев пока нет</div>';
+            list.innerHTML = '<div style="color:#666;text-align:center;padding:40px"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1.5" style="display:block;margin:0 auto 8px"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>Комментариев пока нет</div>';
         }
         document.getElementById('commentsModal').classList.add('active');
     } catch(e){}
@@ -3588,9 +3595,9 @@ async function openProfileView(peerId, isGroup) {
 
         const infoDiv = document.getElementById('profileViewInfo');
         infoDiv.innerHTML = '';
-        if (data.city) infoDiv.innerHTML += `<div class="profile-view-info-item">📍 ${escapeHtml(data.city)}</div>`;
-        if (data.bdate) infoDiv.innerHTML += `<div class="profile-view-info-item">🎂 ${escapeHtml(data.bdate)}</div>`;
-        if (data.site) infoDiv.innerHTML += `<div class="profile-view-info-item">🔗 ${escapeHtml(data.site)}</div>`;
+        if (data.city) infoDiv.innerHTML += `<div class="profile-view-info-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;flex-shrink:0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${escapeHtml(data.city)}</div>`;
+        if (data.bdate) infoDiv.innerHTML += `<div class="profile-view-info-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;flex-shrink:0"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>${escapeHtml(data.bdate)}</div>`;
+        if (data.site) infoDiv.innerHTML += `<div class="profile-view-info-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;flex-shrink:0"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>${escapeHtml(data.site)}</div>`;
 
         const postsList = document.getElementById('profilePostsList');
         postsList.innerHTML = '';
@@ -3620,7 +3627,7 @@ async function openProfileView(peerId, isGroup) {
                 postsList.appendChild(div);
             }
         } else {
-            postsList.innerHTML = '<div class="profile-view-empty">Нет постов для отображения</div>';
+            postsList.innerHTML = '<div class="profile-view-empty"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1.5" style="display:block;margin:0 auto 8px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>Нет постов для отображения</div>';
         }
 
         document.getElementById('profileViewModal').classList.add('active');
