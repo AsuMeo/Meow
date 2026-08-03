@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Magic World 3D</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; overflow:hidden; }
+  body { background:#000; width:100vw; height:100vh; touch-action:none; }
+  canvas { display:block; width:100%; height:100%; }
+  #ui {
+    position:fixed; top:0; left:0; width:100%; height:100%;
+    pointer-events:none; z-index:10;
+  }
+  #joystick {
+    position:absolute; bottom:30px; left:30px;
+    width:120px; height:120px; pointer-events:auto;
+  }
+  #joystick-base {
+    position:absolute; width:120px; height:120px;
+    border-radius:50%; background:rgba(255,255,255,0.1);
+    border:2px solid rgba(255,255,255,0.3);
+  }
+  #joystick-knob {
+    position:absolute; width:50px; height:50px;
+    border-radius:50%; background:rgba(100,200,255,0.6);
+    top:35px; left:35px; transition:none;
+  }
+  #magic-btn {
+    position:absolute; bottom:30px; right:30px;
+    width:80px; height:80px; border-radius:50%;
+    background:rgba(255,100,100,0.5); border:2px solid rgba(255,100,100,0.8);
+    pointer-events:auto; display:flex; align-items:center; justify-content:center;
+    color:#fff; font-size:12px; font-family:sans-serif; user-select:none;
+  }
+  #magic-btn.active { background:rgba(255,50,50,0.8); }
+  #name-input {
+    position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+    background:rgba(0,0,0,0.9); padding:30px; border-radius:15px;
+    text-align:center; z-index:100; pointer-events:auto;
+  }
+  #name-input input {
+    padding:10px 15px; font-size:18px; border-radius:8px; border:none;
+    margin:10px 0; width:200px; text-align:center;
+  }
+  #name-input button {
+    padding:10px 30px; font-size:16px; border-radius:8px;
+    border:none; background:#4488ff; color:#fff; cursor:pointer;
+  }
+  #players-count {
+    position:fixed; top:10px; left:10px;
+    color:#0f0; font-family:monospace; font-size:14px;
+    text-shadow:0 0 5px #0f0; z-index:10;
+  }
+  #crosshair {
+    position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:20px; height:20px; pointer-events:none; z-index:5;
+  }
+  #crosshair::before, #crosshair::after {
+    content:''; position:absolute; background:rgba(255,255,255,0.5);
+  }
+  #crosshair::before { width:2px; height:20px; left:9px; top:0; }
+  #crosshair::after { width:20px; height:2px; left:0; top:9px; }
+</style>
+</head>
+<body>
+<div id="name-input">
+  <div style="color:#fff; font-size:20px; margin-bottom:10px;">Введи имя</div>
+  <input type="text" id="nick" placeholder="Имя" maxlength="12" value="Player">
+  <br><button onclick="startGame()">ИГРАТЬ</button>
+</div>
+
+<div id="ui" style="display:none;">
+  <div id="players-count">Онлайн: 0 | Пинг: --</div>
+  <div id="crosshair"></div>
+  <div id="joystick">
+    <div id="joystick-base"></div>
+    <div id="joystick-knob"></div>
+  </div>
+  <div id="magic-btn">МАГИЯ</div>
+</div>
+
+<canvas id="gl"></canvas>
+
+<script>
+// ============ КОНФИГ ============
+const WS_URL = (location.protocol==='https:'?'wss://':'ws://') + location.host + '/ws';
+const WORLD_SIZE = 200;
+const CHUNK_SIZE = 20;
+const GRAVITY = -25;
+const PLAYER_SPEED = 8;
+const JUMP_FORCE = 12;
+
+let canvas, gl, ws, playerId, players = {}, objects = [], myName = '';
+let cam = { x:0, y:5, z:0, yaw:0, pitch:0 };
+let vel = { x:0, y:0, z:0 };
+let onGround = false;
+let joy = { active:false, dx:0, dy:0, originX:0, originY:0 };
+let magic = { active:false, holding:false, targetObj:null, flickStart:null, flickDir:null };
+let lastTime = 0, ping = 0, pingStart = 0;
+let inputState = { forward:0, right:0, jump:false };
+
+// ============ WEBGL ============
+const vs = `
+attribute vec3 aPos;
+attribute vec3 aNorm;
+attribute vec2 aUV;
+uniform mat4 uMVP;
+uniform mat4 uModel;
+varying vec3 vNorm;
+varying vec3 vPos;
+varying vec2 vUV;
+void main(){
+  vNorm = mat3(uModel) * aNorm;
+  vPos = (uModel * vec4(aPos,1.0)).xyz;
+  vUV = aUV;
+  gl_Position = uMVP * vec4(aPos,1.0);
+}`;
+
+const fs = `
+precision mediump float;
+varying vec3 vNorm;
+varying vec3 vPos;
+varying vec2 vUV;
+uniform vec3 uColor;
+uniform vec3 uLightDir;
+uniform float uGlow;
+void main(){
+  vec3 N = normalize(vNorm);
+  vec3 L = normalize(uLightDir);
+  float diff = max(dot(N,L),0.3);
+  vec3 col = uColor * diff + vec3(uGlow*0.5);
+  float fog = clamp(1.0 - length(vPos.xz)/100.0, 0.0, 1.0);
+  col = mix(vec3(0.05,0.05,0.1), col, fog);
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+let prog, aPos, aNorm, aUV, uMVP, uModel, uColor, uLightDir, uGlow;
+let cubeBuf, sphereBuf;
+
+function mat4() { return new Float32Array(16); }
+function identity(m) {
+  m[0]=1;m[1]=0;m[2]=0;m[3]=0; m[4]=0;m[5]=1;m[6]=0;m[7]=0;
+  m[8]=0;m[9]=0;m[10]=1;m[11]=0; m[12]=0;m[13]=0;m[14]=0;m[15]=1;
+  return m;
+}
+function perspective(m, fov, aspect, near, far) {
+  const f = 1.0 / Math.tan(fov/2);
+  const nf = 1 / (near - far);
+  m[0]=f/aspect;m[1]=0;m[2]=0;m[3]=0;
+  m[4]=0;m[5]=f;m[6]=0;m[7]=0;
+  m[8]=0;m[9]=0;m[10]=(far+near)*nf;m[11]=-1;
+  m[12]=0;m[13]=0;m[14]=2*far*near*nf;m[15]=0;
+  return m;
+}
+function translate(m, x,y,z) {
+  m[12]+=m[0]*x+m[4]*y+m[8]*z; m[13]+=m[1]*x+m[5]*y+m[9]*z;
+  m[14]+=m[2]*x+m[6]*y+m[10]*z; m[15]+=m[3]*x+m[7]*y+m[11]*z;
+  return m;
+}
+function rotateY(m, a) {
+  const c=Math.cos(a), s=Math.sin(a);
+  const a0=m[0],a4=m[4],a8=m[8],a12=m[12];
+  m[0]=a0*c+m[2]*s; m[4]=a4*c+m[6]*s; m[8]=a8*c+m[10]*s; m[12]=a12*c+m[14]*s;
+  m[2]=-a0*s+m[2]*c; m[6]=-a4*s+m[6]*c; m[10]=-a8*s+m[10]*c; m[14]=-a12*s+m[14]*c;
+  return m;
+}
+function rotateX(m, a) {
+  const c=Math.cos(a), s=Math.sin(a);
+  const a1=m[1],a5=m[5],a9=m[9],a13=m[13];
+  m[1]=a1*c+m[2]*s; m[5]=a5*c+m[6]*s; m[9]=a9*c+m[10]*s; m[13]=a13*c+m[14]*s;
+  m[2]=-a1*s+m[2]*c; m[6]=-a5*s+m[6]*c; m[10]=-a9*s+m[10]*c; m[14]=-a13*s+m[14]*c;
+  return m;
+}
+function scale(m, s) {
+  m[0]*=s; m[1]*=s; m[2]*=s; m[3]*=s;
+  m[4]*=s; m[5]*=s; m[6]*=s; m[7]*=s;
+  m[8]*=s; m[9]*=s; m[10]*=s; m[11]*=s;
+  return m;
+}
+function multiply(out, a, b) {
+  for(let i=0;i<4;i++)for(let j=0;j<4;j++){
+    out[i*4+j]=a[i]*b[j]+a[i+4]*b[j+4]+a[i+8]*b[j+8]+a[i+12]*b[j+12];
+  }
+  return out;
+}
+
+function compileShader(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  return s;
+}
+
+function makeCube() {
+  const verts = [], norms = [], inds = [];
+  const faces = [
+    [0,0,1],[0,0,-1],[1,0,0],[-1,0,0],[0,1,0],[0,-1,0]
+  ];
+  let vi = 0;
+  for(let f=0; f<6; f++) {
+    const n = faces[f];
+    let ax=[0,0,0], ay=[0,0,0];
+    if(Math.abs(n[2])>0.5){ax=[1,0,0];ay=[0,1,0];}
+    else if(Math.abs(n[0])>0.5){ax=[0,0,1];ay=[0,1,0];}
+    else {ax=[1,0,0];ay=[0,0,1];}
+    const c = [n[0]*0.5,n[1]*0.5,n[2]*0.5];
+    for(let i=0;i<4;i++){
+      const sx=(i&1)?0.5:-0.5, sy=(i&2)?0.5:-0.5;
+      verts.push(c[0]+ax[0]*sx+ay[0]*sy, c[1]+ax[1]*sx+ay[1]*sy, c[2]+ax[2]*sx+ay[2]*sy);
+      norms.push(n[0],n[1],n[2]);
+    }
+    inds.push(vi,vi+1,vi+2, vi+1,vi+3,vi+2);
+    vi+=4;
+  }
+  return {v:new Float32Array(verts), n:new Float32Array(norms), i:new Uint16Array(inds), count:36};
+}
+
+function makeSphere(segs) {
+  const verts=[], norms=[], inds=[];
+  for(let lat=0; lat<=segs; lat++) {
+    const theta = lat*Math.PI/segs, sinT=Math.sin(theta), cosT=Math.cos(theta);
+    for(let lon=0; lon<=segs; lon++) {
+      const phi = lon*2*Math.PI/segs, sinP=Math.sin(phi), cosP=Math.cos(phi);
+      const x=cosP*sinT, y=cosT, z=sinP*sinT;
+      verts.push(x,y,z); norms.push(x,y,z);
+    }
+  }
+  for(let lat=0; lat<segs; lat++){
+    for(let lon=0; lon<segs; lon++){
+      const a=lat*(segs+1)+lon, b=a+segs+1;
+      inds.push(a,b,a+1, b,b+1,a+1);
+    }
+  }
+  return {v:new Float32Array(verts), n:new Float32Array(norms), i:new Uint16Array(inds), count:inds.length};
+}
+
+function uploadBuf(data, type) {
+  const b = gl.createBuffer();
+  gl.bindBuffer(type, b);
+  gl.bufferData(type, data, gl.STATIC_DRAW);
+  return b;
+}
+
+function initGL() {
+  canvas = document.getElementById('gl');
+  gl = canvas.getContext('webgl', { antialias:false, alpha:false });
+  if(!gl) { alert('WebGL не поддерживается'); return; }
+  gl.enable(gl.DEPTH_TEST);
+  gl.enable(gl.CULL_FACE);
+  gl.clearColor(0.05,0.05,0.1,1);
+
+  prog = gl.createProgram();
+  gl.attachShader(prog, compileShader(gl.VERTEX_SHADER, vs));
+  gl.attachShader(prog, compileShader(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+
+  aPos = gl.getAttribLocation(prog, 'aPos');
+  aNorm = gl.getAttribLocation(prog, 'aNorm');
+  aUV = gl.getAttribLocation(prog, 'aUV');
+  uMVP = gl.getUniformLocation(prog, 'uMVP');
+  uModel = gl.getUniformLocation(prog, 'uModel');
+  uColor = gl.getUniformLocation(prog, 'uColor');
+  uLightDir = gl.getUniformLocation(prog, 'uLightDir');
+  uGlow = gl.getUniformLocation(prog, 'uGlow');
+
+  cubeBuf = makeCube();
+  cubeBuf.vb = uploadBuf(cubeBuf.v, gl.ARRAY_BUFFER);
+  cubeBuf.nb = uploadBuf(cubeBuf.n, gl.ARRAY_BUFFER);
+  cubeBuf.ib = uploadBuf(cubeBuf.i, gl.ELEMENT_ARRAY_BUFFER);
+
+  sphereBuf = makeSphere(12);
+  sphereBuf.vb = uploadBuf(sphereBuf.v, gl.ARRAY_BUFFER);
+  sphereBuf.nb = uploadBuf(sphereBuf.n, gl.ARRAY_BUFFER);
+  sphereBuf.ib = uploadBuf(sphereBuf.i, gl.ELEMENT_ARRAY_BUFFER);
+}
+
+function drawMesh(buf, model, color, glow=0) {
+  const proj = mat4(); perspective(proj, Math.PI/3, canvas.width/canvas.height, 0.1, 300);
+  const view = mat4(); identity(view);
+  rotateX(view, cam.pitch); rotateY(view, cam.yaw);
+  translate(view, -cam.x, -cam.y, -cam.z);
+  const mvp = mat4(); multiply(mvp, proj, view);
+  multiply(mvp, mvp, model);
+
+  gl.uniformMatrix4fv(uMVP, false, mvp);
+  gl.uniformMatrix4fv(uModel, false, model);
+  gl.uniform3f(uColor, color[0], color[1], color[2]);
+  gl.uniform3f(uLightDir, 0.3, -0.8, 0.2);
+  gl.uniform1f(uGlow, glow);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf.vb);
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf.nb);
+  gl.enableVertexAttribArray(aNorm);
+  gl.vertexAttribPointer(aNorm, 3, gl.FLOAT, false, 0, 0);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buf.ib);
+  gl.drawElements(gl.TRIANGLES, buf.count, gl.UNSIGNED_SHORT, 0);
+}
+
+// ============ WORLD ============
+function getGroundHeight(x, z) {
+  return Math.sin(x*0.05)*2 + Math.cos(z*0.05)*2 + Math.sin(x*0.2+z*0.15)*0.5;
+}
+
+function drawWorld() {
+  const chunkX = Math.floor(cam.x/CHUNK_SIZE);
+  const chunkZ = Math.floor(cam.z/CHUNK_SIZE);
+  for(let cx=chunkX-3; cx<=chunkX+3; cx++){
+    for(let cz=chunkZ-3; cz<=chunkZ+3; cz++){
+      const seed = cx*73856093 ^ cz*19349663;
+      const hasTree = (seed % 7) === 0;
+      const hasRock = (seed % 11) === 3;
+      const baseX = cx*CHUNK_SIZE, baseZ = cz*CHUNK_SIZE;
+      // Ground
+      for(let i=0; i<4; i++){
+        for(let j=0; j<4; j++){
+          const px = baseX + i*5, pz = baseZ + j*5;
+          const h = getGroundHeight(px, pz);
+          const m = mat4(); identity(m);
+          translate(m, px, h-0.5, pz);
+          scale(m, 5);
+          const g = 0.15 + Math.sin(px*0.1)*0.05;
+          drawMesh(cubeBuf, m, [g, 0.4+g*0.5, g*0.3]);
+        }
+      }
+      // Tree
+      if(hasTree){
+        const tx = baseX + 10, tz = baseZ + 10;
+        const th = getGroundHeight(tx, tz);
+        const trunk = mat4(); identity(trunk);
+        translate(trunk, tx, th+2, tz);
+        scale(trunk, 0.4); scale(trunk, 1); scale(trunk, 4);
+        drawMesh(cubeBuf, trunk, [0.4, 0.25, 0.1]);
+        const leaves = mat4(); identity(leaves);
+        translate(leaves, tx, th+5, tz);
+        scale(leaves, 2.5);
+        drawMesh(sphereBuf, leaves, [0.1, 0.5, 0.1]);
+      }
+      // Rock
+      if(hasRock){
+        const rx = baseX + 7, rz = baseZ + 12;
+        const rh = getGroundHeight(rx, rz);
+        const rock = mat4(); identity(rock);
+        translate(rock, rx, rh+0.5, rz);
+        scale(rock, 1.2);
+        drawMesh(cubeBuf, rock, [0.4, 0.4, 0.42]);
+      }
+    }
+  }
+}
+
+function drawPlayer(p, isMe) {
+  const m = mat4(); identity(m);
+  translate(m, p.x, p.y, p.z);
+  rotateY(m, p.yaw || 0);
+  const col = isMe ? [0.2, 0.6, 1.0] : [1.0, 0.3, 0.2];
+  const glow = magic.active && isMe ? 0.5 : 0;
+  // Body
+  const body = mat4(); identity(body); translate(body, p.x, p.y+0.8, p.z); scale(body, 0.4);
+  drawMesh(cubeBuf, body, col, glow);
+  // Head
+  const head = mat4(); identity(head); translate(head, p.x, p.y+1.6, p.z); scale(head, 0.25);
+  drawMesh(sphereBuf, head, [0.9, 0.8, 0.7], glow);
+  // Name
+  if(!isMe && p.name) drawName(p);
+}
+
+function drawName(p) {
+  // Simplified - name rendering would need canvas2d overlay
+}
+
+function drawObjects() {
+  for(const obj of objects) {
+    const m = mat4(); identity(m);
+    translate(m, obj.x, obj.y, obj.z);
+    const s = obj.radius || 0.5;
+    scale(m, s);
+    const glow = obj.glow || 0;
+    if(obj.type === 'sphere') {
+      drawMesh(sphereBuf, m, obj.color || [0.8,0.6,0.2], glow);
+    } else {
+      drawMesh(cubeBuf, m, obj.color || [0.6,0.6,0.6], glow);
+    }
+  }
+}
+
+// ============ PHYSICS ============
+function updatePhysics(dt) {
+  // Player movement
+  const speed = PLAYER_SPEED;
+  const fy = Math.sin(cam.yaw), fx = Math.cos(cam.yaw);
+  vel.x = (inputState.forward * fy + inputState.right * fx) * speed;
+  vel.z = (inputState.forward * fx - inputState.right * fy) * speed;
+
+  vel.y += GRAVITY * dt;
+  cam.x += vel.x * dt;
+  cam.y += vel.y * dt;
+  cam.z += vel.z * dt;
+
+  const gh = getGroundHeight(cam.x, cam.z);
+  if(cam.y < gh + 1.6) {
+    cam.y = gh + 1.6;
+    vel.y = 0;
+    onGround = true;
+  } else {
+    onGround = false;
+  }
+
+  // Object physics
+  for(const obj of objects) {
+    if(!obj.static) {
+      obj.vy = (obj.vy || 0) + GRAVITY * dt;
+      obj.x += (obj.vx || 0) * dt;
+      obj.y += obj.vy * dt;
+      obj.z += (obj.vz || 0) * dt;
+      const ogh = getGroundHeight(obj.x, obj.z);
+      if(obj.y < ogh + (obj.radius||0.5)) {
+        obj.y = ogh + (obj.radius||0.5);
+        obj.vy = 0;
+        obj.vx *= 0.8; obj.vz *= 0.8;
+      }
+    }
+  }
+}
+
+// ============ INPUT ============
+function setupInput() {
+  const joyEl = document.getElementById('joystick');
+  const knob = document.getElementById('joystick-knob');
+  const magicBtn = document.getElementById('magic-btn');
+
+  // Touch joystick
+  joyEl.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const t = e.touches[0];
+    const rect = joyEl.getBoundingClientRect();
+    joy.active = true;
+    joy.originX = rect.left + 60;
+    joy.originY = rect.top + 60;
+  }, {passive:false});
+
+  document.addEventListener('touchmove', e => {
+    if(!joy.active) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    let dx = t.clientX - joy.originX;
+    let dy = t.clientY - joy.originY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const maxDist = 45;
+    if(dist > maxDist) { dx = dx/dist*maxDist; dy = dy/dist*maxDist; }
+    knob.style.transform = `translate(${dx}px, ${dy}px)`;
+    joy.dx = dx / maxDist;
+    joy.dy = dy / maxDist;
+    inputState.forward = -joy.dy;
+    inputState.right = joy.dx;
+  }, {passive:false});
+
+  document.addEventListener('touchend', e => {
+    if(joy.active) {
+      joy.active = false;
+      knob.style.transform = 'translate(0,0)';
+      inputState.forward = 0;
+      inputState.right = 0;
+    }
+  });
+
+  // Look (right half of screen)
+  let lookActive = false, lookStartX = 0, lookStartY = 0;
+  document.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    if(t.clientX > window.innerWidth * 0.4 && t.clientY < window.innerHeight - 150) {
+      lookActive = true;
+      lookStartX = t.clientX;
+      lookStartY = t.clientY;
+    }
+  }, {passive:false});
+
+  document.addEventListener('touchmove', e => {
+    if(!lookActive) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    const sens = 0.003;
+    cam.yaw += (t.clientX - lookStartX) * sens;
+    cam.pitch += (t.clientY - lookStartY) * sens;
+    cam.pitch = Math.max(-1.4, Math.min(1.4, cam.pitch));
+    lookStartX = t.clientX;
+    lookStartY = t.clientY;
+  }, {passive:false});
+
+  document.addEventListener('touchend', () => { lookActive = false; });
+
+  // Magic button
+  magicBtn.addEventListener('touchstart', e => {
+    e.preventDefault();
+    magic.active = true;
+    magicBtn.classList.add('active');
+    // Find object in crosshair
+    const fwd = [Math.sin(cam.yaw)*Math.cos(cam.pitch), -Math.sin(cam.pitch), Math.cos(cam.yaw)*Math.cos(cam.pitch)];
+    let best = null, bestDist = 999;
+    for(const obj of objects) {
+      const dx = obj.x - cam.x, dy = obj.y - cam.y, dz = obj.z - cam.z;
+      const dist = Math.sqrt(dx*dx+dy*dy+dz*dz);
+      if(dist > 20 || dist < 1) continue;
+      const dot = (dx*fwd[0]+dy*fwd[1]+dz*fwd[2])/dist;
+      if(dot > 0.95 && dist < bestDist) { best = obj; bestDist = dist; }
+    }
+    if(best) {
+      magic.holding = true;
+      magic.targetObj = best;
+      best.static = true;
+      best.glow = 1;
+    }
+  }, {passive:false});
+
+  magicBtn.addEventListener('touchmove', e => {
+    if(!magic.holding || !magic.targetObj) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    // Move held object based on finger movement
+    const sens = 0.05;
+    magic.targetObj.x += (t.movementX || 0) * sens;
+    magic.targetObj.y += (t.movementY || 0) * sens * 0.5;
+  }, {passive:false});
+
+  magicBtn.addEventListener('touchend', e => {
+    e.preventDefault();
+    magicBtn.classList.remove('active');
+    if(magic.holding && magic.targetObj) {
+      // Flick detection
+      magic.targetObj.static = false;
+      magic.targetObj.glow = 0;
+      magic.targetObj = null;
+    }
+    magic.active = false;
+    magic.holding = false;
+  });
+
+  // Double tap jump
+  let lastTap = 0;
+  document.addEventListener('touchend', e => {
+    const now = Date.now();
+    if(now - lastTap < 300 && onGround) {
+      vel.y = JUMP_FORCE;
+    }
+    lastTap = now;
+  });
+}
+
+// ============ NETWORK ============
+function connectWS() {
+  ws = new WebSocket(WS_URL);
+  ws.binaryType = 'arraybuffer';
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({type:'join', name:myName}));
+    setInterval(() => {
+      pingStart = Date.now();
+      ws.send(JSON.stringify({type:'ping'}));
+    }, 2000);
+  };
+
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    if(msg.type === 'state') {
+      playerId = msg.id;
+      if(msg.players) {
+        for(const id in msg.players) {
+          if(id !== playerId) players[id] = msg.players[id];
+        }
+      }
+      if(msg.objects) objects = msg.objects;
+    } else if(msg.type === 'player_join') {
+      players[msg.id] = msg.data;
+    } else if(msg.type === 'player_leave') {
+      delete players[msg.id];
+    } else if(msg.type === 'player_update') {
+      if(msg.id !== playerId) players[msg.id] = msg.data;
+    } else if(msg.type === 'object_update') {
+      const obj = objects.find(o => o.id === msg.id);
+      if(obj) { obj.x=msg.x; obj.y=msg.y; obj.z=msg.z; obj.vx=msg.vx; obj.vy=msg.vy; obj.vz=msg.vz; }
+    } else if(msg.type === 'pong') {
+      ping = Date.now() - pingStart;
+    }
+  };
+
+  ws.onclose = () => { setTimeout(connectWS, 3000); };
+}
+
+function sendState() {
+  if(ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({
+      type:'update',
+      x:cam.x, y:cam.y, z:cam.z,
+      yaw:cam.yaw, pitch:cam.pitch
+    }));
+  }
+}
+
+// ============ MAIN LOOP ============
+function render(time) {
+  const dt = Math.min((time - lastTime) / 1000, 0.05);
+  lastTime = time;
+
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  updatePhysics(dt);
+  drawWorld();
+  drawPlayer({x:cam.x,y:cam.y,z:cam.z,yaw:cam.yaw}, true);
+  for(const id in players) drawPlayer(players[id], false);
+  drawObjects();
+
+  // Send state every 50ms
+  if(Math.floor(time/50) !== Math.floor((time-dt*1000)/50)) sendState();
+
+  // Update UI
+  document.getElementById('players-count').textContent =
+    `Онлайн: ${Object.keys(players).length + 1} | Пинг: ${ping}ms`;
+
+  requestAnimationFrame(render);
+}
+
+function startGame() {
+  myName = document.getElementById('nick').value || 'Player';
+  document.getElementById('name-input').style.display = 'none';
+  document.getElementById('ui').style.display = 'block';
+  initGL();
+  setupInput();
+  connectWS();
+  requestAnimationFrame(render);
+}
+</script>
+</body>
+</html>
