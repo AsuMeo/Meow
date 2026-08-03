@@ -1,24 +1,16 @@
-import os, json, random, math, time
+import os, json, random, math, time, urllib.request, urllib.parse
 from flask import Flask, request
 from flask_socketio import SocketIO, emit
-import firebase_admin
-from firebase_admin import credentials, auth, db as firebase_db
 
 app = Flask(__name__, static_folder='.')
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'terraria-like-game-secret-2026')
+app.config['SECRET_KEY'] = 'terraria-like-game-secret-2026-fixed-key'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet', ping_timeout=60, ping_interval=25)
 
-# === FIREBASE INIT ===
-fb_json = os.environ.get('FIREBASE_CONFIG')
-if fb_json:
-    cred = credentials.Certificate(json.loads(fb_json))
-    firebase_admin.initialize_app(cred, {
-        'databaseURL': os.environ.get('FIREBASE_DATABASE_URL', '')
-    })
-else:
-    firebase_admin.initialize_app(credentials.ApplicationDefault(), {
-        'databaseURL': os.environ.get('FIREBASE_DATABASE_URL', '')
-    })
+# === HARDCODED FIREBASE CONFIG ===
+FIREBASE_API_KEY = "AIzaSyBm0mIvHVznIeF2PoFk6dtdaiT5r877wyA"
+FIREBASE_AUTH_DOMAIN = "meow-874ce.firebaseapp.com"
+FIREBASE_DATABASE_URL = "https://meow-874ce-default-rtdb.europe-west1.firebasedatabase.app"
+FIREBASE_PROJECT_ID = "meow-874ce"
 
 # === GAME CONFIG ===
 CHUNK_SIZE = 16
@@ -51,6 +43,36 @@ BLOCKS = {
     14: {'name': 'glass', 'solid': False, 'color': '#87CEEB'},
     15: {'name': 'bedrock', 'solid': True, 'color': '#1a1a1a'},
 }
+
+# === FIREBASE REST API HELPERS ===
+def fb_get(path):
+    try:
+        url = f"{FIREBASE_DATABASE_URL}/{path}.json"
+        req = urllib.request.Request(url, method='GET')
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return json.loads(resp.read().decode())
+    except:
+        return None
+
+def fb_put(path, data):
+    try:
+        url = f"{FIREBASE_DATABASE_URL}/{path}.json"
+        req = urllib.request.Request(url, data=json.dumps(data).encode(), method='PUT',
+            headers={'Content-Type': 'application/json'})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return json.loads(resp.read().decode())
+    except:
+        return None
+
+def fb_patch(path, data):
+    try:
+        url = f"{FIREBASE_DATABASE_URL}/{path}.json"
+        req = urllib.request.Request(url, data=json.dumps(data).encode(), method='PATCH',
+            headers={'Content-Type': 'application/json'})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return json.loads(resp.read().decode())
+    except:
+        return None
 
 # === PROCEDURAL WORLD ===
 def get_chunk(cx, cy):
@@ -85,7 +107,6 @@ def generate_chunk(cx, cy):
                 chunk[ly][lx] = 1
             elif wy < height - 8:
                 chunk[ly][lx] = 3
-    # Trees
     for lx in range(2, CHUNK_SIZE - 2):
         wx = cx * CHUNK_SIZE + lx
         height = base_y + int(math.sin(wx * 0.05) * 8 + math.sin(wx * 0.13) * 4)
@@ -204,10 +225,12 @@ def handle_auth(data):
     uid = data.get('uid', '')
     name = data.get('name', 'Player')
     try:
-        ref = firebase_db.reference(f'players/{uid}')
-        saved = ref.get() or {}
-        x = saved.get('x', WORLD_WIDTH // 2)
-        y = saved.get('y', WORLD_HEIGHT // 2 - 20)
+        saved = fb_get(f'players/{uid}')
+        if saved:
+            x = saved.get('x', WORLD_WIDTH // 2)
+            y = saved.get('y', WORLD_HEIGHT // 2 - 20)
+        else:
+            x, y = WORLD_WIDTH // 2, WORLD_HEIGHT // 2 - 20
     except:
         x, y = WORLD_WIDTH // 2, WORLD_HEIGHT // 2 - 20
     players[request.sid] = {
@@ -291,8 +314,7 @@ def handle_disconnect():
     if request.sid in players:
         p = players[request.sid]
         try:
-            ref = firebase_db.reference(f'players/{p["uid"]}')
-            ref.set({'x': p['x'], 'y': p['y'], 'last_seen': time.time()})
+            fb_put(f'players/{p["uid"]}', {'x': p['x'], 'y': p['y'], 'last_seen': time.time()})
         except:
             pass
         del player_sids[p['uid']]
@@ -321,8 +343,7 @@ def save_loop():
         socketio.sleep(30)
         try:
             for (cx, cy), chunk in world_blocks.items():
-                ref = firebase_db.reference(f'world/chunks/{cx}_{cy}')
-                ref.set(chunk)
+                fb_put(f'world/chunks/{cx}_{cy}', chunk)
         except:
             pass
 
