@@ -1,4 +1,4 @@
-import os, json, random, math, time, urllib.request, urllib.parse
+import os, json, random, math, time
 from flask import Flask, request
 from flask_socketio import SocketIO, emit
 
@@ -6,11 +6,30 @@ app = Flask(__name__, static_folder='.')
 app.config['SECRET_KEY'] = 'terraria-like-game-secret-2026-fixed-key'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet', ping_timeout=60, ping_interval=25)
 
-# === HARDCODED FIREBASE CONFIG ===
+# === HARDCODED FIREBASE CLIENT CONFIG (for frontend only) ===
 FIREBASE_API_KEY = "AIzaSyBm0mIvHVznIeF2PoFk6dtdaiT5r877wyA"
 FIREBASE_AUTH_DOMAIN = "meow-874ce.firebaseapp.com"
 FIREBASE_DATABASE_URL = "https://meow-874ce-default-rtdb.europe-west1.firebasedatabase.app"
 FIREBASE_PROJECT_ID = "meow-874ce"
+
+# === SIMPLE FILE-BASED STORAGE (works on Railway ephemeral disk) ===
+DATA_FILE = '/tmp/game_data.json'
+
+def load_data():
+    try:
+        with open(DATA_FILE, 'r') as f:
+            return json.load(f)
+    except:
+        return {'players': {}, 'world': {}}
+
+def save_data(data):
+    try:
+        with open(DATA_FILE, 'w') as f:
+            json.dump(data, f)
+    except:
+        pass
+
+game_data = load_data()
 
 # === GAME CONFIG ===
 CHUNK_SIZE = 16
@@ -23,6 +42,12 @@ random.seed(SEED)
 world_blocks = {}
 players = {}
 player_sids = {}
+
+# Load world from file if exists
+for key, chunk in game_data.get('world', {}).items():
+    parts = key.split('_')
+    if len(parts) == 2:
+        world_blocks[(int(parts[0]), int(parts[1]))] = chunk
 
 # === BLOCK TYPES ===
 BLOCKS = {
@@ -43,36 +68,6 @@ BLOCKS = {
     14: {'name': 'glass', 'solid': False, 'color': '#87CEEB'},
     15: {'name': 'bedrock', 'solid': True, 'color': '#1a1a1a'},
 }
-
-# === FIREBASE REST API HELPERS ===
-def fb_get(path):
-    try:
-        url = f"{FIREBASE_DATABASE_URL}/{path}.json"
-        req = urllib.request.Request(url, method='GET')
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            return json.loads(resp.read().decode())
-    except:
-        return None
-
-def fb_put(path, data):
-    try:
-        url = f"{FIREBASE_DATABASE_URL}/{path}.json"
-        req = urllib.request.Request(url, data=json.dumps(data).encode(), method='PUT',
-            headers={'Content-Type': 'application/json'})
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            return json.loads(resp.read().decode())
-    except:
-        return None
-
-def fb_patch(path, data):
-    try:
-        url = f"{FIREBASE_DATABASE_URL}/{path}.json"
-        req = urllib.request.Request(url, data=json.dumps(data).encode(), method='PATCH',
-            headers={'Content-Type': 'application/json'})
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            return json.loads(resp.read().decode())
-    except:
-        return None
 
 # === PROCEDURAL WORLD ===
 def get_chunk(cx, cy):
@@ -213,6 +208,7 @@ def index():
 
 @socketio.on('connect')
 def handle_connect():
+    print(f"Client connected: {request.sid}")
     emit('init', {
         'world_width': WORLD_WIDTH,
         'world_height': WORLD_HEIGHT,
@@ -222,41 +218,47 @@ def handle_connect():
 
 @socketio.on('auth')
 def handle_auth(data):
+    print(f"Auth received from {request.sid}: {data}")
     uid = data.get('uid', '')
     name = data.get('name', 'Player')
-    try:
-        saved = fb_get(f'players/{uid}')
-        if saved:
-            x = saved.get('x', WORLD_WIDTH // 2)
-            y = saved.get('y', WORLD_HEIGHT // 2 - 20)
-        else:
-            x, y = WORLD_WIDTH // 2, WORLD_HEIGHT // 2 - 20
-    except:
-        x, y = WORLD_WIDTH // 2, WORLD_HEIGHT // 2 - 20
+
+    # Load from file storage
+    saved = game_data.get('players', {}).get(uid, {})
+    x = saved.get('x', WORLD_WIDTH // 2)
+    y = saved.get('y', WORLD_HEIGHT // 2 - 20)
+
     players[request.sid] = {
         'x': x, 'y': y, 'vx': 0, 'vy': 0,
         'uid': uid, 'name': name, 'facing': 1, 'anim': 'idle',
         'on_ground': False, 'inventory': {1: 99, 2: 99, 3: 50, 4: 50, 11: 20}
     }
     player_sids[uid] = request.sid
+
+    # Send chunks around spawn
     cx = int(x) // CHUNK_SIZE
     cy = int(y) // CHUNK_SIZE
-    for dcx in range(-2, 3):
-        for dcy in range(-2, 3):
+    for dcx in range(-3, 4):
+        for dcy in range(-3, 4):
             chunk = get_chunk(cx + dcx, cy + dcy)
             emit('chunk', {'cx': cx + dcx, 'cy': cy + dcy, 'data': chunk})
+
+    # Send other players
     for sid2, p2 in players.items():
         if sid2 != request.sid:
             emit('player_join', {
                 'sid': sid2, 'x': p2['x'], 'y': p2['y'],
                 'name': p2['name'], 'facing': p2['facing'], 'anim': p2['anim']
             })
+
+    # Notify others about new player
     p = players[request.sid]
     emit('player_join', {
         'sid': request.sid, 'x': p['x'], 'y': p['y'],
         'name': p['name'], 'facing': p['facing'], 'anim': p['anim']
     }, broadcast=True, include_self=False)
+
     emit('auth_ok', {'x': p['x'], 'y': p['y']})
+    print(f"Auth OK sent to {request.sid}")
 
 @socketio.on('move')
 def handle_move(data):
@@ -304,19 +306,21 @@ def handle_break(data):
 def handle_chunks(data):
     cx = data.get('cx', 0)
     cy = data.get('cy', 0)
-    for dcx in range(-2, 3):
-        for dcy in range(-2, 3):
+    for dcx in range(-3, 4):
+        for dcy in range(-3, 4):
             chunk = get_chunk(cx + dcx, cy + dcy)
             emit('chunk', {'cx': cx + dcx, 'cy': cy + dcy, 'data': chunk})
 
 @socketio.on('disconnect')
 def handle_disconnect():
+    print(f"Client disconnected: {request.sid}")
     if request.sid in players:
         p = players[request.sid]
-        try:
-            fb_put(f'players/{p["uid"]}', {'x': p['x'], 'y': p['y'], 'last_seen': time.time()})
-        except:
-            pass
+        # Save to file
+        if 'players' not in game_data:
+            game_data['players'] = {}
+        game_data['players'][p['uid']] = {'x': p['x'], 'y': p['y'], 'last_seen': time.time()}
+        save_data(game_data)
         del player_sids[p['uid']]
         del players[request.sid]
     emit('player_leave', {'sid': request.sid}, broadcast=True, include_self=False)
@@ -342,10 +346,11 @@ def save_loop():
     while True:
         socketio.sleep(30)
         try:
-            for (cx, cy), chunk in world_blocks.items():
-                fb_put(f'world/chunks/{cx}_{cy}', chunk)
-        except:
-            pass
+            game_data['world'] = {f"{cx}_{cy}": chunk for (cx, cy), chunk in world_blocks.items()}
+            save_data(game_data)
+            print("World saved to file")
+        except Exception as e:
+            print(f"Save error: {e}")
 
 socketio.start_background_task(save_loop)
 
@@ -591,12 +596,10 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
-const rtdb = firebase.database();
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 let socket = null;
-let mySid = null;
 let myUid = null;
 let myName = 'Player';
 let worldData = {};
@@ -607,10 +610,11 @@ let worldW = 4096, worldH = 256;
 let camera = { x: 0, y: 0 };
 let myPlayer = null;
 let selectedBlock = 1;
-let blockMenuOpen = false;
 let musicPlaying = false;
 let audioCtx = null;
 let musicGain = null;
+let chunksReceived = 0;
+let gameStarted = false;
 
 const BLOCK_COLORS = {
   0: null,
@@ -663,11 +667,18 @@ auth.onAuthStateChanged(user => {
 
 function initSocket() {
   const wsUrl = window.location.origin;
-  socket = io(wsUrl, { transports: ['websocket', 'polling'] });
+  socket = io(wsUrl, { transports: ['websocket', 'polling'], reconnection: true });
 
-  socket.on('connect', () => { console.log('Connected!'); });
+  socket.on('connect', () => {
+    console.log('Socket connected!');
+  });
+
+  socket.on('connect_error', (err) => {
+    console.log('Socket error:', err.message);
+  });
 
   socket.on('init', data => {
+    console.log('Init received:', data);
     chunkSize = data.chunk_size;
     worldW = data.world_width;
     worldH = data.world_height;
@@ -676,16 +687,22 @@ function initSocket() {
   });
 
   socket.on('auth_ok', data => {
+    console.log('Auth OK! Starting game...');
     loadingScreen.style.display = 'none';
     myPlayer = { x: data.x, y: data.y };
     camera.x = data.x;
     camera.y = data.y;
-    requestAnimationFrame(gameLoop);
+    gameStarted = true;
+    if (!window.gameLoopRunning) {
+      window.gameLoopRunning = true;
+      requestAnimationFrame(gameLoop);
+    }
     initMusic();
   });
 
   socket.on('chunk', data => {
     worldData[data.cx + ',' + data.cy] = data.data;
+    chunksReceived++;
   });
 
   socket.on('block_update', data => {
@@ -1134,7 +1151,7 @@ function initBlockMenu() {
     opt.className = 'block-option';
     const bname = (blocksInfo[bid] && blocksInfo[bid].name) ? blocksInfo[bid].name : bid;
     opt.innerHTML = '<div class="bprev" style="background:' + BLOCK_COLORS[bid] + '"></div><div>' + bname + '</div>';
-    opt.onclick = () => { selectedBlock = parseInt(bid); updateHotbar(); menu.style.display = 'none'; blockMenuOpen = false; };
+    opt.onclick = () => { selectedBlock = parseInt(bid); updateHotbar(); menu.style.display = 'none'; };
     menu.appendChild(opt);
   }
 }
@@ -1144,7 +1161,6 @@ btnPlace.addEventListener('touchstart', (e) => {
   placeLongPress = setTimeout(() => {
     const menu = document.getElementById('blockMenu');
     menu.style.display = menu.style.display === 'grid' ? 'none' : 'grid';
-    blockMenuOpen = !blockMenuOpen;
   }, 600);
 }, {passive: false});
 btnPlace.addEventListener('touchend', () => { clearTimeout(placeLongPress); });
