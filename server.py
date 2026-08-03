@@ -14,7 +14,7 @@ app.secret_key = os.environ.get('FLASK_SECRET', os.urandom(32).hex())
 VK_API = "https://api.vk.com/method"
 API_VERSION = "5.199"
 
-FIREBASE_DB_URL = os.environ.get('FIREBASE_DB_URL', '')
+FIREBASE_DB_URL = os.environ.get('FIREBASE_DB_URL', 'https://meow-874ce-default-rtdb.europe-west1.firebasedatabase.app')
 FIREBASE_API_KEY = os.environ.get('FIREBASE_API_KEY', '')
 
 KEYS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'keys_storage.json')
@@ -70,24 +70,45 @@ def firebase_put(path, data):
         print("Firebase PUT error:", e)
     return False
 
-def get_stored_key(vk_id):
+def get_stored_pub_key(vk_id):
     vk_id_str = str(vk_id)
     if FIREBASE_DB_URL:
         fb_data = firebase_get(f"public_keys/{vk_id_str}")
         if fb_data and isinstance(fb_data, dict) and 'public_key' in fb_data:
             return fb_data
     local_data = load_local_keys()
-    return local_data.get(vk_id_str)
+    return local_data.get(f"pub_{vk_id_str}")
 
-def store_key(vk_id, data):
+def store_pub_key(vk_id, data):
     vk_id_str = str(vk_id)
     local_data = load_local_keys()
-    local_data[vk_id_str] = data
+    local_data[f"pub_{vk_id_str}"] = data
     save_local_keys(local_data)
 
     if FIREBASE_DB_URL and 'public_key' in data:
         firebase_put(f"public_keys/{vk_id_str}", {
             'public_key': data['public_key'],
+            'created_at': data.get('created_at', datetime.now().isoformat())
+        })
+
+def get_stored_priv_key(vk_id):
+    vk_id_str = str(vk_id)
+    if FIREBASE_DB_URL:
+        fb_data = firebase_get(f"private_keys/{vk_id_str}")
+        if fb_data and isinstance(fb_data, dict) and 'private_key_enc' in fb_data:
+            return fb_data
+    local_data = load_local_keys()
+    return local_data.get(f"priv_{vk_id_str}")
+
+def store_priv_key(vk_id, data):
+    vk_id_str = str(vk_id)
+    local_data = load_local_keys()
+    local_data[f"priv_{vk_id_str}"] = data
+    save_local_keys(local_data)
+
+    if FIREBASE_DB_URL and 'private_key_enc' in data:
+        firebase_put(f"private_keys/{vk_id_str}", {
+            'private_key_enc': data['private_key_enc'],
             'created_at': data.get('created_at', datetime.now().isoformat())
         })
 
@@ -100,16 +121,6 @@ def vk_request(method, token, **params):
         return data.get('response', data.get('error'))
     except Exception as e:
         return {'error': str(e)}
-
-def vk_request_ghost(method, token, is_ghost=False, **params):
-    """Executes request and immediately sends account.setOffline if ghost mode is active"""
-    result = vk_request(method, token, **params)
-    if is_ghost and token:
-        try:
-            get_session().get(f"{VK_API}/account.setOffline", params={'access_token': token, 'v': API_VERSION}, timeout=5)
-        except Exception:
-            pass
-    return result
 
 def format_last_seen(u):
     online = u.get('online', 0)
@@ -155,7 +166,7 @@ def extract_doc_attachment(save_result):
     return None
 
 SW_JS = """
-const CACHE_NAME = 'vk-meow-v6-cache';
+const CACHE_NAME = 'vk-meow-v7-cache';
 const STATIC_ASSETS = ['/', '/sw.js'];
 
 self.addEventListener('install', (evt) => {
@@ -246,25 +257,37 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .header-title{font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:0.5px}
 
 .header-subtitle{font-size:12px;color:#8e8e93;display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.header-subtitle.typing{color:#34c759;font-weight:500;animation:pulseTyping 1.2s infinite alternate}
-@keyframes pulseTyping{from{opacity:0.6}to{opacity:1}}
 .header-actions{display:flex;gap:6px;align-items:center}
 .header-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;color:#aaa;background:rgba(255,255,255,0.05)}
 .header-btn:active{background:rgba(255,255,255,0.15);color:#fff}
 .header-btn.active{color:#fff;background:rgba(255,255,255,0.15)}
 
+/* Mark Read Header Action Button */
+.mark-read-btn{background:#0a84ff;color:#fff;font-size:12px;font-weight:600;padding:6px 12px;border-radius:14px;border:none;cursor:pointer;display:flex;align-items:center;gap:4px}
+.mark-read-btn:active{opacity:0.8}
+
+/* Search Bar */
+.search-bar-container{padding:8px 12px;background:#0d0d0d;border-bottom:1px solid #1a1a1a}
+.search-input-wrap{display:flex;align-items:center;background:#1c1c1e;border-radius:12px;padding:0 10px;border:1px solid #2a2a2c}
+.search-input-wrap svg{color:#8e8e93;flex-shrink:0;margin-right:8px}
+.search-input{flex:1;background:transparent;border:none;padding:10px 0;color:#fff;font-size:14px;outline:none;font-family:inherit}
+.search-input::placeholder{color:#666}
+
+/* Global Search Section Header */
+.search-section-header{padding:10px 14px 4px;font-size:12px;font-weight:700;color:#0a84ff;text-transform:uppercase;letter-spacing:0.5px}
+
 /* Dialogs Screen */
 .dialogs-screen{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;overflow:hidden;animation:fadeIn 0.15s ease-out}
 .dialogs-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
-.dialog{display:flex;align-items:center;padding:12px 14px;cursor:pointer;border-bottom:1px solid #111}
+.dialog{display:flex;align-items:center;padding:12px 14px;cursor:pointer;border-bottom:1px solid #111;position:relative}
 .dialog:active{background:#111}
 .dialog-avatar-wrap{position:relative;width:50px;height:50px;flex-shrink:0;margin-right:12px}
 .dialog-avatar{width:50px;height:50px;border-radius:50%;object-fit:cover;background:#222;display:block}
 .dialog-online-dot{position:absolute;bottom:2px;right:2px;width:14px;height:14px;border-radius:50%;background:#34c759;border:2.5px solid #000;z-index:2}
 .dialog-online-dot.offline{background:#8e8e93}
-.dialog-typing{font-size:12px;color:#34c759;font-weight:500;font-style:italic}
-.dialog-preview.typing{color:#34c759}
 .dialog-unread-blue{min-width:20px;height:20px;border-radius:50%;background:#0a84ff;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 6px;flex-shrink:0}
+
+.dialog-pin-icon{position:absolute;top:10px;right:14px;color:#8e8e93;font-size:12px}
 
 /* TG Style Dialog Preview Thumbs */
 .dialog-preview-wrap{display:flex;align-items:center;gap:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;font-size:13px;color:#888}
@@ -277,18 +300,40 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .folder-tab.active{background:#2c2c2e;color:#fff;border-color:#3a3a3c}
 .folder-tab:active{background:#333}
 
+/* TG Channel Card Style */
+.tg-channel-card{background:#141416;border-radius:16px;margin-bottom:12px;border:1px solid #1c1c1c;overflow:hidden}
+.tg-channel-header{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid #1c1c1c}
+.tg-channel-avatar{width:42px;height:42px;border-radius:50%;object-fit:cover;background:#222;flex-shrink:0}
+.tg-channel-title{font-size:15px;font-weight:700;color:#fff;line-height:1.2}
+.tg-channel-meta{font-size:12px;color:#8e8e93;margin-top:2px}
+.tg-channel-body{padding:14px;font-size:14px;line-height:1.5;color:#ddd;white-space:pre-line}
+.tg-channel-media{width:100%;max-height:380px;object-fit:cover;cursor:pointer;display:block}
+.tg-channel-footer{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid #1c1c1c;background:#101012;color:#8e8e93;font-size:13px}
+.tg-channel-actions{display:flex;gap:16px;align-items:center}
+.tg-channel-btn{display:flex;align-items:center;gap:5px;cursor:pointer;color:#8e8e93;transition:color 0.15s}
+.tg-channel-btn:active{color:#fff}
+
+/* Comments Modal */
+.comments-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:750;display:flex;flex-direction:column;transform:translateY(100%);transition:transform 0.25s cubic-bezier(0.1,0.9,0.2,1)}
+.comments-modal.active{transform:translateY(0)}
+.comments-header{height:56px;background:#0d0d0d;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #1c1c1c;flex-shrink:0}
+.comments-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px}
+.comment-item{display:flex;gap:10px;margin-bottom:14px;background:#141416;padding:10px 12px;border-radius:12px;border:1px solid #1c1c1c}
+.comment-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;background:#222;flex-shrink:0}
+.comment-body{flex:1;min-width:0}
+.comment-author{font-size:13px;font-weight:700;color:#fff;margin-bottom:2px}
+.comment-text{font-size:13px;color:#ddd;line-height:1.4}
+.comment-time{font-size:10px;color:#666;margin-top:4px}
+
+/* Pinned Message Bar in Chat */
+.pinned-msg-bar{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#141416;border-bottom:1px solid #222;z-index:10}
+.pinned-msg-info{flex:1;min-width:0;border-left:2px solid #0a84ff;padding-left:8px;cursor:pointer}
+.pinned-msg-title{font-size:11px;font-weight:700;color:#0a84ff;text-transform:uppercase}
+.pinned-msg-text{font-size:12px;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pinned-msg-close{width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#888;border-radius:50%}
+
 /* News Feed */
 .news-feed{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 12px}
-.news-item{background:#141416;border-radius:16px;padding:14px;margin-bottom:10px;border:1px solid #1c1c1c}
-.news-item-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.news-item-avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;background:#222}
-.news-item-name{font-size:14px;font-weight:600;color:#fff}
-.news-item-time{font-size:11px;color:#666}
-.news-item-text{font-size:14px;color:#ddd;line-height:1.5;margin-bottom:10px}
-.news-item-photo{width:100%;border-radius:12px;margin-top:8px;max-height:300px;object-fit:cover;cursor:pointer}
-.news-item-actions{display:flex;gap:16px;margin-top:10px;padding-top:10px;border-top:1px solid #222}
-.news-action{display:flex;align-items:center;gap:4px;color:#8e8e93;font-size:13px;cursor:pointer}
-.news-action:active{color:#fff}
 
 /* Profile View Modal */
 .profile-view-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:650;display:flex;flex-direction:column;overflow:hidden;transform:translateY(100%);transition:transform 0.25s cubic-bezier(0.1,0.9,0.2,1)}
@@ -446,6 +491,12 @@ input:checked + .slider:before{transform:translateX(20px)}
 .action-sheet-item{padding:14px 16px;border-radius:12px;background:#2c2c2e;color:#fff;font-size:15px;font-weight:500;display:flex;align-items:center;gap:12px;cursor:pointer}
 .action-sheet-item.danger{color:#ff3b30}
 
+/* Forward Modal Target List */
+.forward-list{max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-top:12px}
+.forward-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:#222;cursor:pointer}
+.forward-item:active{background:#333}
+.forward-item img{width:36px;height:36px;border-radius:50%;object-fit:cover}
+
 /* Modals */
 .modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:600;padding:20px}
 .modal-content{background:#161616;border-radius:20px;padding:24px;width:100%;max-width:380px;border:1px solid #282828}
@@ -491,13 +542,14 @@ input:checked + .slider:before{transform:translateX(20px)}
 </div>
 
 <div class="drawer-content">
-<div class="drawer-item" onclick="toggleGhostMode()">
+
+<div class="drawer-item" onclick="toggleStealthRead()">
 <div class="drawer-item-left">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 10h.01M15 10h.01M12 2a8 8 0 0 0-8 8v11l3-3 3 3 2-2 2 2 3-3 3 3V10a8 8 0 0 0-8-8z"/></svg>
-<span>Режим призрака</span>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+<span>Режим «Не читать»</span>
 </div>
 <label class="switch" onclick="event.stopPropagation()">
-<input type="checkbox" id="ghostToggle" onchange="setGhostState(this.checked)">
+<input type="checkbox" id="stealthReadToggle" onchange="setStealthReadState(this.checked)">
 <span class="slider"></span>
 </label>
 </div>
@@ -546,7 +598,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 <div class="drawer-item" onclick="openEncryptModal(); closeDrawer();">
 <div class="drawer-item-left">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-<span>Шифрование и Ключи (E2EE)</span>
+<span>Облачное E2EE Шифрование</span>
 </div>
 </div>
 <div style="flex:1"></div>
@@ -562,17 +614,17 @@ input:checked + .slider:before{transform:translateX(20px)}
 <!-- Encryption & Keys Modal -->
 <div class="modal hidden" id="encryptModal">
 <div class="encrypt-modal-content">
-<div class="modal-title">🔐 Настоящее E2EE шифрование</div>
+<div class="modal-title">🔐 Облачное E2EE шифрование</div>
 <div class="warning-box">
-⚠️ <b>Предупреждение:</b> Никому не передавайте свой приватный ключ! Приватный ключ хранится исключительно на этом устройстве и никогда не передается на сервер (Firebase хранит только публичный ключ).
+☁️ Ваши зашифрованные ключи надежно сохранены в <b>Firebase Realtime Database</b> и защищены вашим мастер-паролем. Вход с любого устройства восстановит доступ к вашим чатам!
 </div>
 <div class="modal-text" style="margin-bottom:10px">Отпечаток устройства (Delfan Fingerprint):</div>
 <div class="delfan-box" id="delfanFingerprint">Вычисление отпечатка...</div>
 
-<div class="modal-text" style="margin-bottom:4px">Ваш публичный ключ:</div>
+<div class="modal-text" style="margin-bottom:4px">Ваш публичный ключ (RTDB Cloud):</div>
 <div class="key-box" id="modalPubKey">Загрузка...</div>
 
-<div class="modal-text" style="margin-top:10px;margin-bottom:4px">Ваш приватный ключ (локальный):</div>
+<div class="modal-text" style="margin-top:10px;margin-bottom:4px">Ваш зашифрованный приватный ключ:</div>
 <div class="key-box" id="modalPrivKey">Загрузка...</div>
 
 <div style="display:flex;gap:8px;margin-top:16px">
@@ -581,7 +633,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 </div>
 <input type="file" class="file-input" id="importKeysInput" accept=".json" onchange="importKeysFile(event)">
 
-<button class="btn btn-danger" style="margin-top:10px;font-size:13px;padding:10px" onclick="regenerateKeysPrompt()">Обновить ключи</button>
+<button class="btn btn-danger" style="margin-top:10px;font-size:13px;padding:10px" onclick="regenerateKeysPrompt()">Сбросить пароль E2EE</button>
 <button class="btn" style="margin-top:10px" onclick="closeEncryptModal()">Закрыть</button>
 </div>
 </div>
@@ -608,17 +660,41 @@ input:checked + .slider:before{transform:translateX(20px)}
 <img class="photo-viewer-img" id="photoViewerImg" src="" onclick="event.stopPropagation()">
 </div>
 
+<!-- Forward Message Modal -->
+<div class="modal hidden" id="forwardModal">
+<div class="modal-content">
+<div class="modal-title">Переслать сообщение</div>
+<div class="modal-text">Выберите чат для пересылки:</div>
+<div class="forward-list" id="forwardList"></div>
+<button class="btn btn-secondary" style="margin-top:12px" onclick="closeForwardModal()">Отмена</button>
+</div>
+</div>
+
+<!-- Comments View Modal -->
+<div class="comments-modal" id="commentsModal">
+<div class="comments-header">
+<div class="header-back" onclick="closeCommentsModal()" style="margin-right:10px">
+<svg viewBox="0 0 24 24" style="width:22px;height:22px;stroke:#fff;stroke-width:2.5px;fill:none">
+<line x1="19" y1="12" x2="5" y2="12"></line>
+<polyline points="12 19 5 12 12 5"></polyline>
+</svg>
+</div>
+<div class="header-title" id="commentsHeaderTitle">Комментарии</div>
+</div>
+<div class="comments-list" id="commentsList"></div>
+</div>
+
 <!-- Login Screen -->
 <div class="login-screen" id="loginScreen">
 <h1>VK Meow</h1>
 <div class="badge-e2e">
 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-Kate Mobile API • True Client-Side E2EE
+Kate Mobile API • Cloud Realtime E2EE
 </div>
-<p>Вход по токену Kate Mobile. Полная лента, все посты, все переписки и сквозное шифрование.</p>
+<p>Вход по токену Kate Mobile. Мгновенная работа, ТГ-каналы, поиск и облачное шифрование.</p>
 <button class="btn btn-secondary" onclick="getToken()">1. Получить токен Kate Mobile</button>
 <input type="text" class="token-input" id="tokenUrl" placeholder="Ссылка с токеном из строки браузера...">
-<input type="password" class="pass-input" id="password" placeholder="Пароль для защиты ключей E2EE...">
+<input type="password" class="pass-input" id="password" placeholder="Пароль для защиты E2EE ключей...">
 <button class="btn" onclick="login()">Войти</button>
 </div>
 
@@ -655,13 +731,16 @@ Kate Mobile API • True Client-Side E2EE
 </div>
 </div>
 
-<!-- Folder Tabs -->
-<div class="folder-tabs" id="folderTabs">
-<div class="folder-tab active" onclick="switchFolder('all')" data-folder="all">Личные</div>
-<div class="folder-tab" onclick="switchFolder('groups')" data-folder="groups">Группы</div>
-<div class="folder-tab" onclick="switchFolder('channels')" data-folder="channels">Каналы</div>
-<div class="folder-tab" onclick="switchFolder('news')" data-folder="news">Новости</div>
+<!-- Search Input Bar -->
+<div class="search-bar-container">
+<div class="search-input-wrap">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+<input class="search-input" id="dialogSearchInput" placeholder="Поиск по диалогам и ВКонтакте..." oninput="handleSearchInput()">
 </div>
+</div>
+
+<!-- Folder Tabs -->
+<div class="folder-tabs" id="folderTabs"></div>
 
 <div class="dialogs-list" id="dialogsList"></div>
 <div class="news-feed hidden" id="newsFeed"></div>
@@ -695,6 +774,19 @@ Kate Mobile API • True Client-Side E2EE
 <div class="header-info" onclick="backToDialogs()">
 <div class="header-title" id="chatTitle">...</div>
 <div class="header-subtitle" id="chatEncryptStatus">в сети</div>
+</div>
+<div class="header-actions">
+<button class="mark-read-btn hidden" id="manualMarkReadBtn" onclick="manualMarkChatAsRead()">✓✓ Прочитать</button>
+</div>
+</div>
+
+<div class="pinned-msg-bar hidden" id="pinnedMsgBar">
+<div class="pinned-msg-info" onclick="scrollToPinnedMsg()">
+<div class="pinned-msg-title">📌 Закрепленное сообщение</div>
+<div class="pinned-msg-text" id="pinnedMsgText">...</div>
+</div>
+<div class="pinned-msg-close" onclick="unpinCurrentMessage()">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
 </div>
 </div>
 
@@ -778,6 +870,14 @@ Kate Mobile API • True Client-Side E2EE
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
 Ответить
 </div>
+<div class="action-sheet-item" onclick="triggerPinMessageFromSheet()">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14l-1.5-7h-11z"/><path d="M9 10V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6"/></svg>
+Закрепить сообщение
+</div>
+<div class="action-sheet-item" onclick="triggerForwardFromSheet()">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>
+Переслать
+</div>
 <div class="action-sheet-item" id="editSheetItem" onclick="triggerEditFromSheet()">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
 Редактировать
@@ -843,7 +943,8 @@ if ('serviceWorker' in navigator) {
 const ENCRYPT_PREFIX = "ENC2:";
 let token = localStorage.getItem('vk_token');
 let password = localStorage.getItem('vk_pass');
-let ghostMode = localStorage.getItem('ghost_mode') === 'true';
+
+let stealthRead = localStorage.getItem('stealth_read') !== 'false';
 let soundEnabled = localStorage.getItem('sound_enabled') !== 'false';
 let encryptionEnabled = localStorage.getItem('encryption_enabled') !== 'false';
 
@@ -851,6 +952,9 @@ let currentPeer = null;
 let currentUser = null;
 let dialogsData = [];
 let userGroupsData = [];
+let globalSearchResults = [];
+let searchDebounce = null;
+
 let longPollTs = null;
 let longPollKey = null;
 let longPollServer = null;
@@ -866,9 +970,9 @@ let editMsg = null;
 let selectedMsgForAction = null;
 let typingTimeout = null;
 
-let ghostOfflineInterval = null;
-let ghostPollInterval = null;
-let isLongPollingActive = false;
+let pinnedPeers = JSON.parse(localStorage.getItem('vk_pinned_peers') || '[]');
+let archivedPeers = JSON.parse(localStorage.getItem('vk_archived_peers') || '[]');
+let pinnedMessagesMap = JSON.parse(localStorage.getItem('vk_pinned_messages') || '{}');
 
 function showUploadProgress(text) {
     const toast = document.getElementById('uploadToast');
@@ -896,60 +1000,16 @@ function closePhotoViewer() {
     document.getElementById('photoViewerModal').classList.remove('active');
 }
 
-function toggleGhostMode() {
-    ghostMode = !ghostMode;
-    setGhostState(ghostMode);
+function toggleStealthRead() {
+    stealthRead = !stealthRead;
+    setStealthReadState(stealthRead);
 }
 
-function setGhostState(val) {
-    ghostMode = val;
-    localStorage.setItem('ghost_mode', val ? 'true' : 'false');
-    const chk = document.getElementById('ghostToggle');
+function setStealthReadState(val) {
+    stealthRead = val;
+    localStorage.setItem('stealth_read', val ? 'true' : 'false');
+    const chk = document.getElementById('stealthReadToggle');
     if (chk) chk.checked = val;
-
-    if (ghostMode) {
-        // STOP REAL-TIME LONG POLL TO PREVENT KEEPING USER ONLINE IN VK!
-        isLongPollingActive = false;
-        
-        // Immediate setOffline
-        enforceGhostOffline();
-
-        // Aggressive background setOffline loop (every 10 seconds)
-        if (ghostOfflineInterval) clearInterval(ghostOfflineInterval);
-        ghostOfflineInterval = setInterval(enforceGhostOffline, 10000);
-
-        // Rare sync poll (every 45 seconds) instead of 300ms longpoll
-        if (ghostPollInterval) clearInterval(ghostPollInterval);
-        ghostPollInterval = setInterval(rareGhostSync, 45000);
-    } else {
-        if (ghostOfflineInterval) clearInterval(ghostOfflineInterval);
-        if (ghostPollInterval) clearInterval(ghostPollInterval);
-        ghostOfflineInterval = null;
-        ghostPollInterval = null;
-
-        // RE-ENABLE FAST REAL-TIME LONG POLL
-        startLongPolling();
-    }
-}
-
-async function enforceGhostOffline() {
-    if (!token) return;
-    try {
-        await fetch('/api/ghost_enforce', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ token, is_ghost: true })
-        });
-    } catch(e){}
-}
-
-async function rareGhostSync() {
-    if (!ghostMode || !token) return;
-    if (currentPeer) {
-        await loadMessages(false);
-    } else {
-        await loadDialogs();
-    }
 }
 
 function toggleSoundNotifications() {
@@ -1043,7 +1103,7 @@ async function updateDelfanDisplay() {
     if (!localKeyPair) return;
     
     pubElem.textContent = localKeyPair.pubJwkStr;
-    privElem.textContent = "[СКРЫТ ДЛЯ БЕЗОПАСНОСТИ - ХРАНИТСЯ ТОЛЬКО НА УСТРОЙСТВЕ]";
+    privElem.textContent = "[СКРЫТ ДЛЯ БЕЗОПАСНОСТИ - ХРАНИТСЯ В FIREBASE RTDB]";
     const fp = await generateDelfanFingerprint(localKeyPair.pubJwkStr);
     elem.textContent = fp;
 }
@@ -1086,7 +1146,7 @@ async function importKeysFile(e) {
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(data)
                 });
-                alert('Ключи успешно импортированы! Перезагрузка...');
+                alert('Ключи успешно импортированы в Firebase RTDB! Перезагрузка...');
                 location.reload();
             } else {
                 alert('Неверный формат файла ключей');
@@ -1100,14 +1160,14 @@ async function importKeysFile(e) {
 }
 
 async function regenerateKeysPrompt() {
-    if (confirm('⚠️ Вы уверены, что хотите обновить ключи? Старые зашифрованные сообщения будет невозможно расшифровать!')) {
+    if (confirm('⚠️ Вы уверены, что хотите обновить пароль и пересоздать ключи E2EE?')) {
         localStorage.removeItem('vk_pass');
-        const newPass = prompt('Введите новый пароль для шифрования ключей:');
+        const newPass = prompt('Введите новый мастер-пароль для шифрования:');
         if (!newPass) return;
         password = newPass;
         localStorage.setItem('vk_pass', newPass);
         await initClientCrypto(true);
-        alert('Ключи обновлены!');
+        alert('Ключи обновлены в облаке!');
         openEncryptModal();
     }
 }
@@ -1149,7 +1209,7 @@ async function decryptAESGCM(key, combinedBuf) {
 
 async function initClientCrypto(forceNew = false) {
     if (!myVkId || !password) return false;
-    showUploadProgress('Синхронизация ключей E2EE...');
+    showUploadProgress('Синхронизация ключей (Firebase RTDB)...');
 
     try {
         const masterKey = await deriveMasterKey(password, myVkId + "_vk_e2ee_salt");
@@ -1174,7 +1234,7 @@ async function initClientCrypto(forceNew = false) {
                 return true;
             } catch(e) {
                 console.error("Local Key Decryption Failed:", e);
-                alert("Неверный пароль шифрования для данного VK ID! Приватный ключ защищен паролем.");
+                alert("Неверный пароль шифрования для данного VK ID! Введенный пароль не подходит к зашифрованному ключу в облаке.");
                 return false;
             }
         } else {
@@ -1305,7 +1365,7 @@ async function login() {
             showDialogsScreen();
             loadDialogs();
             loadFolders();
-            setGhostState(ghostMode);
+            startLongPolling();
             updateDrawerProfile();
         }
     } finally {
@@ -1328,7 +1388,7 @@ async function fetchMyRealStatus() {
         const res = await fetch('/api/my_status', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ token, is_ghost: ghostMode })
+            body: JSON.stringify({ token })
         });
         const data = await res.json();
         const onlineElem = document.getElementById('drawerOnlineStatus');
@@ -1356,8 +1416,7 @@ function updateDrawerProfile() {
     
     fetchMyRealStatus();
 
-    const ghostChk = document.getElementById('ghostToggle');
-    if (ghostChk) ghostChk.checked = ghostMode;
+    setStealthReadState(stealthRead);
     setSoundState(soundEnabled);
     setEncryptionState(encryptionEnabled);
     updateCacheSizeDisplay();
@@ -1420,7 +1479,7 @@ async function saveProfileChanges() {
         const res = await fetch('/api/profile/update', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ token, first_name: firstName, last_name: lastName, status: statusText, is_ghost: ghostMode })
+            body: JSON.stringify({ token, first_name: firstName, last_name: lastName, status: statusText })
         });
         const data = await res.json();
         if (data.ok) {
@@ -1452,7 +1511,6 @@ async function uploadAvatarFile(e) {
     const formData = new FormData();
     formData.append('token', token);
     formData.append('photo', file);
-    formData.append('is_ghost', ghostMode ? 'true' : 'false');
 
     try {
         const res = await fetch('/api/profile/upload_avatar', { method: 'POST', body: formData });
@@ -1533,7 +1591,7 @@ async function fastDecryptDialogPreviews(dialogs) {
 
 async function loadDialogs() {
     try {
-        const res = await fetch('/api/dialogs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, is_ghost: ghostMode }) });
+        const res = await fetch('/api/dialogs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
         const data = await res.json();
         if (data.error) return;
         dialogsData = data.dialogs;
@@ -1545,62 +1603,250 @@ async function loadDialogs() {
     } catch(e){}
 }
 
+function handleSearchInput() {
+    if (searchDebounce) clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(async () => {
+        const query = document.getElementById('dialogSearchInput').value.trim();
+        if (query.length > 1) {
+            try {
+                const res = await fetch('/api/search_global', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ token, query })
+                });
+                const data = await res.json();
+                globalSearchResults = data.results || [];
+            } catch(e) {
+                globalSearchResults = [];
+            }
+        } else {
+            globalSearchResults = [];
+        }
+        renderDialogsListFiltered();
+    }, 300);
+}
+
 function renderDialogsListFiltered() {
     const list = document.getElementById('dialogsList');
     list.innerHTML = '';
+    const query = document.getElementById('dialogSearchInput').value.toLowerCase().trim();
 
-    for (let i = 0; i < dialogsData.length; i++) {
-        const d = dialogsData[i];
-        
+    let filtered = dialogsData.filter(d => {
+        const isArchived = archivedPeers.includes(String(d.id));
+        if (currentFolder === 'archive') return isArchived;
+        if (isArchived) return false;
+
         if (currentFolder === 'all') {
-            if (d.type !== 'user' || String(d.id) === '100') continue;
+            if (d.type !== 'user' || String(d.id) === '100') return false;
         } else if (currentFolder === 'groups') {
-            if (d.type !== 'chat' && d.type !== 'group' && String(d.id) !== '100') continue;
+            if (d.type !== 'chat' && d.type !== 'group' && String(d.id) !== '100') return false;
+        } else if (currentFolder === 'unread') {
+            if (d.unread <= 0) return false;
         } else if (currentFolder !== 'channels' && currentFolder !== 'news') {
             const folderData = customFolders.find(f => f.id === currentFolder);
-            if (folderData && !folderData.peers.includes(String(d.id))) continue;
+            if (folderData && !folderData.peers.includes(String(d.id))) return false;
         }
 
+        if (query) {
+            return (d.name || '').toLowerCase().includes(query) || (d.last_message || '').toLowerCase().includes(query);
+        }
+        return true;
+    });
+
+    filtered.sort((a, b) => {
+        const aPinned = pinnedPeers.includes(String(a.id));
+        const bPinned = pinnedPeers.includes(String(b.id));
+        if (aPinned && !bPinned) return -1;
+        if (!aPinned && bPinned) return 1;
+        return (b.date || 0) - (a.date || 0);
+    });
+
+    for (const d of filtered) {
         const div = document.createElement('div');
         div.className = 'dialog';
-        div.onclick = () => openChat(i);
+        div.onclick = () => openChatByObject(d);
+
+        attachDialogSwipeArchive(div, d);
+
         const time = d.date ? new Date(d.date * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : '';
         const previewHTML = buildDialogPreviewHTML(d);
+        const isPinned = pinnedPeers.includes(String(d.id));
 
-        div.innerHTML = `<div class="dialog-avatar-wrap" onclick="event.stopPropagation();openProfileView(${d.id}, ${d.type === 'group' ? 'true' : 'false'})"><img class="dialog-avatar" src="${d.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'"><div class="dialog-online-dot ${d.online ? '' : 'offline'}" id="dot-${d.id}"></div></div><div class="dialog-info"><div class="dialog-top"><div class="dialog-name">${escapeHtml(d.name)}</div><div class="dialog-time">${time}</div></div><div class="dialog-bottom" id="preview-${d.id}"><div class="dialog-preview ${d.typing ? 'typing' : ''}">${d.typing ? 'печатает...' : previewHTML}</div>${d.unread > 0 ? `<div class="dialog-unread-blue">${d.unread}</div>` : ''}</div></div>`;
+        div.innerHTML = `
+            <div class="dialog-avatar-wrap" onclick="event.stopPropagation();openProfileView(${d.id}, ${d.type === 'group' ? 'true' : 'false'})">
+                <img class="dialog-avatar" src="${d.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
+                <div class="dialog-online-dot ${d.online ? '' : 'offline'}" id="dot-${d.id}"></div>
+            </div>
+            <div class="dialog-info">
+                <div class="dialog-top">
+                    <div class="dialog-name">${escapeHtml(d.name)}</div>
+                    <div class="dialog-time">${time}</div>
+                </div>
+                <div class="dialog-bottom" id="preview-${d.id}">
+                    <div class="dialog-preview">${previewHTML}</div>
+                    ${d.unread > 0 ? `<div class="dialog-unread-blue">${d.unread}</div>` : ''}
+                </div>
+            </div>
+            ${isPinned ? '<div class="dialog-pin-icon">📌</div>' : ''}
+        `;
         list.appendChild(div);
     }
+
+    if (query && globalSearchResults.length > 0) {
+        const header = document.createElement('div');
+        header.className = 'search-section-header';
+        header.textContent = 'Глобальный поиск ВКонтакте';
+        list.appendChild(header);
+
+        for (const item of globalSearchResults) {
+            const div = document.createElement('div');
+            div.className = 'dialog';
+            div.onclick = () => openProfileView(item.id, item.type === 'group');
+
+            div.innerHTML = `
+                <div class="dialog-avatar-wrap">
+                    <img class="dialog-avatar" src="${item.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
+                </div>
+                <div class="dialog-info">
+                    <div class="dialog-top">
+                        <div class="dialog-name">${escapeHtml(item.name)}</div>
+                    </div>
+                    <div class="dialog-bottom">
+                        <div class="dialog-preview">${escapeHtml(item.type === 'group' ? 'Канал / Группа ВКонтакте' : 'Пользователь ВКонтакте')}</div>
+                    </div>
+                </div>
+            `;
+            list.appendChild(div);
+        }
+    }
+}
+
+function attachDialogSwipeArchive(elem, d) {
+    let startX = 0;
+    let currentX = 0;
+    let isDragging = false;
+
+    elem.addEventListener('touchstart', (e) => {
+        startX = e.touches[0].clientX;
+        isDragging = true;
+    }, { passive: true });
+
+    elem.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        currentX = e.touches[0].clientX - startX;
+        if (currentX > 0 && currentX < 120) {
+            elem.style.transform = `translateX(${currentX}px)`;
+        }
+    }, { passive: true });
+
+    elem.addEventListener('touchend', () => {
+        if (!isDragging) return;
+        isDragging = false;
+        if (currentX > 60) {
+            toggleArchivePeer(String(d.id));
+        }
+        elem.style.transform = 'translateX(0px)';
+        currentX = 0;
+    });
+}
+
+function toggleArchivePeer(peerIdStr) {
+    if (archivedPeers.includes(peerIdStr)) {
+        archivedPeers = archivedPeers.filter(p => p !== peerIdStr);
+    } else {
+        archivedPeers.push(peerIdStr);
+    }
+    localStorage.setItem('vk_archived_peers', JSON.stringify(archivedPeers));
+    renderDialogsListFiltered();
+}
+
+function togglePinPeer(peerIdStr) {
+    if (pinnedPeers.includes(peerIdStr)) {
+        pinnedPeers = pinnedPeers.filter(p => p !== peerIdStr);
+    } else {
+        pinnedPeers.push(peerIdStr);
+    }
+    localStorage.setItem('vk_pinned_peers', JSON.stringify(pinnedPeers));
+    renderDialogsListFiltered();
 }
 
 async function loadUserGroups() {
     try {
-        const res = await fetch('/api/user_groups', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ token, is_ghost: ghostMode }) });
+        const res = await fetch('/api/user_groups', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ token }) });
         const data = await res.json();
         if (data.groups) {
             userGroupsData = data.groups;
-            renderUserGroupsList();
+            renderUserGroupsListTGStyle();
         }
     } catch(e){}
 }
 
-function renderUserGroupsList() {
+function renderUserGroupsListTGStyle() {
     const list = document.getElementById('dialogsList');
     list.innerHTML = '';
+    const query = document.getElementById('dialogSearchInput').value.toLowerCase().trim();
 
-    for (const g of userGroupsData) {
+    const filtered = userGroupsData.filter(g => {
+        if (query) return (g.name || '').toLowerCase().includes(query) || (g.description || '').toLowerCase().includes(query);
+        return true;
+    });
+
+    for (const g of filtered) {
         const div = document.createElement('div');
         div.className = 'dialog';
         div.onclick = () => openProfileView(-g.id, true);
 
         const avatar = g.photo || g.photo_200 || g.photo_100 || 'https://vk.com/images/camera_100.png';
 
-        div.innerHTML = `<div class="dialog-avatar-wrap"><img class="dialog-avatar" src="${avatar}" onerror="this.src='https://vk.com/images/camera_100.png'"></div><div class="dialog-info"><div class="dialog-top"><div class="dialog-name">${escapeHtml(g.name)}</div></div><div class="dialog-bottom"><div class="dialog-preview">${escapeHtml(g.activity || g.description || 'Канал/Сообщество (нажмите для просмотра постов)')}</div></div></div>`;
+        div.innerHTML = `
+            <div class="dialog-avatar-wrap">
+                <img class="dialog-avatar" src="${avatar}" onerror="this.src='https://vk.com/images/camera_100.png'">
+            </div>
+            <div class="dialog-info">
+                <div class="dialog-top">
+                    <div class="dialog-name">${escapeHtml(g.name)}</div>
+                </div>
+                <div class="dialog-bottom">
+                    <div class="dialog-preview">${escapeHtml(g.activity || g.description || 'Канал/Сообщество (нажмите для постов)')}</div>
+                </div>
+            </div>
+        `;
         list.appendChild(div);
+    }
+
+    if (query && globalSearchResults.length > 0) {
+        const header = document.createElement('div');
+        header.className = 'search-section-header';
+        header.textContent = 'Глобальный поиск каналов';
+        list.appendChild(header);
+
+        for (const item of globalSearchResults) {
+            if (item.type === 'group') {
+                const div = document.createElement('div');
+                div.className = 'dialog';
+                div.onclick = () => openProfileView(item.id, true);
+
+                div.innerHTML = `
+                    <div class="dialog-avatar-wrap">
+                        <img class="dialog-avatar" src="${item.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
+                    </div>
+                    <div class="dialog-info">
+                        <div class="dialog-top">
+                            <div class="dialog-name">${escapeHtml(item.name)}</div>
+                        </div>
+                        <div class="dialog-bottom">
+                            <div class="dialog-preview">Канал ВКонтакте</div>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(div);
+            }
+        }
     }
 }
 
-async function openChat(index) {
-    const d = dialogsData[index]; currentPeer = d.id;
+function openChatByObject(d) {
+    currentPeer = d.id;
     document.getElementById('chatTitle').textContent = d.name;
     document.getElementById('chatAvatar').src = d.photo || 'https://vk.com/images/camera_100.png';
     document.getElementById('chatScreen').classList.add('active');
@@ -1608,9 +1854,65 @@ async function openChat(index) {
     renderedMsgIds.clear();
     document.getElementById('messages').innerHTML = '';
 
+    const markBtn = document.getElementById('manualMarkReadBtn');
+    if (stealthRead && d.unread > 0) {
+        markBtn.classList.remove('hidden');
+    } else {
+        markBtn.classList.add('hidden');
+    }
+
+    checkPinnedMessage();
     fetchPeerStatus();
     cancelReplyOrEdit();
+
+    if (!stealthRead && d.unread > 0) {
+        markChatAsReadServer(d.id);
+        d.unread = 0;
+    }
+
     loadMessages(true);
+}
+
+function checkPinnedMessage() {
+    const bar = document.getElementById('pinnedMsgBar');
+    const textElem = document.getElementById('pinnedMsgText');
+    const pinnedMsg = pinnedMessagesMap[String(currentPeer)];
+    if (pinnedMsg) {
+        textElem.textContent = pinnedMsg.text || 'Вложение';
+        bar.classList.remove('hidden');
+    } else {
+        bar.classList.add('hidden');
+    }
+}
+
+function unpinCurrentMessage() {
+    delete pinnedMessagesMap[String(currentPeer)];
+    localStorage.setItem('vk_pinned_messages', JSON.stringify(pinnedMessagesMap));
+    checkPinnedMessage();
+}
+
+function scrollToPinnedMsg() {
+    const pinnedMsg = pinnedMessagesMap[String(currentPeer)];
+    if (pinnedMsg) scrollToMsg(pinnedMsg.id);
+}
+
+async function markChatAsReadServer(peerId) {
+    try {
+        await fetch('/api/mark_read', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ token, peer_id: peerId })
+        });
+    } catch(e){}
+}
+
+async function manualMarkChatAsRead() {
+    if (!currentPeer) return;
+    await markChatAsReadServer(currentPeer);
+    document.getElementById('manualMarkReadBtn').classList.add('hidden');
+    const d = dialogsData.find(item => String(item.id) === String(currentPeer));
+    if (d) d.unread = 0;
+    renderDialogsListFiltered();
 }
 
 function backToDialogs() {
@@ -1627,7 +1929,7 @@ async function fetchPeerStatus() {
         const res = await fetch('/api/peer_status', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ token, peer_id: currentPeer, is_ghost: ghostMode })
+            body: JSON.stringify({ token, peer_id: currentPeer })
         });
         const data = await res.json();
         const statusElem = document.getElementById('chatEncryptStatus');
@@ -1638,7 +1940,7 @@ async function fetchPeerStatus() {
 }
 
 function triggerTypingSignal() {
-    if (!currentPeer || ghostMode) return;
+    if (!currentPeer || stealthRead) return;
     if (typingTimeout) clearTimeout(typingTimeout);
     
     fetch('/api/typing', {
@@ -1653,7 +1955,7 @@ function triggerTypingSignal() {
 async function loadMessages(initialScroll = false) {
     if (!currentPeer) return;
     try {
-        const res = await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, peer_id: currentPeer, is_ghost: ghostMode }) });
+        const res = await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, peer_id: currentPeer }) });
         const data = await res.json();
         const container = document.getElementById('messages');
         
@@ -1854,6 +2156,64 @@ function triggerReplyFromSheet() {
     if (selectedMsgForAction) setReplyToMessage(selectedMsgForAction);
 }
 
+function triggerPinMessageFromSheet() {
+    closeActionSheet();
+    if (selectedMsgForAction && currentPeer) {
+        pinnedMessagesMap[String(currentPeer)] = {
+            id: selectedMsgForAction.id,
+            text: decryptedCache[selectedMsgForAction.id] || selectedMsgForAction.text || 'Сообщение'
+        };
+        localStorage.setItem('vk_pinned_messages', JSON.stringify(pinnedMessagesMap));
+        checkPinnedMessage();
+    }
+}
+
+function triggerForwardFromSheet() {
+    closeActionSheet();
+    if (!selectedMsgForAction) return;
+    const list = document.getElementById('forwardList');
+    list.innerHTML = '';
+
+    for (const d of dialogsData) {
+        if (d.type === 'user') {
+            const item = document.createElement('div');
+            item.className = 'forward-item';
+            item.onclick = () => confirmForwardToPeer(d.id);
+            item.innerHTML = `
+                <img src="${d.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
+                <div><b>${escapeHtml(d.name)}</b></div>
+            `;
+            list.appendChild(item);
+        }
+    }
+    document.getElementById('forwardModal').classList.remove('hidden');
+}
+
+function closeForwardModal() {
+    document.getElementById('forwardModal').classList.add('hidden');
+}
+
+async function confirmForwardToPeer(targetPeerId) {
+    closeForwardModal();
+    if (!selectedMsgForAction) return;
+
+    showUploadProgress('Пересылка сообщения...');
+    const forwardText = decryptedCache[selectedMsgForAction.id] || selectedMsgForAction.text || '';
+
+    try {
+        await fetch('/api/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, peer_id: targetPeerId, text: `[Переслано]: ${forwardText}` })
+        });
+        alert('Сообщение успешно переслано!');
+    } catch(e) {
+        alert('Ошибка при пересылке');
+    } finally {
+        hideUploadProgress();
+    }
+}
+
 function triggerEditFromSheet() {
     closeActionSheet();
     if (selectedMsgForAction && selectedMsgForAction.out) startEditingMessage(selectedMsgForAction);
@@ -1883,7 +2243,7 @@ async function confirmDeleteMessage() {
         fetch('/api/delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token, message_ids: msgId, delete_for_all: deleteForAll, is_ghost: ghostMode })
+            body: JSON.stringify({ token, message_ids: msgId, delete_for_all: deleteForAll })
         });
     } finally {
         setTimeout(hideUploadProgress, 300);
@@ -2167,7 +2527,7 @@ async function sendMessage() {
         }
     }
 
-    const payload = { token, peer_id: currentPeer, text: sendText, is_ghost: ghostMode };
+    const payload = { token, peer_id: currentPeer, text: sendText };
     if (replyToMsg) payload.reply_to = replyToMsg.id;
     
     cancelReplyOrEdit();
@@ -2177,7 +2537,7 @@ async function sendMessage() {
             await fetch('/api/edit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token, peer_id: currentPeer, message_id: editMsg.id, text: sendText, is_ghost: ghostMode })
+                body: JSON.stringify({ token, peer_id: currentPeer, message_id: editMsg.id, text: sendText })
             });
         } else {
             await fetch('/api/send', {
@@ -2229,7 +2589,6 @@ async function sendMediaBlob(blob, filename, mimeType) {
             formData.append('token', token);
             formData.append('peer_id', currentPeer);
             formData.append('file', blob, filename);
-            formData.append('is_ghost', ghostMode ? 'true' : 'false');
 
             const res = await fetch('/api/upload_normal', { method: 'POST', body: formData });
             if (!res.ok) {
@@ -2446,7 +2805,6 @@ async function uploadEncryptedMedia(blob, filename, mimeType) {
     formData.append('token', token);
     formData.append('peer_id', currentPeer);
     formData.append('file', encBlob, `enc_${Date.now()}.${ext}`);
-    formData.append('is_ghost', ghostMode ? 'true' : 'false');
 
     const res = await fetch('/api/upload_encrypted_doc', { method: 'POST', body: formData });
     const data = await res.json();
@@ -2481,13 +2839,11 @@ function playNotificationSound() {
 }
 
 async function startLongPolling() {
-    if (ghostMode) return;
-    isLongPollingActive = true;
     try {
         const res = await fetch('/api/longpoll/init', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ token, is_ghost: ghostMode })
+            body: JSON.stringify({ token })
         });
         const data = await res.json();
         if (data.server && data.key && data.ts) {
@@ -2497,14 +2853,13 @@ async function startLongPolling() {
             pollEvents();
         }
     } catch(e) {
-        if (!ghostMode) setTimeout(startLongPolling, 5000);
+        setTimeout(startLongPolling, 3000);
     }
 }
 
 async function pollEvents() {
-    if (ghostMode || !isLongPollingActive) return;
     if (!longPollServer || !longPollKey || !longPollTs) {
-        setTimeout(startLongPolling, 3000);
+        setTimeout(startLongPolling, 2000);
         return;
     }
 
@@ -2535,11 +2890,9 @@ async function pollEvents() {
             }
         }
     } catch(e) {
-        await new Promise(r => setTimeout(r, 2000));
+        await new Promise(r => setTimeout(r, 1000));
     }
-    if (!ghostMode && isLongPollingActive) {
-        setTimeout(pollEvents, 300);
-    }
+    setTimeout(pollEvents, 200);
 }
 
 function logout() {
@@ -2575,36 +2928,23 @@ function renderFolderTabs() {
     if (!tabs) return;
     tabs.innerHTML = '';
 
-    const allTab = document.createElement('div');
-    allTab.className = 'folder-tab ' + (currentFolder === 'all' ? 'active' : '');
-    allTab.textContent = 'Личные';
-    allTab.onclick = () => switchFolder('all');
-    tabs.appendChild(allTab);
+    const createTab = (id, name) => {
+        const tab = document.createElement('div');
+        tab.className = 'folder-tab ' + (currentFolder === id ? 'active' : '');
+        tab.textContent = name;
+        tab.onclick = () => switchFolder(id);
+        tabs.appendChild(tab);
+    };
 
-    const groupsTab = document.createElement('div');
-    groupsTab.className = 'folder-tab ' + (currentFolder === 'groups' ? 'active' : '');
-    groupsTab.textContent = 'Группы';
-    groupsTab.onclick = () => switchFolder('groups');
-    tabs.appendChild(groupsTab);
-
-    const channelsTab = document.createElement('div');
-    channelsTab.className = 'folder-tab ' + (currentFolder === 'channels' ? 'active' : '');
-    channelsTab.textContent = 'Каналы';
-    channelsTab.onclick = () => switchFolder('channels');
-    tabs.appendChild(channelsTab);
-
-    const newsTab = document.createElement('div');
-    newsTab.className = 'folder-tab ' + (currentFolder === 'news' ? 'active' : '');
-    newsTab.textContent = 'Новости';
-    newsTab.onclick = () => switchFolder('news');
-    tabs.appendChild(newsTab);
+    createTab('all', 'Личные');
+    createTab('groups', 'Группы');
+    createTab('channels', 'Каналы');
+    createTab('unread', 'Непрочитанные');
+    createTab('archive', 'Архив');
+    createTab('news', 'Новости');
 
     for (const f of customFolders) {
-        const tab = document.createElement('div');
-        tab.className = 'folder-tab ' + (currentFolder === f.id ? 'active' : '');
-        tab.textContent = f.name;
-        tab.onclick = () => switchFolder(f.id);
-        tabs.appendChild(tab);
+        createTab(f.id, f.name);
     }
 
     const addTab = document.createElement('div');
@@ -2641,24 +2981,29 @@ async function loadNewsFeed() {
     feed.innerHTML = '';
     showUploadProgress('Загрузка полной ленты новостей...');
     try {
-        const res = await fetch('/api/news', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({token, is_ghost: ghostMode}) });
+        const res = await fetch('/api/news', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({token}) });
         const data = await res.json();
         if (data.items) {
             for (const item of data.items) {
                 const div = document.createElement('div');
-                div.className = 'news-item';
-                const photo = item.photo ? `<img class="news-item-photo" src="${item.photo}" onclick="openPhotoViewer('${item.photo}')" onerror="this.style.display='none'">` : '';
+                div.className = 'tg-channel-card';
+                const photo = item.photo ? `<img class="tg-channel-media" src="${item.photo}" onclick="openPhotoViewer('${item.photo}')" onerror="this.style.display='none'">` : '';
                 div.innerHTML = `
-                    <div class="news-item-header">
-                        <img class="news-item-avatar" src="${item.author_photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
-                        <div><div class="news-item-name">${escapeHtml(item.author_name)}</div><div class="news-item-time">${item.time || ''}</div></div>
+                    <div class="tg-channel-header">
+                        <img class="tg-channel-avatar" src="${item.author_photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
+                        <div>
+                            <div class="tg-channel-title">${escapeHtml(item.author_name)}</div>
+                            <div class="tg-channel-meta">${item.time || ''}</div>
+                        </div>
                     </div>
-                    <div class="news-item-text">${escapeHtml(item.text || '')}</div>
                     ${photo}
-                    <div class="news-item-actions">
-                        <div class="news-action">❤ ${item.likes || 0}</div>
-                        <div class="news-action">💬 ${item.comments || 0}</div>
-                        <div class="news-action">↗ ${item.reposts || 0}</div>
+                    <div class="tg-channel-body">${escapeHtml(item.text || '')}</div>
+                    <div class="tg-channel-footer">
+                        <div class="tg-channel-actions">
+                            <div class="tg-channel-btn">❤ ${item.likes || 0}</div>
+                            <div class="tg-channel-btn" onclick="openCommentsModal('${item.owner_id || 0}', '${item.post_id || 0}')">💬 ${item.comments || 0} комм.</div>
+                        </div>
+                        <div>👁 ${item.reposts || 0}</div>
                     </div>
                 `;
                 feed.appendChild(div);
@@ -2668,13 +3013,51 @@ async function loadNewsFeed() {
     hideUploadProgress();
 }
 
+async function openCommentsModal(ownerId, postId) {
+    showUploadProgress('Загрузка комментариев...');
+    try {
+        const res = await fetch('/api/wall_comments', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ token, owner_id: ownerId, post_id: postId })
+        });
+        const data = await res.json();
+        const list = document.getElementById('commentsList');
+        list.innerHTML = '';
+
+        if (data.comments && data.comments.length > 0) {
+            for (const c of data.comments) {
+                const item = document.createElement('div');
+                item.className = 'comment-item';
+                item.innerHTML = `
+                    <img class="comment-avatar" src="${c.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
+                    <div class="comment-body">
+                        <div class="comment-author">${escapeHtml(c.name)}</div>
+                        <div class="comment-text">${escapeHtml(c.text)}</div>
+                        <div class="comment-time">${c.time || ''}</div>
+                    </div>
+                `;
+                list.appendChild(item);
+            }
+        } else {
+            list.innerHTML = '<div style="color:#666;text-align:center;padding:40px">Комментариев пока нет</div>';
+        }
+        document.getElementById('commentsModal').classList.add('active');
+    } catch(e){}
+    hideUploadProgress();
+}
+
+function closeCommentsModal() {
+    document.getElementById('commentsModal').classList.remove('active');
+}
+
 async function openProfileView(peerId, isGroup) {
-    showUploadProgress('Загрузка профиля и всех постов...');
+    showUploadProgress('Загрузка профиля и постов канала...');
     try {
         const res = await fetch('/api/profile_view', {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({token, peer_id: peerId, is_group: isGroup, is_ghost: ghostMode})
+            body: JSON.stringify({token, peer_id: peerId, is_group: isGroup})
         });
         const data = await res.json();
         if (data.error) { hideUploadProgress(); return; }
@@ -2692,18 +3075,27 @@ async function openProfileView(peerId, isGroup) {
 
         const postsList = document.getElementById('profilePostsList');
         postsList.innerHTML = '';
+
         if (data.posts && data.posts.length > 0) {
             for (const post of data.posts) {
                 const div = document.createElement('div');
-                div.className = 'news-item';
-                const photo = post.photo ? `<img class="news-item-photo" src="${post.photo}" onclick="openPhotoViewer('${post.photo}')" onerror="this.style.display='none'">` : '';
+                div.className = 'tg-channel-card';
+                const photo = post.photo ? `<img class="tg-channel-media" src="${post.photo}" onclick="openPhotoViewer('${post.photo}')" onerror="this.style.display='none'">` : '';
                 div.innerHTML = `
-                    <div class="news-item-text">${escapeHtml(post.text || '')}</div>
+                    <div class="tg-channel-header">
+                        <img class="tg-channel-avatar" src="${data.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
+                        <div>
+                            <div class="tg-channel-title">${escapeHtml(data.name)}</div>
+                        </div>
+                    </div>
                     ${photo}
-                    <div class="news-item-actions">
-                        <div class="news-action">❤ ${post.likes || 0}</div>
-                        <div class="news-action">💬 ${post.comments || 0}</div>
-                        <div class="news-action">↗ ${post.reposts || 0}</div>
+                    <div class="tg-channel-body">${escapeHtml(post.text || '')}</div>
+                    <div class="tg-channel-footer">
+                        <div class="tg-channel-actions">
+                            <div class="tg-channel-btn">❤ ${post.likes || 0}</div>
+                            <div class="tg-channel-btn" onclick="openCommentsModal('${post.owner_id || peerId}', '${post.id}')">💬 ${post.comments || 0} комм.</div>
+                        </div>
+                        <div>👁 ${post.reposts || 0}</div>
                     </div>
                 `;
                 postsList.appendChild(div);
@@ -2777,7 +3169,7 @@ async function saveNewFolder() {
             if (ok) {
                 loadDialogs();
                 loadFolders();
-                setGhostState(ghostMode);
+                startLongPolling();
             } else {
                 document.getElementById('loginScreen').classList.remove('hidden');
             }
@@ -2832,8 +3224,7 @@ def auth():
 @app.route('/api/my_status', methods=['POST'])
 def my_status():
     token = request.json.get('token')
-    is_ghost = request.json.get('is_ghost', False)
-    u_info = vk_request_ghost('users.get', token, is_ghost, fields='online,last_seen,sex')
+    u_info = vk_request('users.get', token, fields='online,last_seen,sex')
     if isinstance(u_info, list) and len(u_info) > 0:
         u = u_info[0]
         return jsonify({
@@ -2843,23 +3234,19 @@ def my_status():
     return jsonify({'online': 0, 'online_text': 'неизвестно'})
 
 
-@app.route('/api/ghost_enforce', methods=['POST'])
-def ghost_enforce():
+@app.route('/api/mark_read', methods=['POST'])
+def mark_read():
     token = request.json.get('token')
-    is_ghost = request.json.get('is_ghost', True)
-    if is_ghost and token:
-        try:
-            get_session().get(f"{VK_API}/account.setOffline", params={'access_token': token, 'v': API_VERSION}, timeout=5)
-        except Exception:
-            pass
+    peer_id = request.json.get('peer_id')
+    if token and peer_id:
+        vk_request('messages.markAsRead', token, peer_id=peer_id)
     return jsonify({'ok': True})
 
 
 @app.route('/api/user_groups', methods=['POST'])
 def user_groups():
     token = request.json.get('token')
-    is_ghost = request.json.get('is_ghost', False)
-    res = vk_request_ghost('groups.get', token, is_ghost, extended=1, fields='photo_100,photo_200,description,status,activity', count=100)
+    res = vk_request('groups.get', token, extended=1, fields='photo_100,photo_200,description,status,activity', count=100)
 
     if isinstance(res, dict) and 'error' in res:
         return jsonify(res), 400
@@ -2874,9 +3261,40 @@ def user_groups():
     return jsonify({'groups': items})
 
 
+@app.route('/api/search_global', methods=['POST'])
+def search_global():
+    token = request.json.get('token')
+    query = request.json.get('query', '').strip()
+    if not query:
+        return jsonify({'results': []})
+
+    results = []
+    users_res = vk_request('users.search', token, q=query, count=10, fields='photo_100')
+    if isinstance(users_res, dict) and 'items' in users_res:
+        for u in users_res.get('items', []):
+            results.append({
+                'id': u.get('id'),
+                'type': 'user',
+                'name': f"{u.get('first_name', '')} {u.get('last_name', '')}".strip(),
+                'photo': u.get('photo_100', '')
+            })
+
+    groups_res = vk_request('groups.search', token, q=query, count=10)
+    if isinstance(groups_res, dict) and 'items' in groups_res:
+        for g in groups_res.get('items', []):
+            results.append({
+                'id': -g.get('id'),
+                'type': 'group',
+                'name': g.get('name', ''),
+                'photo': g.get('photo_100', '')
+            })
+
+    return jsonify({'results': results})
+
+
 @app.route('/api/keys/<vk_id>', methods=['GET'])
 def get_key(vk_id):
-    stored = get_stored_key(vk_id)
+    stored = get_stored_pub_key(vk_id)
     if stored:
         return jsonify(stored)
     return jsonify({'error': 'Not found'}), 404
@@ -2884,26 +3302,32 @@ def get_key(vk_id):
 
 @app.route('/api/keys/private/<vk_id>', methods=['GET'])
 def get_private_key_local(vk_id):
-    local_data = load_local_keys()
-    vk_id_str = str(vk_id)
-    if vk_id_str in local_data:
-        return jsonify(local_data[vk_id_str])
+    stored_priv = get_stored_priv_key(vk_id)
+    stored_pub = get_stored_pub_key(vk_id)
+
+    if stored_priv and stored_pub:
+        return jsonify({
+            'public_key': stored_pub.get('public_key'),
+            'private_key_enc': stored_priv.get('private_key_enc')
+        })
     return jsonify({'error': 'Not found'}), 404
 
 
 @app.route('/api/keys/<vk_id>', methods=['POST'])
 def save_key(vk_id):
     data = request.json
-    data['created_at'] = datetime.now().isoformat()
-    store_key(vk_id, data)
+    now_iso = datetime.now().isoformat()
+    if 'public_key' in data:
+        store_pub_key(vk_id, {'public_key': data['public_key'], 'created_at': now_iso})
+    if 'private_key_enc' in data:
+        store_priv_key(vk_id, {'private_key_enc': data['private_key_enc'], 'created_at': now_iso})
     return jsonify({'ok': True})
 
 
 @app.route('/api/dialogs', methods=['POST'])
 def get_dialogs():
     token = request.json.get('token')
-    is_ghost = request.json.get('is_ghost', False)
-    result = vk_request_ghost('messages.getConversations', token, is_ghost, count=100, offset=0, extended=1)
+    result = vk_request('messages.getConversations', token, count=100, offset=0, extended=1)
 
     if isinstance(result, dict) and 'error' in result:
         return jsonify(result), 400
@@ -2948,8 +3372,7 @@ def get_dialogs():
 def get_messages():
     token = request.json.get('token')
     peer_id = request.json.get('peer_id')
-    is_ghost = request.json.get('is_ghost', False)
-    result = vk_request_ghost('messages.getHistory', token, is_ghost, peer_id=peer_id, count=200, offset=0, extended=1)
+    result = vk_request('messages.getHistory', token, peer_id=peer_id, count=200, offset=0, extended=1)
 
     if isinstance(result, dict) and 'error' in result:
         return jsonify(result), 400
@@ -2976,12 +3399,11 @@ def get_messages():
 def peer_status():
     token = request.json.get('token')
     peer_id = request.json.get('peer_id')
-    is_ghost = request.json.get('is_ghost', False)
     
     if not peer_id or int(peer_id) < 0:
         return jsonify({'status_text': 'сообщество'})
 
-    user_info = vk_request_ghost('users.get', token, is_ghost, user_ids=peer_id, fields='online,last_seen,sex')
+    user_info = vk_request('users.get', token, user_ids=peer_id, fields='online,last_seen,sex')
 
     if isinstance(user_info, list) and len(user_info) > 0:
         u = user_info[0]
@@ -3006,12 +3428,11 @@ def update_profile():
     first_name = request.json.get('first_name', '').strip()
     last_name = request.json.get('last_name', '').strip()
     status_text = request.json.get('status', '').strip()
-    is_ghost = request.json.get('is_ghost', False)
 
-    status_res = vk_request_ghost('status.set', token, is_ghost, text=status_text)
+    status_res = vk_request('status.set', token, text=status_text)
     profile_res = None
     if first_name and last_name:
-        profile_res = vk_request_ghost('account.saveProfileInfo', token, is_ghost, first_name=first_name, last_name=last_name)
+        profile_res = vk_request('account.saveProfileInfo', token, first_name=first_name, last_name=last_name)
     
     return jsonify({'ok': True, 'status_res': status_res, 'profile_res': profile_res})
 
@@ -3020,12 +3441,11 @@ def update_profile():
 def upload_avatar():
     token = request.form.get('token')
     photo_file = request.files.get('photo')
-    is_ghost = request.form.get('is_ghost') == 'true'
 
     if not photo_file:
         return jsonify({'error': 'Файл не выбран'}), 400
 
-    upload_server = vk_request_ghost('photos.getOwnerPhotoUploadServer', token, is_ghost)
+    upload_server = vk_request('photos.getOwnerPhotoUploadServer', token)
     if isinstance(upload_server, dict) and 'error' in upload_server:
         return jsonify(upload_server), 400
 
@@ -3033,14 +3453,14 @@ def upload_avatar():
     files = {'photo': (photo_file.filename, photo_file.read(), photo_file.content_type or 'image/jpeg')}
     upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
 
-    save_result = vk_request_ghost('photos.saveOwnerPhoto', token, is_ghost,
+    save_result = vk_request('photos.saveOwnerPhoto', token,
         server=upload_resp.get('server'),
         photo=upload_resp.get('photo'),
         hash=upload_resp.get('hash')
     )
 
     if isinstance(save_result, dict) and 'photo_hash' in save_result:
-        u_info = vk_request_ghost('users.get', token, is_ghost, fields='photo_100')
+        u_info = vk_request('users.get', token, fields='photo_100')
         if isinstance(u_info, list) and len(u_info) > 0:
             return jsonify({'ok': True, 'photo_url': u_info[0].get('photo_100')})
 
@@ -3053,13 +3473,12 @@ def send_message():
     peer_id = request.json.get('peer_id')
     text = request.json.get('text', '')
     reply_to = request.json.get('reply_to')
-    is_ghost = request.json.get('is_ghost', False)
     
     params = {'peer_id': peer_id, 'message': text, 'random_id': random.randint(1, 2147483647)}
     if reply_to:
         params['reply_to'] = reply_to
 
-    result = vk_request_ghost('messages.send', token, is_ghost, **params)
+    result = vk_request('messages.send', token, **params)
     return jsonify({'result': result})
 
 
@@ -3069,9 +3488,8 @@ def edit_message():
     peer_id = request.json.get('peer_id')
     message_id = request.json.get('message_id')
     text = request.json.get('text', '')
-    is_ghost = request.json.get('is_ghost', False)
 
-    result = vk_request_ghost('messages.edit', token, is_ghost, peer_id=peer_id, message_id=message_id, message=text)
+    result = vk_request('messages.edit', token, peer_id=peer_id, message_id=message_id, message=text)
     return jsonify({'result': result})
 
 
@@ -3080,9 +3498,8 @@ def delete_message():
     token = request.json.get('token')
     message_ids = request.json.get('message_ids')
     delete_for_all = request.json.get('delete_for_all', 1)
-    is_ghost = request.json.get('is_ghost', False)
 
-    result = vk_request_ghost('messages.delete', token, is_ghost, message_ids=str(message_ids), delete_for_all=delete_for_all)
+    result = vk_request('messages.delete', token, message_ids=str(message_ids), delete_for_all=delete_for_all)
     return jsonify({'result': result})
 
 
@@ -3091,12 +3508,11 @@ def upload_encrypted_doc():
     token = request.form.get('token')
     peer_id = request.form.get('peer_id')
     file = request.files.get('file')
-    is_ghost = request.form.get('is_ghost') == 'true'
 
     if not file:
         return jsonify({'error': 'No file'}), 400
 
-    upload_server = vk_request_ghost('docs.getMessagesUploadServer', token, is_ghost, type='doc', peer_id=peer_id)
+    upload_server = vk_request('docs.getMessagesUploadServer', token, type='doc', peer_id=peer_id)
     if isinstance(upload_server, dict) and 'error' in upload_server:
         return jsonify(upload_server), 400
 
@@ -3104,11 +3520,11 @@ def upload_encrypted_doc():
     files = {'file': (file.filename, file.read(), 'application/octet-stream')}
     upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
 
-    save_result = vk_request_ghost('docs.save', token, is_ghost, file=upload_resp.get('file'), title=file.filename)
+    save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=file.filename)
     attachment = extract_doc_attachment(save_result)
 
     if attachment:
-        vk_request_ghost('messages.send', token, is_ghost, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
+        vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
         return jsonify({'ok': True})
 
     return jsonify({'error': 'Upload failed'}), 400
@@ -3119,7 +3535,6 @@ def upload_normal():
     token = request.form.get('token')
     peer_id = request.form.get('peer_id')
     file = request.files.get('file')
-    is_ghost = request.form.get('is_ghost') == 'true'
 
     if not file:
         return jsonify({'error': 'No file'}), 400
@@ -3128,7 +3543,7 @@ def upload_normal():
     file_bytes = file.read()
 
     if filename.endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp', '.meow')):
-        upload_server = vk_request_ghost('photos.getMessagesUploadServer', token, is_ghost, peer_id=peer_id)
+        upload_server = vk_request('photos.getMessagesUploadServer', token, peer_id=peer_id)
         if isinstance(upload_server, dict) and 'error' in upload_server:
             return jsonify(upload_server), 400
 
@@ -3136,7 +3551,7 @@ def upload_normal():
         files = {'photo': (filename, BytesIO(file_bytes), file.content_type or 'image/jpeg')}
         upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
 
-        save_result = vk_request_ghost('photos.saveMessagesPhoto', token, is_ghost,
+        save_result = vk_request('photos.saveMessagesPhoto', token,
             photo=upload_resp.get('photo'),
             server=upload_resp.get('server'),
             hash=upload_resp.get('hash')
@@ -3145,10 +3560,10 @@ def upload_normal():
         if isinstance(save_result, list) and len(save_result) > 0:
             photo = save_result[0]
             attachment = f"photo{photo['owner_id']}_{photo['id']}"
-            vk_request_ghost('messages.send', token, is_ghost, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
+            vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
             return jsonify({'ok': True})
 
-    upload_server = vk_request_ghost('docs.getMessagesUploadServer', token, is_ghost, type='doc', peer_id=peer_id)
+    upload_server = vk_request('docs.getMessagesUploadServer', token, type='doc', peer_id=peer_id)
     if isinstance(upload_server, dict) and 'error' in upload_server:
         return jsonify(upload_server), 400
 
@@ -3156,11 +3571,11 @@ def upload_normal():
     files = {'file': (filename, BytesIO(file_bytes), file.content_type or 'application/octet-stream')}
     upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
 
-    save_result = vk_request_ghost('docs.save', token, is_ghost, file=upload_resp.get('file'), title=filename)
+    save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=filename)
     attachment = extract_doc_attachment(save_result)
 
     if attachment:
-        vk_request_ghost('messages.send', token, is_ghost, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
+        vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
         return jsonify({'ok': True})
 
     return jsonify({'error': 'Upload failed'}), 400
@@ -3168,7 +3583,7 @@ def upload_normal():
 
 @app.route('/api/folders/<vk_id>', methods=['GET'])
 def get_folders(vk_id):
-    stored = get_stored_key(f"folders_{vk_id}")
+    stored = get_stored_pub_key(f"folders_{vk_id}")
     if stored and 'folders' in stored:
         return jsonify({'folders': stored['folders']})
     return jsonify({'folders': []})
@@ -3177,22 +3592,21 @@ def get_folders(vk_id):
 @app.route('/api/folders/<vk_id>', methods=['POST'])
 def save_folders(vk_id):
     data = request.json
-    existing = get_stored_key(f"folders_{vk_id}") or {'folders': []}
+    existing = get_stored_pub_key(f"folders_{vk_id}") or {'folders': []}
     folder_id = 'folder_' + str(random.randint(1000, 9999))
     existing['folders'] = existing.get('folders', []) + [{
         'id': folder_id,
         'name': data.get('name', 'Папка'),
         'peers': data.get('peers', [])
     }]
-    store_key(f"folders_{vk_id}", existing)
+    store_pub_key(f"folders_{vk_id}", existing)
     return jsonify({'ok': True})
 
 
 @app.route('/api/news', methods=['POST'])
 def get_news():
     token = request.json.get('token')
-    is_ghost = request.json.get('is_ghost', False)
-    result = vk_request_ghost('newsfeed.get', token, is_ghost, filters='post', count=100, fields='photo_50,photo_100')
+    result = vk_request('newsfeed.get', token, filters='post', count=100, fields='photo_50,photo_100')
 
     if isinstance(result, dict) and 'error' in result:
         return jsonify(result), 400
@@ -3220,6 +3634,8 @@ def get_news():
                 break
 
         items.append({
+            'owner_id': source_id,
+            'post_id': item.get('post_id', 0),
             'author_name': author_name.strip(),
             'author_photo': author_photo,
             'text': item.get('text', ''),
@@ -3232,12 +3648,50 @@ def get_news():
     return jsonify({'items': items})
 
 
+@app.route('/api/wall_comments', methods=['POST'])
+def wall_comments():
+    token = request.json.get('token')
+    owner_id = request.json.get('owner_id')
+    post_id = request.json.get('post_id')
+
+    res = vk_request('wall.getComments', token, owner_id=owner_id, post_id=post_id, extended=1, count=50)
+
+    if isinstance(res, dict) and 'error' in res:
+        return jsonify({'comments': []})
+
+    profiles = {p['id']: p for p in res.get('profiles', [])}
+    groups = {g['id']: g for g in res.get('groups', [])}
+
+    comments = []
+    for item in res.get('items', []):
+        from_id = item.get('from_id', 0)
+        name = "Пользователь"
+        photo = ""
+        if from_id > 0:
+            p = profiles.get(from_id, {})
+            name = f"{p.get('first_name', '')} {p.get('last_name', '')}".strip()
+            photo = p.get('photo_50', '')
+        elif from_id < 0:
+            g = groups.get(-from_id, {})
+            name = g.get('name', '')
+            photo = g.get('photo_50', '')
+
+        comments.append({
+            'id': item.get('id'),
+            'name': name,
+            'photo': photo,
+            'text': item.get('text', ''),
+            'time': datetime.fromtimestamp(item.get('date', 0)).strftime('%d.%m %H:%M') if item.get('date') else ''
+        })
+
+    return jsonify({'comments': comments})
+
+
 @app.route('/api/profile_view', methods=['POST'])
 def profile_view():
     token = request.json.get('token')
     peer_id = request.json.get('peer_id')
     is_group = request.json.get('is_group', False)
-    is_ghost = request.json.get('is_ghost', False)
 
     try:
         peer_id_int = int(peer_id)
@@ -3246,7 +3700,7 @@ def profile_view():
 
     if is_group or peer_id_int < 0:
         group_id = abs(peer_id_int)
-        group_info = vk_request_ghost('groups.getById', token, is_ghost, group_id=group_id, fields='description,status,photo_200,photo_100')
+        group_info = vk_request('groups.getById', token, group_id=group_id, fields='description,status,photo_200,photo_100')
 
         name = ""
         photo = ""
@@ -3263,7 +3717,7 @@ def profile_view():
             photo = g.get('photo_200') or g.get('photo_100', '')
             status = g.get('status') or g.get('description', '')
 
-        wall = vk_request_ghost('wall.get', token, is_ghost, owner_id=-group_id, count=50, extended=1)
+        wall = vk_request('wall.get', token, owner_id=-group_id, count=50, extended=1)
 
         posts = []
         if isinstance(wall, dict) and 'items' in wall:
@@ -3278,6 +3732,7 @@ def profile_view():
                         break
                 posts.append({
                     'id': p.get('id'),
+                    'owner_id': -group_id,
                     'text': p.get('text', ''),
                     'photo': photo_url,
                     'likes': p.get('likes', {}).get('count', 0),
@@ -3292,11 +3747,11 @@ def profile_view():
             'posts': posts
         })
     else:
-        user_info = vk_request_ghost('users.get', token, is_ghost, user_ids=peer_id, fields='photo_200,photo_100,status,city,bdate,site,sex')
+        user_info = vk_request('users.get', token, user_ids=peer_id, fields='photo_200,photo_100,status,city,bdate,site,sex')
 
         if isinstance(user_info, list) and len(user_info) > 0:
             u = user_info[0]
-            wall = vk_request_ghost('wall.get', token, is_ghost, owner_id=peer_id, count=50, extended=1, filter='owner')
+            wall = vk_request('wall.get', token, owner_id=peer_id, count=50, extended=1, filter='owner')
 
             posts = []
             if isinstance(wall, dict) and 'items' in wall:
@@ -3310,6 +3765,7 @@ def profile_view():
                             break
                     posts.append({
                         'id': p.get('id'),
+                        'owner_id': peer_id,
                         'text': p.get('text', ''),
                         'photo': photo_url,
                         'likes': p.get('likes', {}).get('count', 0),
@@ -3332,8 +3788,7 @@ def profile_view():
 @app.route('/api/longpoll/init', methods=['POST'])
 def longpoll_init():
     token = request.json.get('token')
-    is_ghost = request.json.get('is_ghost', False)
-    lp = vk_request_ghost('messages.getLongPollServer', token, is_ghost, need_pts=1, lp_version=3)
+    lp = vk_request('messages.getLongPollServer', token, need_pts=1, lp_version=3)
 
     if isinstance(lp, dict) and 'error' in lp:
         return jsonify(lp), 400
