@@ -192,6 +192,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .dialog-preview.typing{color:#34c759}
 .dialog-unread-blue{min-width:20px;height:20px;border-radius:50%;background:#0a84ff;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 6px;flex-shrink:0}
 
+/* TG Style Dialog Preview Thumbs */
+.dialog-preview-wrap{display:flex;align-items:center;gap:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;font-size:13px;color:#888}
+.dialog-preview-thumb{width:20px;height:20px;border-radius:4px;object-fit:cover;filter:blur(2.5px);flex-shrink:0;background:#333;display:inline-block}
+.dialog-preview-thumb.circle{border-radius:50%}
+
 /* Folder Tabs */
 .folder-tabs{display:flex;gap:4px;padding:8px 12px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;background:#0d0d0d;border-bottom:1px solid #1c1c1c}
 .folder-tabs::-webkit-scrollbar{display:none}
@@ -207,7 +212,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .news-item-name{font-size:14px;font-weight:600;color:#fff}
 .news-item-time{font-size:11px;color:#666}
 .news-item-text{font-size:14px;color:#ddd;line-height:1.5;margin-bottom:10px}
-.news-item-photo{width:100%;border-radius:12px;margin-top:8px;max-height:300px;object-fit:cover}
+.news-item-photo{width:100%;border-radius:12px;margin-top:8px;max-height:300px;object-fit:cover;cursor:pointer}
 .news-item-actions{display:flex;gap:16px;margin-top:10px;padding-top:10px;border-top:1px solid #222}
 .news-action{display:flex;align-items:center;gap:4px;color:#8e8e93;font-size:13px;cursor:pointer}
 .news-action:active{color:#fff}
@@ -218,7 +223,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .profile-view-header{height:56px;background:#0d0d0d;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #1c1c1c;flex-shrink:0}
 .profile-view-cover{height:140px;background:linear-gradient(135deg,#1c1c1e,#2c2c2e);position:relative}
 .profile-view-avatar-wrap{position:relative;margin-top:-50px;padding:0 16px;display:flex;align-items:flex-end;gap:12px}
-.profile-view-avatar{width:100px;height:100px;border-radius:50%;object-fit:cover;background:#222;border:4px solid #000}
+.profile-view-avatar{width:100px;height:100px;border-radius:50%;object-fit:cover;background:#222;border:4px solid #000;cursor:pointer}
 .profile-view-name-wrap{flex:1;padding-bottom:8px}
 .profile-view-name{font-size:20px;font-weight:700;color:#fff}
 .profile-view-status{font-size:13px;color:#8e8e93;margin-top:2px}
@@ -227,6 +232,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .profile-view-posts{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 12px 20px}
 .profile-view-post-title{font-size:16px;font-weight:700;color:#fff;padding:12px 4px}
 .profile-view-empty{color:#666;text-align:center;padding:40px 20px;font-size:14px}
+
+/* Photo Viewer Modal */
+.photo-viewer-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:999;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.2s ease}
+.photo-viewer-modal.active{opacity:1;pointer-events:auto}
+.photo-viewer-img{max-width:96%;max-height:92vh;object-fit:contain;border-radius:8px;box-shadow:0 0 30px rgba(0,0,0,0.8)}
+.photo-viewer-close{position:absolute;top:16px;right:20px;color:#fff;font-size:32px;cursor:pointer;font-weight:bold;z-index:1000;width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.15);border-radius:50%}
 
 /* Encryption Settings Modal */
 .encrypt-modal-content{background:#161616;border-radius:20px;padding:20px;width:100%;max-width:420px;border:1px solid #282828;max-height:85vh;overflow-y:auto}
@@ -249,15 +260,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 .drawer-header{padding:24px 18px;background:#1c1c1e;border-bottom:1px solid #28282a;display:flex;flex-direction:column;gap:12px;position:relative}
 .drawer-avatar-wrap{position:relative;width:72px;height:72px;margin-bottom:4px}
-.drawer-avatar{width:72px;height:72px;border-radius:50%;object-fit:cover;background:#333;border:2px solid rgba(255,255,255,0.1)}
+.drawer-avatar{width:72px;height:72px;border-radius:50%;object-fit:cover;background:#333;border:2px solid rgba(255,255,255,0.1);cursor:pointer}
 .drawer-avatar-edit{position:absolute;bottom:0;right:0;width:26px;height:26px;background:#fff;color:#000;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.4)}
 .drawer-user-name{font-size:18px;font-weight:700;color:#fff}
 .drawer-user-status{font-size:13px;color:#aaa;line-height:1.3;cursor:pointer;display:flex;align-items:center;gap:6px}
 
 .drawer-content{flex:1;overflow-y:auto;padding:12px 10px;display:flex;flex-direction:column;gap:6px}
-.drawer-item{display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:12px;color:#ddd;font-size:15px;font-weight:500;cursor:pointer;transition:background 0.15s}
+.drawer-item{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:12px;color:#ddd;font-size:15px;font-weight:500;cursor:pointer;transition:background 0.15s}
+.drawer-item-left{display:flex;align-items:center;gap:14px}
 .drawer-item:active{background:rgba(255,255,255,0.08);color:#fff}
 .drawer-item svg{color:#aaa}
+
+/* Switch UI */
+.switch{position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#3a3a3c;transition:.2s;border-radius:24px}
+.slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background-color:white;transition:.2s;border-radius:50%}
+input:checked + .slider{background-color:#34c759}
+input:checked + .slider:before{transform:translateX(20px)}
 
 /* Chat Screen */
 .chat-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;z-index:100;transform:translateX(100%);transition:transform 0.22s cubic-bezier(0.1, 0.9, 0.2, 1)}
@@ -373,15 +393,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <span id="uploadToastText">Загрузка...</span>
 </div>
 
+<!-- Soft iOS / Telegram Chime Base64 Sound -->
 <audio id="notifSound" preload="auto">
-<source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZURE" type="audio/wav">
+<source src="data:audio/mp3;base64,SUQ3BAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//7AABAAAAAAAAAAAAAAAAAAAAAAAABGcm9udA0AAAAAAAAAAAAAAAAAAAAAAABIaWdoAGNhbGlicmF0aW9uAAAAAAAAAAAAAD/+wAFAAAACAAAAAgAAAAIAAAAD2R1cmF0aW9uAFRpbWUAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAP7AAAAD8AAAA/AAAAPwAAAA/v4AAAAAMUAAAAAAAAAAMAAAAAD+///+/v4=" type="audio/mp3">
 </audio>
 
 <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
 <div class="drawer" id="drawer">
 <div class="drawer-header">
 <div class="drawer-avatar-wrap">
-<img class="drawer-avatar" id="drawerAvatar" src="" alt="">
+<img class="drawer-avatar" id="drawerAvatar" src="" alt="" onclick="openPhotoViewer(this.src)">
 <div class="drawer-avatar-edit" onclick="triggerAvatarSelect()" title="Изменить фото">
 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
 </div>
@@ -394,22 +415,52 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </div>
 
 <div class="drawer-content">
+<div class="drawer-item" onclick="toggleGhostMode()">
+<div class="drawer-item-left">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 10h.01M15 10h.01M12 2a8 8 0 0 0-8 8v11l3-3 3 3 2-2 2 2 3-3 3 3V10a8 8 0 0 0-8-8z"/></svg>
+<span>Режим призрака</span>
+</div>
+<label class="switch" onclick="event.stopPropagation()">
+<input type="checkbox" id="ghostToggle" onchange="setGhostState(this.checked)">
+<span class="slider"></span>
+</label>
+</div>
+
+<div class="drawer-item" onclick="toggleSoundNotifications()">
+<div class="drawer-item-left">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+<span>Звук уведомлений</span>
+</div>
+<label class="switch" onclick="event.stopPropagation()">
+<input type="checkbox" id="soundToggle" onchange="setSoundState(this.checked)">
+<span class="slider"></span>
+</label>
+</div>
+
 <div class="drawer-item" onclick="openProfileEditModal()">
+<div class="drawer-item-left">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
 <span>Редактировать профиль</span>
 </div>
+</div>
 <div class="drawer-item" onclick="triggerAvatarSelect()">
+<div class="drawer-item-left">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-<span>Сменить аватар (Kate Mobile метод)</span>
+<span>Сменить аватар (Kate Mobile)</span>
+</div>
 </div>
 <div class="drawer-item" onclick="openEncryptModal(); closeDrawer();">
+<div class="drawer-item-left">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
 <span>Шифрование и Ключи (E2EE)</span>
 </div>
+</div>
 <div style="flex:1"></div>
 <div class="drawer-item" style="color:#ff3b30" onclick="logout()">
+<div class="drawer-item-left">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
 <span>Выйти из аккаунта</span>
+</div>
 </div>
 </div>
 </div>
@@ -456,6 +507,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </div>
 
 <input type="file" class="file-input" id="avatarFileInput" accept="image/*" onchange="uploadAvatarFile(event)">
+
+<!-- Photo Viewer Modal -->
+<div class="photo-viewer-modal" id="photoViewerModal" onclick="closePhotoViewer()">
+<span class="photo-viewer-close" onclick="closePhotoViewer()">&times;</span>
+<img class="photo-viewer-img" id="photoViewerImg" src="" onclick="event.stopPropagation()">
+</div>
 
 <!-- Login Screen -->
 <div class="login-screen" id="loginScreen">
@@ -655,7 +712,7 @@ Kate Mobile API • True Client-Side E2EE
 </div>
 <div class="profile-view-cover" id="profileViewCover"></div>
 <div class="profile-view-avatar-wrap">
-<img class="profile-view-avatar" id="profileViewAvatar" src="" alt="">
+<img class="profile-view-avatar" id="profileViewAvatar" src="" alt="" onclick="openPhotoViewer(this.src)">
 <div class="profile-view-name-wrap">
 <div class="profile-view-name" id="profileViewName">...</div>
 <div class="profile-view-status" id="profileViewStatus">...</div>
@@ -689,6 +746,9 @@ Kate Mobile API • True Client-Side E2EE
 const ENCRYPT_PREFIX = "ENC2:";
 let token = localStorage.getItem('vk_token');
 let password = localStorage.getItem('vk_pass');
+let ghostMode = localStorage.getItem('ghost_mode') !== 'false';
+let soundEnabled = localStorage.getItem('sound_enabled') !== 'false';
+
 let currentPeer = null;
 let currentUser = null;
 let dialogsData = [];
@@ -702,13 +762,12 @@ let myVkId = null;
 let localKeyPair = null;
 let peerKeysCache = {};
 let decryptedCache = {};
+let renderedMsgIds = new Set();
 
 let replyToMsg = null;
 let editMsg = null;
 let selectedMsgForAction = null;
 let typingTimeout = null;
-let peerTypingTimer = null;
-let dialogTypingTimers = {};
 
 function showUploadProgress(text) {
     const toast = document.getElementById('uploadToast');
@@ -722,6 +781,53 @@ function showUploadProgress(text) {
 function hideUploadProgress() {
     const toast = document.getElementById('uploadToast');
     if (toast) toast.classList.add('hidden');
+}
+
+function openPhotoViewer(url) {
+    if (!url) return;
+    const modal = document.getElementById('photoViewerModal');
+    const img = document.getElementById('photoViewerImg');
+    img.src = url;
+    modal.classList.add('active');
+}
+
+function closePhotoViewer() {
+    document.getElementById('photoViewerModal').classList.remove('active');
+}
+
+function toggleGhostMode() {
+    ghostMode = !ghostMode;
+    setGhostState(ghostMode);
+}
+
+function setGhostState(val) {
+    ghostMode = val;
+    localStorage.setItem('ghost_mode', val);
+    const chk = document.getElementById('ghostToggle');
+    if (chk) chk.checked = val;
+}
+
+function toggleSoundNotifications() {
+    soundEnabled = !soundEnabled;
+    setSoundState(soundEnabled);
+}
+
+function setSoundState(val) {
+    soundEnabled = val;
+    localStorage.setItem('sound_enabled', val);
+    const chk = document.getElementById('soundToggle');
+    if (chk) chk.checked = val;
+}
+
+async function flashOnlineStatus() {
+    if (!ghostMode || !token) return;
+    try {
+        await fetch('/api/ghost_flash', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ token })
+        });
+    } catch(e){}
 }
 
 function bufToB64(buf) {
@@ -1047,6 +1153,9 @@ function updateDrawerProfile() {
     } else {
         document.getElementById('drawerStatusText').textContent = 'Нажмите, чтобы изменить описание...';
     }
+    
+    setGhostState(ghostMode);
+    setSoundState(soundEnabled);
 }
 
 let touchStartX = 0;
@@ -1099,6 +1208,7 @@ async function saveProfileChanges() {
     const lastName = document.getElementById('editLastName').value.trim();
     const statusText = document.getElementById('editStatusInput').value.trim();
 
+    await flashOnlineStatus();
     showUploadProgress('Сохранение в VK (Kate Mobile)...');
     try {
         const res = await fetch('/api/profile/update', {
@@ -1132,6 +1242,7 @@ async function uploadAvatarFile(e) {
     const file = e.target.files[0];
     if (!file) return;
 
+    await flashOnlineStatus();
     showUploadProgress('Обновление аватара (Kate Mobile)...');
     const formData = new FormData();
     formData.append('token', token);
@@ -1155,6 +1266,66 @@ async function uploadAvatarFile(e) {
     }
 }
 
+/* DIALOG PREVIEW BUILDING (TG-STYLE + BLUR) */
+function buildDialogPreviewHTML(d) {
+    let rawText = d.last_message || '';
+    const atts = d.last_attachments || [];
+
+    let photoUrl = null;
+    let videoUrl = null;
+    let isCircle = false;
+    let isVoice = false;
+
+    for (const a of atts) {
+        if (a.type === 'photo') {
+            const p = a.photo?.sizes?.[0];
+            if (p) photoUrl = p.url;
+        } else if (a.type === 'video') {
+            videoUrl = a.video?.first_frame?.find(s => s.url)?.url || a.video?.image?.[0]?.url;
+        } else if (a.type === 'doc') {
+            const title = (a.doc?.title || '').toLowerCase();
+            const ext = (a.doc?.ext || '').toLowerCase();
+            if (ext === 'mkru' || ext === 'mec' || title.endsWith('.mkru')) isCircle = true;
+            else if (ext === 'mgs' || ext === 'meg' || title.endsWith('.mgs')) isVoice = true;
+            else if (ext === 'meow' || title.endsWith('.meow')) photoUrl = a.doc?.url;
+        }
+    }
+
+    if (rawText.startsWith(ENCRYPT_PREFIX)) {
+        return `<span class="dialog-preview-wrap" id="dialog-dec-${d.id}">🔒 Зашифрованное сообщение</span>`;
+    }
+
+    if (isCircle) {
+        return `<span class="dialog-preview-wrap">🎥 Кружочек</span>`;
+    } else if (isVoice) {
+        return `<span class="dialog-preview-wrap">🎤 Голосовое сообщение</span>`;
+    } else if (photoUrl) {
+        return `<span class="dialog-preview-wrap"><img class="dialog-preview-thumb" src="${photoUrl}" onerror="this.style.display='none'">📷 Фото ${escapeHtml(rawText)}</span>`;
+    } else if (videoUrl) {
+        return `<span class="dialog-preview-wrap"><img class="dialog-preview-thumb" src="${videoUrl}" onerror="this.style.display='none'">📹 Видео ${escapeHtml(rawText)}</span>`;
+    }
+
+    return `<span class="dialog-preview-wrap">${escapeHtml(rawText || 'Сообщение')}</span>`;
+}
+
+async function fastDecryptDialogPreviews(dialogs) {
+    for (const d of dialogs) {
+        if (d.last_message && d.last_message.startsWith(ENCRYPT_PREFIX)) {
+            setTimeout(async () => {
+                try {
+                    const encObj = JSON.parse(d.last_message.substring(ENCRYPT_PREFIX.length));
+                    const decBuf = await clientDecryptData(encObj);
+                    if (decBuf) {
+                        const plainText = new TextDecoder().decode(decBuf);
+                        const elem = document.getElementById(`dialog-dec-${d.id}`);
+                        if (elem) elem.innerHTML = `🔒 ${escapeHtml(plainText)}`;
+                    }
+                } catch(e){}
+            }, 5);
+        }
+    }
+}
+
 async function loadDialogs() {
     try {
         const res = await fetch('/api/dialogs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
@@ -1171,14 +1342,13 @@ async function loadDialogs() {
             div.onclick = () => openChat(i);
             const time = d.date ? new Date(d.date * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : '';
 
-            let preview = d.last_message || '';
-            if (preview.startsWith(ENCRYPT_PREFIX)) {
-                preview = '🔒 Зашифрованное сообщение';
-            }
+            const previewHTML = buildDialogPreviewHTML(d);
 
-            div.innerHTML = `<div class="dialog-avatar-wrap" onclick="event.stopPropagation();openProfileView(${d.id}, ${d.type === 'group' ? 'true' : 'false'})"><img class="dialog-avatar" src="${d.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'"><div class="dialog-online-dot ${d.online ? '' : 'offline'}" id="dot-${d.id}"></div></div><div class="dialog-info"><div class="dialog-top"><div class="dialog-name">${escapeHtml(d.name)}</div><div class="dialog-time">${time}</div></div><div class="dialog-bottom" id="preview-${d.id}"><div class="dialog-preview ${d.typing ? 'typing' : ''}">${d.typing ? 'печатает...' : escapeHtml(preview)}</div>${d.unread > 0 ? `<div class="dialog-unread-blue">${d.unread}</div>` : ''}</div></div>`;
+            div.innerHTML = `<div class="dialog-avatar-wrap" onclick="event.stopPropagation();openProfileView(${d.id}, ${d.type === 'group' ? 'true' : 'false'})"><img class="dialog-avatar" src="${d.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'"><div class="dialog-online-dot ${d.online ? '' : 'offline'}" id="dot-${d.id}"></div></div><div class="dialog-info"><div class="dialog-top"><div class="dialog-name">${escapeHtml(d.name)}</div><div class="dialog-time">${time}</div></div><div class="dialog-bottom" id="preview-${d.id}"><div class="dialog-preview ${d.typing ? 'typing' : ''}">${d.typing ? 'печатает...' : previewHTML}</div>${d.unread > 0 ? `<div class="dialog-unread-blue">${d.unread}</div>` : ''}</div></div>`;
             list.appendChild(div);
         }
+
+        fastDecryptDialogPreviews(data.dialogs);
     } catch(e){}
 }
 
@@ -1188,14 +1358,18 @@ async function openChat(index) {
     document.getElementById('chatAvatar').src = d.photo || 'https://vk.com/images/camera_100.png';
     document.getElementById('chatScreen').classList.add('active');
 
+    renderedMsgIds.clear();
+    document.getElementById('messages').innerHTML = '';
+
     fetchPeerStatus();
     cancelReplyOrEdit();
-    loadMessages();
+    loadMessages(true);
 }
 
 function backToDialogs() {
     document.getElementById('chatScreen').classList.remove('active');
     currentPeer = null;
+    renderedMsgIds.clear();
     cancelReplyOrEdit();
     loadDialogs();
 }
@@ -1217,7 +1391,7 @@ async function fetchPeerStatus() {
 }
 
 function triggerTypingSignal() {
-    if (!currentPeer) return;
+    if (!currentPeer || ghostMode) return;
     if (typingTimeout) clearTimeout(typingTimeout);
     
     fetch('/api/typing', {
@@ -1229,7 +1403,7 @@ function triggerTypingSignal() {
     typingTimeout = setTimeout(() => {}, 5000);
 }
 
-async function loadMessages() {
+async function loadMessages(initialScroll = false) {
     if (!currentPeer) return;
     try {
         const res = await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, peer_id: currentPeer }) });
@@ -1238,11 +1412,20 @@ async function loadMessages() {
         
         if (data.messages) {
             const msgs = data.messages.reverse();
-            container.innerHTML = '';
+            const wasAtBottom = (container.scrollHeight - container.scrollTop - container.clientHeight) < 80;
+
+            let hasNew = false;
             for (const m of msgs) {
-                renderMessageItem(container, m);
+                if (!renderedMsgIds.has(m.id)) {
+                    renderedMsgIds.add(m.id);
+                    renderMessageItem(container, m);
+                    hasNew = true;
+                }
             }
-            container.scrollTop = container.scrollHeight;
+
+            if (initialScroll || (wasAtBottom && hasNew)) {
+                container.scrollTop = container.scrollHeight;
+            }
         }
     } catch(e){}
 }
@@ -1320,7 +1503,7 @@ function renderMessageItem(container, msg) {
                 const p = a.photo?.sizes?.find(s => s.type === 'x') || a.photo?.sizes?.[a.photo?.sizes?.length - 1];
                 if (p) {
                     const photoUrl = p.url;
-                    html += `<img class="msg-photo" src="${photoUrl}">`;
+                    html += `<img class="msg-photo" src="${photoUrl}" onclick="openPhotoViewer('${photoUrl}')">`;
                 }
             }
             if (a.type === 'doc') {
@@ -1445,6 +1628,7 @@ async function confirmDeleteMessage() {
     const deleteForAll = document.getElementById('deleteForAllCheck').checked ? 1 : 0;
     
     closeDeleteModal();
+    await flashOnlineStatus();
     showUploadProgress('Удаление...');
     
     const elem = document.getElementById(`msg-${msgId}`);
@@ -1671,6 +1855,7 @@ function renderDecryptedMedia(elem, data) {
         const img = document.createElement('img');
         img.className = 'msg-photo';
         img.src = data.blobUrl;
+        img.onclick = () => openPhotoViewer(data.blobUrl);
         elem.replaceWith(img);
     } else if (isVideo) {
         const vid = document.createElement('video');
@@ -1719,6 +1904,7 @@ async function sendMessage() {
     const text = input.value.trim();
     if (!text || !currentPeer) return;
 
+    await flashOnlineStatus();
     showUploadProgress('Отправка...');
     input.value = '';
     handleInputTyping();
@@ -1760,7 +1946,7 @@ async function sendMessage() {
         alert("Ошибка сети при отправке!");
     } finally {
         hideUploadProgress();
-        loadMessages();
+        loadMessages(true);
     }
 }
 
@@ -1778,6 +1964,7 @@ function getSupportedMimeType(kind) {
 
 async function sendMediaBlob(blob, filename, mimeType) {
     if (!currentPeer) return;
+    await flashOnlineStatus();
     showUploadProgress('Отправка медиа...');
     
     try {
@@ -1808,7 +1995,7 @@ async function sendMediaBlob(blob, filename, mimeType) {
         alert('Ошибка при отправке: ' + (e.message || e));
     } finally {
         hideUploadProgress();
-        loadMessages();
+        loadMessages(true);
     }
 }
 
@@ -2041,6 +2228,7 @@ async function handleFile(e) {
 }
 
 function playNotificationSound() {
+    if (!soundEnabled) return;
     const audio = document.getElementById('notifSound');
     if (audio) {
         audio.currentTime = 0;
@@ -2087,7 +2275,7 @@ async function pollEvents() {
         if (data.updates && data.updates.length > 0) {
             playNotificationSound();
             if (currentPeer) {
-                loadMessages();
+                loadMessages(false);
             }
             loadDialogs();
         }
@@ -2213,7 +2401,7 @@ async function loadNewsFeed() {
             for (const item of data.items) {
                 const div = document.createElement('div');
                 div.className = 'news-item';
-                const photo = item.photo ? `<img class="news-item-photo" src="${item.photo}" onerror="this.style.display='none'">` : '';
+                const photo = item.photo ? `<img class="news-item-photo" src="${item.photo}" onclick="openPhotoViewer('${item.photo}')" onerror="this.style.display='none'">` : '';
                 div.innerHTML = `
                     <div class="news-item-header">
                         <img class="news-item-avatar" src="${item.author_photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
@@ -2222,7 +2410,7 @@ async function loadNewsFeed() {
                     <div class="news-item-text">${escapeHtml(item.text || '')}</div>
                     ${photo}
                     <div class="news-item-actions">
-                        <div class="news-action">❤ ${item.likes || 0}</div>
+                        <div class="news-action" onclick="flashOnlineStatus()">❤ ${item.likes || 0}</div>
                         <div class="news-action">💬 ${item.comments || 0}</div>
                         <div class="news-action">↗ ${item.reposts || 0}</div>
                     </div>
@@ -2263,12 +2451,12 @@ async function openProfileView(peerId, isGroup) {
             for (const post of data.posts) {
                 const div = document.createElement('div');
                 div.className = 'news-item';
-                const photo = post.photo ? `<img class="news-item-photo" src="${post.photo}" onerror="this.style.display='none'">` : '';
+                const photo = post.photo ? `<img class="news-item-photo" src="${post.photo}" onclick="openPhotoViewer('${post.photo}')" onerror="this.style.display='none'">` : '';
                 div.innerHTML = `
                     <div class="news-item-text">${escapeHtml(post.text || '')}</div>
                     ${photo}
                     <div class="news-item-actions">
-                        <div class="news-action">❤ ${post.likes || 0}</div>
+                        <div class="news-action" onclick="flashOnlineStatus()">❤ ${post.likes || 0}</div>
                         <div class="news-action">💬 ${post.comments || 0}</div>
                         <div class="news-action">↗ ${post.reposts || 0}</div>
                     </div>
@@ -2389,6 +2577,19 @@ def auth():
     })
 
 
+@app.route('/api/ghost_flash', methods=['POST'])
+def ghost_flash():
+    token = request.json.get('token')
+    if token:
+        vk_request('account.setOnline', token)
+        def set_back_offline():
+            import time
+            time.sleep(1.5)
+            vk_request('account.setOffline', token)
+        threading.Thread(target=set_back_offline).start()
+    return jsonify({'ok': True})
+
+
 @app.route('/api/keys/<vk_id>', methods=['GET'])
 def get_key(vk_id):
     stored = get_stored_key(vk_id)
@@ -2450,6 +2651,7 @@ def get_dialogs():
             'photo': photo,
             'unread': conv.get('unread_count', 0),
             'last_message': msg.get('text', ''),
+            'last_attachments': msg.get('attachments', []),
             'date': msg.get('date', 0),
             'online': profile.get('online', 0) if peer_type == 'user' else 0
         })
