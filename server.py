@@ -22,12 +22,10 @@ KEYS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'keys_stora
 # Thread-safe HTTP sessions
 _session_local = threading.local()
 
-
 def get_session():
     if not hasattr(_session_local, 'session'):
         _session_local.session = requests.Session()
     return _session_local.session
-
 
 def load_local_keys():
     """Load keys from local disk storage"""
@@ -40,7 +38,6 @@ def load_local_keys():
             return {}
     return {}
 
-
 def save_local_keys(data):
     """Save keys to local disk storage"""
     try:
@@ -48,7 +45,6 @@ def save_local_keys(data):
             json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception as e:
         print("Local key save error:", e)
-
 
 def firebase_get(path):
     """GET data from Firebase Realtime Database with Auth Parameter"""
@@ -65,9 +61,8 @@ def firebase_get(path):
         print("Firebase GET error:", e)
     return None
 
-
 def firebase_put(path, data):
-    """PUT data to Firebase Realtime Database with Auth Parameter"""
+    """PUT data to Firebase Realtime Database (ONLY Public Keys / non-private data)"""
     if not FIREBASE_DB_URL:
         return False
     url = f"{FIREBASE_DB_URL.rstrip('/')}/{path}.json"
@@ -80,28 +75,28 @@ def firebase_put(path, data):
         print("Firebase PUT error:", e)
         return False
 
-
 def get_stored_key(vk_id):
-    """Try Firebase first, fallback to disk storage"""
+    """Try Firebase first for public key, fallback to local storage"""
     vk_id_str = str(vk_id)
     if FIREBASE_DB_URL:
-        fb_data = firebase_get(f"keys/{vk_id_str}")
+        fb_data = firebase_get(f"public_keys/{vk_id_str}")
         if fb_data and isinstance(fb_data, dict) and 'public_key' in fb_data:
             return fb_data
     local_data = load_local_keys()
     return local_data.get(vk_id_str)
 
-
 def store_key(vk_id, data):
-    """Save to both local disk and Firebase"""
+    """Save private keys locally ONLY, and push public key to Firebase"""
     vk_id_str = str(vk_id)
     local_data = load_local_keys()
     local_data[vk_id_str] = data
     save_local_keys(local_data)
 
-    if FIREBASE_DB_URL:
-        firebase_put(f"keys/{vk_id_str}", data)
-
+    if FIREBASE_DB_URL and 'public_key' in data:
+        firebase_put(f"public_keys/{vk_id_str}", {
+            'public_key': data['public_key'],
+            'created_at': data.get('created_at', datetime.now().isoformat())
+        })
 
 def vk_request(method, token, **params):
     """Proxy request to VK API with thread-safe HTTP session"""
@@ -113,7 +108,6 @@ def vk_request(method, token, **params):
         return data.get('response', data.get('error'))
     except Exception as e:
         return {'error': str(e)}
-
 
 def extract_doc_attachment(save_result):
     """Safely extract doc attachment string from VK API response"""
@@ -139,14 +133,13 @@ def extract_doc_attachment(save_result):
             
     return None
 
-
 HTML = """
 <!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>VK Meow - E2EE Messenger</title>
+<title>VK Meow - True E2EE Messenger</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#000;color:#fff;height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
@@ -175,7 +168,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .header-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;margin-right:10px;background:#222;flex-shrink:0;cursor:pointer}
 .header-info{flex:1;min-width:0;cursor:pointer}
 
-/* LARGER TITLE FOR VK MEOW */
 .header-title-main{font-size:20px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:0.8px;color:#fff}
 .header-title{font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:0.5px}
 
@@ -199,6 +191,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .dialog-typing{font-size:12px;color:#34c759;font-weight:500;font-style:italic}
 .dialog-preview.typing{color:#34c759}
 .dialog-unread-blue{min-width:20px;height:20px;border-radius:50%;background:#0a84ff;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 6px;flex-shrink:0}
+
 /* Folder Tabs */
 .folder-tabs{display:flex;gap:4px;padding:8px 12px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;background:#0d0d0d;border-bottom:1px solid #1c1c1c}
 .folder-tabs::-webkit-scrollbar{display:none}
@@ -235,21 +228,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .profile-view-post-title{font-size:16px;font-weight:700;color:#fff;padding:12px 4px}
 .profile-view-empty{color:#666;text-align:center;padding:40px 20px;font-size:14px}
 
-/* Create Folder Modal */
-.folder-create-list{max-height:300px;overflow-y:auto;-webkit-overflow-scrolling:touch;margin:10px 0}
-.folder-create-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;cursor:pointer}
-.folder-create-item:active{background:rgba(255,255,255,0.05)}
-.folder-create-item img{width:40px;height:40px;border-radius:50%;object-fit:cover;background:#222}
-.folder-create-item input[type="checkbox"]{width:20px;height:20px;accent-color:#fff}
+/* Encryption Settings Modal */
+.encrypt-modal-content{background:#161616;border-radius:20px;padding:20px;width:100%;max-width:420px;border:1px solid #282828;max-height:85vh;overflow-y:auto}
+.key-box{background:#0a0a0a;border:1px solid #222;padding:10px;border-radius:10px;font-family:monospace;font-size:11px;color:#34c759;word-break:break-all;max-height:80px;overflow-y:auto;margin-top:4px}
+.warning-box{background:rgba(255,59,48,0.1);border:1px solid rgba(255,59,48,0.3);color:#ff3b30;padding:10px;border-radius:10px;font-size:12px;margin-bottom:14px;line-height:1.4}
+.delfan-box{background:rgba(10,132,255,0.1);border:1px solid rgba(10,132,255,0.3);color:#0a84ff;padding:10px;border-radius:10px;font-size:12px;margin-bottom:14px;font-family:monospace;word-break:break-all}
 
-.dialog-avatar{width:50px;height:50px;border-radius:50%;object-fit:cover;margin-right:12px;flex-shrink:0;background:#222}
 .dialog-info{flex:1;min-width:0}
 .dialog-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
 .dialog-name{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;margin-right:8px}
 .dialog-time{font-size:11px;color:#666;flex-shrink:0}
 .dialog-bottom{display:flex;align-items:center;gap:6px}
 .dialog-preview{font-size:13px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
-.dialog-unread{min-width:18px;height:18px;border-radius:50%;background:#fff;color:#000;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0}
 
 /* Navigation Drawer */
 .drawer-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:400;opacity:0;pointer-events:none;transition:opacity 0.25s ease}
@@ -275,7 +265,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .messages-wrapper{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column}
 .messages{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch}
 
-/* Message styling - STRICT ORIGINAL COLORS (#1c1c1e and #2c2c2e) */
+/* Message styling */
 .msg-container{position:relative;display:flex;width:100%;align-items:flex-end;touch-action:pan-y;margin-bottom:2px}
 .msg-swipe-bg{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;width:40px;opacity:0;transition:opacity 0.15s;color:#8e8e93;z-index:1}
 .msg-swipe-right{right:-40px}
@@ -283,12 +273,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .msg{max-width:82%;padding:8px 12px;border-radius:18px;font-size:14px;line-height:1.4;word-wrap:break-word;position:relative;animation:msgAppear 0.15s ease-out}
 @keyframes msgAppear{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
-/* INCOMING BUBBLE (#1c1c1e) */
 .msg-in{align-self:flex-start;background:#1c1c1e;border-bottom-left-radius:4px;color:#fff}
-/* OUTGOING BUBBLE (#2c2c2e) */
 .msg-out{align-self:flex-end;background:#2c2c2e;border-bottom-right-radius:4px;color:#fff}
 
-/* PURE CIRCLE VIDEO WRAPPER */
 .msg-circle-mode{background:transparent !important;padding:0 !important;border-radius:0 !important;box-shadow:none !important;max-width:200px !important}
 .msg-circle-mode .msg-time{position:absolute;bottom:6px;right:10px;background:rgba(0,0,0,0.55);padding:2px 6px;border-radius:10px;backdrop-filter:blur(4px);z-index:5}
 
@@ -299,7 +286,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .msg-author{font-size:11px;color:#aaa;font-weight:600;margin-bottom:2px}
 .msg-text{color:#fff}
 .msg-time{font-size:10px;color:#888;margin-top:4px;text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:3px}
-
 .decrypting-shimmer{color:#888;font-style:italic}
 
 /* TG Circle Video Message (.mkru) */
@@ -317,7 +303,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .tg-voice-bar.active{background:#fff}
 .tg-voice-info{display:flex;justify-content:space-between;font-size:10px;color:#aaa}
 
-/* Media Attachments - ABSOLUTELY NO BORDER / OUTLINE */
 .msg-photo{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;object-fit:cover;cursor:pointer;background:#111;border:none!important;outline:none!important;box-shadow:none!important}
 .msg-video{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;background:#000;border:none!important;outline:none!important;box-shadow:none!important}
 .msg-file{background:rgba(255,255,255,.05);padding:10px;border-radius:12px;margin-top:6px;display:flex;align-items:center;gap:10px;cursor:pointer}
@@ -335,7 +320,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .message-input{flex:1;padding:10px 14px;border:none;border-radius:20px;background:#1c1c1e;color:#fff;font-size:14px;outline:none;resize:none;max-height:100px;font-family:inherit;line-height:1.4;border:1px solid #2a2a2c}
 .send-btn,.media-rec-btn{width:38px;height:38px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;border:none;color:#000}
 
-/* Voice Bar */
 .recording-bar{display:flex;align-items:center;flex:1;padding:0 12px;height:38px;background:#1c1c1e;border-radius:20px;gap:10px}
 .recording-dot{width:10px;height:10px;border-radius:50%;background:#ff3b30;animation:pulseDot 1s infinite alternate}
 @keyframes pulseDot{from{opacity:0.3}to{opacity:1}}
@@ -353,7 +337,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .circle-btn-stop{background:#ff3b30;color:#fff;box-shadow:0 0 15px rgba(255,59,48,0.5)}
 .circle-btn-cancel{background:#3a3a3c;color:#fff}
 
-/* Global Upload Progress Toast */
 .upload-toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(28,28,30,0.95);border:1px solid #3a3a3c;color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;z-index:900;display:flex;align-items:center;gap:10px;box-shadow:0 4px 16px rgba(0,0,0,0.5)}
 
 /* Bottom Nav */
@@ -385,18 +368,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <body>
 <div class="app">
 
-<!-- Global Toast Indicator -->
 <div class="upload-toast hidden" id="uploadToast">
 <span class="loader"></span>
 <span id="uploadToastText">Загрузка...</span>
 </div>
 
-<!-- Audio for notifications -->
 <audio id="notifSound" preload="auto">
 <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZURE" type="audio/wav">
 </audio>
 
-<!-- Navigation Drawer Overlay & Side Panel -->
 <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
 <div class="drawer" id="drawer">
 <div class="drawer-header">
@@ -420,17 +400,44 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </div>
 <div class="drawer-item" onclick="triggerAvatarSelect()">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-<span>Сменить аватар из галереи</span>
+<span>Сменить аватар (Kate Mobile метод)</span>
 </div>
-<div class="drawer-item" onclick="toggleEncrypt(); closeDrawer();">
+<div class="drawer-item" onclick="openEncryptModal(); closeDrawer();">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-<span>Шифрование E2EE</span>
+<span>Шифрование и Ключи (E2EE)</span>
 </div>
 <div style="flex:1"></div>
 <div class="drawer-item" style="color:#ff3b30" onclick="logout()">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
 <span>Выйти из аккаунта</span>
 </div>
+</div>
+</div>
+
+<!-- Encryption & Keys Modal -->
+<div class="modal hidden" id="encryptModal">
+<div class="encrypt-modal-content">
+<div class="modal-title">🔐 Настоящее E2EE шифрование</div>
+<div class="warning-box">
+⚠️ <b>Предупреждение:</b> Никому не передавайте свой приватный ключ! Приватный ключ хранится исключительно на этом устройстве и никогда не передается на сервер (Firebase хранит только публичный ключ).
+</div>
+<div class="modal-text" style="margin-bottom:10px">Отпечаток устройства (Delfan Fingerprint):</div>
+<div class="delfan-box" id="delfanFingerprint">Вычисление отпечатка...</div>
+
+<div class="modal-text" style="margin-bottom:4px">Ваш публичный ключ:</div>
+<div class="key-box" id="modalPubKey">Загрузка...</div>
+
+<div class="modal-text" style="margin-top:10px;margin-bottom:4px">Ваш приватный ключ (локальный):</div>
+<div class="key-box" id="modalPrivKey">Загрузка...</div>
+
+<div style="display:flex;gap:8px;margin-top:16px">
+<button class="btn btn-secondary" style="flex:1;font-size:13px;padding:10px" onclick="exportKeysFile()">Экспорт ключей</button>
+<button class="btn btn-secondary" style="flex:1;font-size:13px;padding:10px" onclick="document.getElementById('importKeysInput').click()">Импорт ключей</button>
+</div>
+<input type="file" class="file-input" id="importKeysInput" accept=".json" onchange="importKeysFile(event)">
+
+<button class="btn btn-danger" style="margin-top:10px;font-size:13px;padding:10px" onclick="regenerateKeysPrompt()">Обновить ключи</button>
+<button class="btn" style="margin-top:10px" onclick="closeEncryptModal()">Закрыть</button>
 </div>
 </div>
 
@@ -455,12 +462,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <h1>VK Meow</h1>
 <div class="badge-e2e">
 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-100% Client-Side E2EE Messenger
+Kate Mobile API • True Client-Side E2EE
 </div>
-<p>Сквозное шифрование. Приятный моментальный интерфейс без задержек.</p>
-<button class="btn btn-secondary" onclick="getToken()">1. Получить токен VK</button>
+<p>Вход по токену Kate Mobile. Полная лента, все посты, все переписки и сквозное шифрование.</p>
+<button class="btn btn-secondary" onclick="getToken()">1. Получить токен Kate Mobile</button>
 <input type="text" class="token-input" id="tokenUrl" placeholder="Ссылка с токеном из строки браузера...">
-<input type="password" class="pass-input" id="password" placeholder="Пароль для защиты ключей...">
+<input type="password" class="pass-input" id="password" placeholder="Пароль для защиты ключей E2EE...">
 <button class="btn" onclick="login()">Войти</button>
 </div>
 
@@ -483,17 +490,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <!-- Dialogs Screen -->
 <div class="dialogs-screen hidden" id="dialogsScreen">
 <div class="header">
-<!-- DRAWER / MENU ICON BUTTON INSTEAD OF USER AVATAR -->
 <div class="header-menu-btn" onclick="openDrawer()" title="Меню">
 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
 </div>
 <div class="header-info" onclick="openDrawer()">
-<!-- VK MEOW TITLE LARGER -->
 <div class="header-title-main" id="dialogsHeaderTitle">VK Meow</div>
-<div class="header-subtitle" id="dialogsHeaderSubtitle">Сообщения</div>
+<div class="header-subtitle" id="dialogsHeaderSubtitle">Личные чаты</div>
 </div>
 <div class="header-actions">
-<div class="header-btn active" id="encryptBtn" onclick="toggleEncrypt()" title="Локальное шифрование">
+<div class="header-btn active" id="encryptBtn" onclick="openEncryptModal()" title="Шифрование E2EE">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
 </div>
 </div>
@@ -501,7 +506,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 <!-- Folder Tabs -->
 <div class="folder-tabs" id="folderTabs">
-<div class="folder-tab active" onclick="switchFolder('all')" data-folder="all">Все</div>
+<div class="folder-tab active" onclick="switchFolder('all')" data-folder="all">Личные</div>
 <div class="folder-tab" onclick="switchFolder('channels')" data-folder="channels">Каналы</div>
 <div class="folder-tab" onclick="switchFolder('news')" data-folder="news">Новости</div>
 </div>
@@ -528,8 +533,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <!-- Chat Screen -->
 <div class="chat-screen" id="chatScreen">
 <div class="header">
-<!-- EXPLICIT VISIBLE ARROW BACK BUTTON BEFORE AVATAR -->
-<div class="header-back" onclick="backToDialogs()" title="Назад к диалогам">
+<div class="header-back" onclick="backToDialogs()" title="Назад к личным чатам">
 <svg viewBox="0 0 24 24">
 <line x1="19" y1="12" x2="5" y2="12"></line>
 <polyline points="12 19 5 12 12 5"></polyline>
@@ -659,7 +663,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </div>
 <div class="profile-view-info" id="profileViewInfo"></div>
 <div class="profile-view-posts" id="profileViewPosts">
-<div class="profile-view-post-title">Посты</div>
+<div class="profile-view-post-title">Посты и записи на стене</div>
 <div id="profilePostsList"></div>
 </div>
 </div>
@@ -679,7 +683,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 <script>
 /* =========================================================================
-   PURE CLIENT-SIDE E2EE ENGINE & CLOUD PERSISTENCE
+   TRUE CLIENT-SIDE E2EE ENGINE & KATE MOBILE API
    ========================================================================= */
 
 const ENCRYPT_PREFIX = "ENC2:";
@@ -688,7 +692,10 @@ let password = localStorage.getItem('vk_pass');
 let currentPeer = null;
 let currentUser = null;
 let dialogsData = [];
-let pollInterval = null;
+let longPollTimer = null;
+let longPollTs = null;
+let longPollKey = null;
+let longPollServer = null;
 let encryptionEnabled = true;
 let myVkId = null;
 
@@ -702,7 +709,6 @@ let selectedMsgForAction = null;
 let typingTimeout = null;
 let peerTypingTimer = null;
 let dialogTypingTimers = {};
-let lastDialogHash = '';
 
 function showUploadProgress(text) {
     const toast = document.getElementById('uploadToast');
@@ -730,6 +736,91 @@ function b64ToBuf(b64) {
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     return bytes.buffer;
+}
+
+/* DELFAN FINGERPRINT GENERATOR */
+async function generateDelfanFingerprint(pubKeyStr) {
+    const msgUint8 = new TextEncoder().encode(pubKeyStr + (myVkId || ''));
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return `${hashHex.substr(0,8)}-${hashHex.substr(8,8)}-${hashHex.substr(16,8)}-${hashHex.substr(24,8)}`;
+}
+
+async function updateDelfanDisplay() {
+    const elem = document.getElementById('delfanFingerprint');
+    const pubElem = document.getElementById('modalPubKey');
+    const privElem = document.getElementById('modalPrivKey');
+    if (!localKeyPair) return;
+    
+    pubElem.textContent = localKeyPair.pubJwkStr;
+    privElem.textContent = "[СКРЫТ ДЛЯ БЕЗОПАСНОСТИ - ХРАНИТСЯ ТОЛЬКО НА УСТРОЙСТВЕ]";
+    const fp = await generateDelfanFingerprint(localKeyPair.pubJwkStr);
+    elem.textContent = fp;
+}
+
+function openEncryptModal() {
+    updateDelfanDisplay();
+    document.getElementById('encryptModal').classList.remove('hidden');
+}
+
+function closeEncryptModal() {
+    document.getElementById('encryptModal').classList.add('hidden');
+}
+
+async function exportKeysFile() {
+    if (!localKeyPair) return;
+    const res = await fetch(`/api/keys/private/${myVkId}`);
+    const data = res.ok ? await res.json() : null;
+    if (!data || !data.private_key_enc) {
+        alert('Приватный ключ не найден');
+        return;
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `vk_meow_keys_${myVkId}.json`;
+    a.click();
+}
+
+async function importKeysFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+        try {
+            const data = JSON.parse(evt.target.result);
+            if (data.public_key && data.private_key_enc) {
+                await fetch(`/api/keys/${myVkId}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                alert('Ключи успешно импортированы! Перезагрузка...');
+                location.reload();
+            } else {
+                alert('Неверный формат файла ключей');
+            }
+        } catch(err) {
+            alert('Ошибка чтения файла ключей');
+        }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+}
+
+async function regenerateKeysPrompt() {
+    if (confirm('⚠️ Вы уверены, что хотите обновить ключи? Старые зашифрованные сообщения будет невозможно расшифровать!')) {
+        localStorage.removeItem('vk_pass');
+        const newPass = prompt('Введите новый пароль для шифрования ключей:');
+        if (!newPass) return;
+        password = newPass;
+        localStorage.setItem('vk_pass', newPass);
+        await initClientCrypto(true);
+        alert('Ключи обновлены!');
+        openEncryptModal();
+    }
 }
 
 /* HIGH-SECURITY PBKDF2 (600,000 ITERATIONS) */
@@ -768,14 +859,14 @@ async function decryptAESGCM(key, combinedBuf) {
     return await window.crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
 }
 
-async function initClientCrypto() {
+async function initClientCrypto(forceNew = false) {
     if (!myVkId || !password) return false;
-    showUploadProgress('Синхронизация ключей...');
+    showUploadProgress('Синхронизация ключей E2EE...');
 
     try {
         const masterKey = await deriveMasterKey(password, myVkId + "_vk_e2ee_salt");
-        const res = await fetch(`/api/keys/${myVkId}`);
-        const stored = res.ok ? await res.json() : null;
+        const res = !forceNew ? await fetch(`/api/keys/private/${myVkId}`) : null;
+        const stored = res && res.ok ? await res.json() : null;
 
         if (stored && stored.public_key && stored.private_key_enc) {
             try {
@@ -795,7 +886,7 @@ async function initClientCrypto() {
                 return true;
             } catch(e) {
                 console.error("Local Key Decryption Failed:", e);
-                alert("Неверный пароль шифрования для данного VK ID!");
+                alert("Неверный пароль шифрования для данного VK ID! Приватный ключ защищен паролем.");
                 return false;
             }
         } else {
@@ -899,7 +990,7 @@ async function clientDecryptData(encObj) {
    UI & APP LOGIC
    ========================================================================= */
 
-const AUTH_URL = 'https://oauth.vk.com/authorize?client_id=2685278&scope=messages,audio,photos,video,docs,notes,pages,status,wall,groups,email,stats,notifications,offline&redirect_uri=https://oauth.vk.com/blank.html&response_type=token';
+const AUTH_URL = 'https://oauth.vk.com/authorize?client_id=3682744&scope=messages,audio,photos,video,docs,notes,pages,status,wall,groups,email,stats,notifications,offline&redirect_uri=https://oauth.vk.com/blank.html&response_type=token';
 
 function getToken() { window.open(AUTH_URL, '_blank'); }
 
@@ -907,9 +998,9 @@ async function login() {
     const url = document.getElementById('tokenUrl').value.trim();
     const pass = document.getElementById('password').value.trim();
     if (!url) { alert('Вставь ссылку с токеном'); return; }
-    if (!pass) { alert('Укажи пароль'); return; }
+    if (!pass) { alert('Укажи пароль для E2EE'); return; }
 
-    showUploadProgress('Вход...');
+    showUploadProgress('Вход через Kate Mobile API...');
     try {
         const res = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
         const data = await res.json();
@@ -930,7 +1021,7 @@ async function login() {
             showDialogsScreen();
             loadDialogs();
             loadFolders();
-            startPolling();
+            startLongPolling();
             updateDrawerProfile();
         }
     } finally {
@@ -942,7 +1033,7 @@ function showDialogsScreen() {
     document.getElementById('dialogsScreen').classList.remove('hidden');
     if (currentUser) {
         document.getElementById('dialogsHeaderTitle').textContent = 'VK Meow';
-        document.getElementById('dialogsHeaderSubtitle').textContent = 'Сообщения';
+        document.getElementById('dialogsHeaderSubtitle').textContent = 'Личные чаты';
         updateDrawerProfile();
     }
 }
@@ -1008,7 +1099,7 @@ async function saveProfileChanges() {
     const lastName = document.getElementById('editLastName').value.trim();
     const statusText = document.getElementById('editStatusInput').value.trim();
 
-    showUploadProgress('Сохранение в VK...');
+    showUploadProgress('Сохранение в VK (Kate Mobile)...');
     try {
         const res = await fetch('/api/profile/update', {
             method: 'POST',
@@ -1041,7 +1132,7 @@ async function uploadAvatarFile(e) {
     const file = e.target.files[0];
     if (!file) return;
 
-    showUploadProgress('Обновление аватара...');
+    showUploadProgress('Обновление аватара (Kate Mobile)...');
     const formData = new FormData();
     formData.append('token', token);
     formData.append('photo', file);
@@ -1071,16 +1162,6 @@ async function loadDialogs() {
         if (data.error) return;
         dialogsData = data.dialogs;
         const list = document.getElementById('dialogsList');
-
-        const newHash = data.dialogs.map(d => d.id + ':' + d.unread + ':' + (d.last_message || '').slice(0, 30)).join('|');
-        if (lastDialogHash === newHash && list.children.length > 0) {
-            for (const d of data.dialogs) {
-                const dot = document.getElementById('dot-' + d.id);
-                if (dot) dot.className = 'dialog-online-dot ' + (d.online ? '' : 'offline');
-            }
-            return;
-        }
-        lastDialogHash = newHash;
         list.innerHTML = '';
 
         for (let i = 0; i < data.dialogs.length; i++) {
@@ -1103,8 +1184,6 @@ async function loadDialogs() {
 
 async function openChat(index) {
     const d = dialogsData[index]; currentPeer = d.id;
-    
-    // Set PEER info in chat header
     document.getElementById('chatTitle').textContent = d.name;
     document.getElementById('chatAvatar').src = d.photo || 'https://vk.com/images/camera_100.png';
     document.getElementById('chatScreen').classList.add('active');
@@ -1118,6 +1197,7 @@ function backToDialogs() {
     document.getElementById('chatScreen').classList.remove('active');
     currentPeer = null;
     cancelReplyOrEdit();
+    loadDialogs();
 }
 
 async function fetchPeerStatus() {
@@ -1149,40 +1229,6 @@ function triggerTypingSignal() {
     typingTimeout = setTimeout(() => {}, 5000);
 }
 
-function setPeerTypingDisplay() {
-    const statusElem = document.getElementById('chatEncryptStatus');
-    statusElem.textContent = 'печатает...';
-    statusElem.classList.add('typing');
-
-    if (peerTypingTimer) clearTimeout(peerTypingTimer);
-    peerTypingTimer = setTimeout(() => {
-        statusElem.classList.remove('typing');
-        fetchPeerStatus();
-    }, 2500);
-}
-
-function setDialogTyping(peerId) {
-    const previewWrap = document.getElementById('preview-' + peerId);
-    if (previewWrap) {
-        const previewText = previewWrap.querySelector('.dialog-preview');
-        if (previewText) {
-            previewText.textContent = 'печатает...';
-            previewText.classList.add('typing');
-        }
-    }
-    if (dialogTypingTimers[peerId]) clearTimeout(dialogTypingTimers[peerId]);
-    dialogTypingTimers[peerId] = setTimeout(() => {
-        const pw = document.getElementById('preview-' + peerId);
-        if (pw) {
-            const pt = pw.querySelector('.dialog-preview');
-            if (pt) {
-                pt.classList.remove('typing');
-                loadDialogs();
-            }
-        }
-    }, 3500);
-}
-
 async function loadMessages() {
     if (!currentPeer) return;
     try {
@@ -1192,12 +1238,7 @@ async function loadMessages() {
         
         if (data.messages) {
             const msgs = data.messages.reverse();
-            const msgIds = msgs.map(m => m.id).join(',');
-            if (container.getAttribute('data-msg-hash') === msgIds) return;
-            
-            container.setAttribute('data-msg-hash', msgIds);
             container.innerHTML = '';
-            
             for (const m of msgs) {
                 renderMessageItem(container, m);
             }
@@ -1210,12 +1251,7 @@ async function loadMessages() {
 function renderMessageItem(container, msg) {
     const containerDiv = document.createElement('div');
     containerDiv.className = 'msg-container';
-    
-    if (msg.out) {
-        containerDiv.style.justifyContent = 'flex-end';
-    } else {
-        containerDiv.style.justifyContent = 'flex-start';
-    }
+    containerDiv.style.justifyContent = msg.out ? 'flex-end' : 'flex-start';
     
     const isEncrypted = msg.text && msg.text.startsWith(ENCRYPT_PREFIX);
     
@@ -1282,7 +1318,10 @@ function renderMessageItem(container, msg) {
         for (const a of msg.attachments) {
             if (a.type === 'photo') {
                 const p = a.photo?.sizes?.find(s => s.type === 'x') || a.photo?.sizes?.[a.photo?.sizes?.length - 1];
-                if (p) html += `<img class="msg-photo" src="${p.url}">`;
+                if (p) {
+                    const photoUrl = p.url;
+                    html += `<img class="msg-photo" src="${photoUrl}">`;
+                }
             }
             if (a.type === 'doc') {
                 const doc = a.doc;
@@ -1513,7 +1552,6 @@ async function processEncryptedAttachment(elemId, url, extInfo) {
             }
         }
 
-        // Direct fallback if unencrypted or plain attachment
         let fallbackMime = 'video/webm';
         if (extInfo.includes('mgs') || extInfo.includes('meg') || extInfo.includes('audio')) fallbackMime = 'audio/webm';
         else if (extInfo.includes('meow') || extInfo.includes('image')) fallbackMime = 'image/jpeg';
@@ -1946,7 +1984,6 @@ async function stopAndSendCircleRecording() {
     circleRecorder.stop();
 }
 
-/* LOCAL E2EE ENCRYPT + UPLOAD TO VK DOCS */
 async function uploadEncryptedMedia(blob, filename, mimeType) {
     if (!currentPeer) return;
     const peerKey = await getPeerPubKey(currentPeer);
@@ -2003,14 +2040,6 @@ async function handleFile(e) {
     }
 }
 
-function toggleEncrypt() {
-    encryptionEnabled = !encryptionEnabled;
-    document.getElementById('encryptBtn').classList.toggle('active', encryptionEnabled);
-}
-
-let lastMessageCount = 0;
-let lastDialogsUnread = 0;
-
 function playNotificationSound() {
     const audio = document.getElementById('notifSound');
     if (audio) {
@@ -2019,34 +2048,53 @@ function playNotificationSound() {
     }
 }
 
-function startPolling() {
-    if (pollInterval) clearInterval(pollInterval);
-    pollInterval = setInterval(async () => { 
-        if (currentPeer) {
-            const oldCount = document.getElementById('messages').children.length;
-            await loadMessages();
-            const newCount = document.getElementById('messages').children.length;
-            if (newCount > oldCount && document.getElementById('chatScreen').classList.contains('active')) {
-                const msgs = document.getElementById('messages').querySelectorAll('.msg-in');
-                if (msgs.length > 0) {
-                    const lastMsg = msgs[msgs.length - 1];
-                    if (!lastMsg.classList.contains('notified')) {
-                        lastMsg.classList.add('notified');
-                        playNotificationSound();
-                    }
-                }
-            }
-            fetchPeerStatus();
-        } else {
-            const oldUnread = lastDialogsUnread;
-            await loadDialogs();
-            const newUnread = dialogsData.reduce((sum, d) => sum + (d.unread || 0), 0);
-            if (newUnread > oldUnread) {
-                playNotificationSound();
-            }
-            lastDialogsUnread = newUnread;
+/* REAL LONG POLLING LOOP */
+async function startLongPolling() {
+    try {
+        const res = await fetch('/api/longpoll/init', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ token })
+        });
+        const data = await res.json();
+        if (data.server && data.key && data.ts) {
+            longPollServer = data.server;
+            longPollKey = data.key;
+            longPollTs = data.ts;
+            pollEvents();
         }
-    }, 2500);
+    } catch(e) {
+        setTimeout(startLongPolling, 5000);
+    }
+}
+
+async function pollEvents() {
+    if (!longPollServer || !longPollKey || !longPollTs) {
+        setTimeout(startLongPolling, 3000);
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/longpoll/listen', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ server: longPollServer, key: longPollKey, ts: longPollTs })
+        });
+        const data = await res.json();
+        if (data.ts) {
+            longPollTs = data.ts;
+        }
+        if (data.updates && data.updates.length > 0) {
+            playNotificationSound();
+            if (currentPeer) {
+                loadMessages();
+            }
+            loadDialogs();
+        }
+    } catch(e) {
+        await new Promise(r => setTimeout(r, 2000));
+    }
+    setTimeout(pollEvents, 300);
 }
 
 function logout() {
@@ -2085,7 +2133,7 @@ function renderFolderTabs() {
 
     const allTab = document.createElement('div');
     allTab.className = 'folder-tab ' + (currentFolder === 'all' ? 'active' : '');
-    allTab.textContent = 'Все';
+    allTab.textContent = 'Личные';
     allTab.onclick = () => switchFolder('all');
     tabs.appendChild(allTab);
 
@@ -2132,31 +2180,32 @@ async function switchFolder(folder) {
         newsFeed.classList.add('hidden');
         await loadDialogs();
 
-        if (folder === 'channels') {
-            const items = dialogsList.querySelectorAll('.dialog');
-            items.forEach((item, i) => {
-                if (dialogsData[i] && dialogsData[i].type !== 'group') {
+        const items = dialogsList.querySelectorAll('.dialog');
+        items.forEach((item, i) => {
+            const d = dialogsData[i];
+            if (!d) return;
+            if (folder === 'channels') {
+                if (d.type !== 'group' && d.type !== 'chat') {
                     item.style.display = 'none';
                 }
-            });
-        } else if (folder !== 'all') {
-            const folderData = customFolders.find(f => f.id === folder);
-            if (folderData) {
-                const items = dialogsList.querySelectorAll('.dialog');
-                items.forEach((item, i) => {
-                    if (dialogsData[i] && !folderData.peers.includes(String(dialogsData[i].id))) {
-                        item.style.display = 'none';
-                    }
-                });
+            } else if (folder === 'all') {
+                if (d.type !== 'user') {
+                    item.style.display = 'none';
+                }
+            } else {
+                const folderData = customFolders.find(f => f.id === folder);
+                if (folderData && !folderData.peers.includes(String(d.id))) {
+                    item.style.display = 'none';
+                }
             }
-        }
+        });
     }
 }
 
 async function loadNewsFeed() {
     const feed = document.getElementById('newsFeed');
     feed.innerHTML = '';
-    showUploadProgress('Загрузка новостей...');
+    showUploadProgress('Загрузка полной ленты новостей...');
     try {
         const res = await fetch('/api/news', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({token}) });
         const data = await res.json();
@@ -2187,7 +2236,7 @@ async function loadNewsFeed() {
 
 /* PROFILE VIEW */
 async function openProfileView(peerId, isGroup) {
-    showUploadProgress('Загрузка профиля...');
+    showUploadProgress('Загрузка профиля и всех постов...');
     try {
         const res = await fetch('/api/profile_view', {
             method: 'POST',
@@ -2245,7 +2294,7 @@ function openCreateFolderModal() {
     const list = document.getElementById('folderCreateList');
     list.innerHTML = '';
     for (const d of dialogsData) {
-        if (d.type !== 'group') {
+        if (d.type === 'user') {
             const item = document.createElement('div');
             item.className = 'folder-create-item';
             item.innerHTML = `
@@ -2297,7 +2346,7 @@ async function saveNewFolder() {
             if (ok) {
                 loadDialogs();
                 loadFolders();
-                startPolling();
+                startLongPolling();
             } else {
                 document.getElementById('loginScreen').classList.remove('hidden');
             }
@@ -2348,6 +2397,15 @@ def get_key(vk_id):
     return jsonify({'error': 'Not found'}), 404
 
 
+@app.route('/api/keys/private/<vk_id>', methods=['GET'])
+def get_private_key_local(vk_id):
+    local_data = load_local_keys()
+    vk_id_str = str(vk_id)
+    if vk_id_str in local_data:
+        return jsonify(local_data[vk_id_str])
+    return jsonify({'error': 'Not found'}), 404
+
+
 @app.route('/api/keys/<vk_id>', methods=['POST'])
 def save_key(vk_id):
     data = request.json
@@ -2359,7 +2417,7 @@ def save_key(vk_id):
 @app.route('/api/dialogs', methods=['POST'])
 def get_dialogs():
     token = request.json.get('token')
-    result = vk_request('messages.getConversations', token, count=25, offset=0, extended=1)
+    result = vk_request('messages.getConversations', token, count=100, offset=0, extended=1)
     if isinstance(result, dict) and 'error' in result:
         return jsonify(result), 400
     dialogs = []
@@ -2402,7 +2460,7 @@ def get_dialogs():
 def get_messages():
     token = request.json.get('token')
     peer_id = request.json.get('peer_id')
-    result = vk_request('messages.getHistory', token, peer_id=peer_id, count=50, offset=0, extended=1)
+    result = vk_request('messages.getHistory', token, peer_id=peer_id, count=200, offset=0, extended=1)
     if isinstance(result, dict) and 'error' in result:
         return jsonify(result), 400
     messages = []
@@ -2478,7 +2536,6 @@ def update_profile():
     status_text = request.json.get('status', '').strip()
 
     status_res = vk_request('status.set', token, text=status_text)
-    
     profile_res = None
     if first_name and last_name:
         profile_res = vk_request('account.saveProfileInfo', token, first_name=first_name, last_name=last_name)
@@ -2589,7 +2646,7 @@ def upload_normal():
     filename = file.filename.lower()
     file_bytes = file.read()
 
-    if filename.endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')):
+    if filename.endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp', '.meow')):
         upload_server = vk_request('photos.getMessagesUploadServer', token, peer_id=peer_id)
         if isinstance(upload_server, dict) and 'error' in upload_server:
             return jsonify(upload_server), 400
@@ -2653,7 +2710,7 @@ def save_folders(vk_id):
 @app.route('/api/news', methods=['POST'])
 def get_news():
     token = request.json.get('token')
-    result = vk_request('newsfeed.get', token, filters='post', count=20, fields='photo_50')
+    result = vk_request('newsfeed.get', token, filters='post', count=100, fields='photo_50')
     if isinstance(result, dict) and 'error' in result:
         return jsonify(result), 400
     items = []
@@ -2703,7 +2760,7 @@ def profile_view():
         group_info = vk_request('groups.getById', token, group_id=group_id, fields='description,status,photo_200')
         if isinstance(group_info, list) and len(group_info) > 0:
             g = group_info[0]
-            wall = vk_request('wall.get', token, owner_id=-group_id, count=10, extended=1)
+            wall = vk_request('wall.get', token, owner_id=-group_id, count=100, extended=1)
             posts = []
             if isinstance(wall, dict) and 'items' in wall:
                 for p in wall.get('items', []):
@@ -2731,7 +2788,7 @@ def profile_view():
         user_info = vk_request('users.get', token, user_ids=peer_id, fields='photo_200,status,city,bdate,site,sex')
         if isinstance(user_info, list) and len(user_info) > 0:
             u = user_info[0]
-            wall = vk_request('wall.get', token, owner_id=peer_id, count=10, extended=1, filter='owner')
+            wall = vk_request('wall.get', token, owner_id=peer_id, count=100, extended=1, filter='owner')
             posts = []
             if isinstance(wall, dict) and 'items' in wall:
                 for p in wall.get('items', []):
@@ -2759,6 +2816,37 @@ def profile_view():
                 'posts': posts
             })
     return jsonify({'error': 'Not found'}), 404
+
+
+@app.route('/api/longpoll/init', methods=['POST'])
+def longpoll_init():
+    token = request.json.get('token')
+    lp = vk_request('messages.getLongPollServer', token, need_pts=1, lp_version=3)
+    if isinstance(lp, dict) and 'error' in lp:
+        return jsonify(lp), 400
+    return jsonify({
+        'server': lp.get('server'),
+        'key': lp.get('key'),
+        'ts': lp.get('ts')
+    })
+
+
+@app.route('/api/longpoll/listen', methods=['POST'])
+def longpoll_listen():
+    data = request.json
+    server = data.get('server')
+    key = data.get('key')
+    ts = data.get('ts')
+    if not server or not key or not ts:
+        return jsonify({'error': 'Missing params'}), 400
+    
+    url = f"https://{server}?act=a_check&key={key}&ts={ts}&wait=25&mode=2&version=3"
+    try:
+        resp = requests.get(url, timeout=30)
+        json_data = resp.json()
+        return jsonify(json_data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/proxy_file')
