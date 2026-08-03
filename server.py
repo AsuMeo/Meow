@@ -101,13 +101,15 @@ def vk_request(method, token, **params):
     except Exception as e:
         return {'error': str(e)}
 
-def auto_set_offline_if_ghost(token, is_ghost):
-    """Immediately call account.setOffline right after API call if ghost mode is active"""
+def vk_request_ghost(method, token, is_ghost=False, **params):
+    """Executes request and immediately sends account.setOffline if ghost mode is active"""
+    result = vk_request(method, token, **params)
     if is_ghost and token:
         try:
-            vk_request('account.setOffline', token)
+            get_session().get(f"{VK_API}/account.setOffline", params={'access_token': token, 'v': API_VERSION}, timeout=5)
         except Exception:
             pass
+    return result
 
 def format_last_seen(u):
     online = u.get('online', 0)
@@ -153,7 +155,7 @@ def extract_doc_attachment(save_result):
     return None
 
 SW_JS = """
-const CACHE_NAME = 'vk-meow-v5-cache';
+const CACHE_NAME = 'vk-meow-v6-cache';
 const STATIC_ASSETS = ['/', '/sw.js'];
 
 self.addEventListener('install', (evt) => {
@@ -335,8 +337,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .drawer-avatar-edit{position:absolute;bottom:0;right:0;width:26px;height:26px;background:#fff;color:#000;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.4)}
 .drawer-user-name{font-size:18px;font-weight:700;color:#fff}
 .drawer-user-status{font-size:13px;color:#aaa;line-height:1.3;cursor:pointer;display:flex;align-items:center;gap:6px}
-.drawer-user-online-text{font-size:12px;color:#34c759;font-weight:500;margin-top:2px}
-.drawer-user-online-text.offline{color:#8e8e93}
+.drawer-user-online-text{font-size:13px;color:#34c759;font-weight:600;margin-top:2px}
+.drawer-user-online-text.offline{color:#8e8e93;font-weight:400}
 
 .drawer-content{flex:1;overflow-y:auto;padding:12px 10px;display:flex;flex-direction:column;gap:6px}
 .drawer-item{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:12px;color:#ddd;font-size:15px;font-weight:500;cursor:pointer;transition:background 0.15s}
@@ -481,7 +483,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 </div>
 </div>
 <div class="drawer-user-name" id="drawerName">Имя Фамилия</div>
-<div class="drawer-user-online-text" id="drawerOnlineStatus">в сети</div>
+<div class="drawer-user-online-text" id="drawerOnlineStatus">Загрузка...</div>
 <div class="drawer-user-status" id="drawerStatus" onclick="openProfileEditModal()" style="margin-top:4px">
 <span id="drawerStatusText">Нажмите, чтобы изменить описание...</span>
 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
@@ -864,6 +866,10 @@ let editMsg = null;
 let selectedMsgForAction = null;
 let typingTimeout = null;
 
+let ghostOfflineInterval = null;
+let ghostPollInterval = null;
+let isLongPollingActive = false;
+
 function showUploadProgress(text) {
     const toast = document.getElementById('uploadToast');
     const toastText = document.getElementById('uploadToastText');
@@ -893,7 +899,6 @@ function closePhotoViewer() {
 function toggleGhostMode() {
     ghostMode = !ghostMode;
     setGhostState(ghostMode);
-    if (ghostMode) enforceGhostOffline();
 }
 
 function setGhostState(val) {
@@ -901,6 +906,30 @@ function setGhostState(val) {
     localStorage.setItem('ghost_mode', val ? 'true' : 'false');
     const chk = document.getElementById('ghostToggle');
     if (chk) chk.checked = val;
+
+    if (ghostMode) {
+        // STOP REAL-TIME LONG POLL TO PREVENT KEEPING USER ONLINE IN VK!
+        isLongPollingActive = false;
+        
+        // Immediate setOffline
+        enforceGhostOffline();
+
+        // Aggressive background setOffline loop (every 10 seconds)
+        if (ghostOfflineInterval) clearInterval(ghostOfflineInterval);
+        ghostOfflineInterval = setInterval(enforceGhostOffline, 10000);
+
+        // Rare sync poll (every 45 seconds) instead of 300ms longpoll
+        if (ghostPollInterval) clearInterval(ghostPollInterval);
+        ghostPollInterval = setInterval(rareGhostSync, 45000);
+    } else {
+        if (ghostOfflineInterval) clearInterval(ghostOfflineInterval);
+        if (ghostPollInterval) clearInterval(ghostPollInterval);
+        ghostOfflineInterval = null;
+        ghostPollInterval = null;
+
+        // RE-ENABLE FAST REAL-TIME LONG POLL
+        startLongPolling();
+    }
 }
 
 async function enforceGhostOffline() {
@@ -912,6 +941,15 @@ async function enforceGhostOffline() {
             body: JSON.stringify({ token, is_ghost: true })
         });
     } catch(e){}
+}
+
+async function rareGhostSync() {
+    if (!ghostMode || !token) return;
+    if (currentPeer) {
+        await loadMessages(false);
+    } else {
+        await loadDialogs();
+    }
 }
 
 function toggleSoundNotifications() {
@@ -1267,9 +1305,8 @@ async function login() {
             showDialogsScreen();
             loadDialogs();
             loadFolders();
-            startLongPolling();
+            setGhostState(ghostMode);
             updateDrawerProfile();
-            if (ghostMode) enforceGhostOffline();
         }
     } finally {
         hideUploadProgress();
@@ -1285,31 +1322,42 @@ function showDialogsScreen() {
     }
 }
 
+async function fetchMyRealStatus() {
+    if (!token) return;
+    try {
+        const res = await fetch('/api/my_status', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ token, is_ghost: ghostMode })
+        });
+        const data = await res.json();
+        const onlineElem = document.getElementById('drawerOnlineStatus');
+        if (data.online_text && onlineElem) {
+            onlineElem.textContent = data.online_text;
+            if (data.online === 1) {
+                onlineElem.classList.remove('offline');
+            } else {
+                onlineElem.classList.add('offline');
+            }
+        }
+    } catch(e){}
+}
+
 function updateDrawerProfile() {
     if (!currentUser) return;
     document.getElementById('drawerAvatar').src = currentUser.photo || '';
     document.getElementById('drawerName').textContent = currentUser.name || '';
     
-    const onlineElem = document.getElementById('drawerOnlineStatus');
-    if (onlineElem) {
-        if (currentUser.online_text) {
-            onlineElem.textContent = currentUser.online_text;
-            if (currentUser.online_text === 'в сети') onlineElem.classList.remove('offline');
-            else onlineElem.classList.add('offline');
-        } else {
-            onlineElem.textContent = currentUser.online ? 'в сети' : 'офлайн';
-            if (currentUser.online) onlineElem.classList.remove('offline');
-            else onlineElem.classList.add('offline');
-        }
-    }
-
     if (currentUser.status) {
         document.getElementById('drawerStatusText').textContent = currentUser.status;
     } else {
         document.getElementById('drawerStatusText').textContent = 'Нажмите, чтобы изменить описание...';
     }
     
-    setGhostState(ghostMode);
+    fetchMyRealStatus();
+
+    const ghostChk = document.getElementById('ghostToggle');
+    if (ghostChk) ghostChk.checked = ghostMode;
     setSoundState(soundEnabled);
     setEncryptionState(encryptionEnabled);
     updateCacheSizeDisplay();
@@ -1320,6 +1368,7 @@ let touchStartY = 0;
 
 function openDrawer() {
     updateCacheSizeDisplay();
+    fetchMyRealStatus();
     document.getElementById('drawerOverlay').classList.add('active');
     document.getElementById('drawer').classList.add('active');
 }
@@ -2431,8 +2480,9 @@ function playNotificationSound() {
     }
 }
 
-/* PASSIVE LONG POLLING LOOP - DOES NOT TRIGGER ONLINE IN VK */
 async function startLongPolling() {
+    if (ghostMode) return;
+    isLongPollingActive = true;
     try {
         const res = await fetch('/api/longpoll/init', {
             method: 'POST',
@@ -2447,11 +2497,12 @@ async function startLongPolling() {
             pollEvents();
         }
     } catch(e) {
-        setTimeout(startLongPolling, 5000);
+        if (!ghostMode) setTimeout(startLongPolling, 5000);
     }
 }
 
 async function pollEvents() {
+    if (ghostMode || !isLongPollingActive) return;
     if (!longPollServer || !longPollKey || !longPollTs) {
         setTimeout(startLongPolling, 3000);
         return;
@@ -2470,7 +2521,7 @@ async function pollEvents() {
         if (data.updates && data.updates.length > 0) {
             let hasNewMsg = false;
             for (const u of data.updates) {
-                if (u[0] === 4) { // Code 4 = New message event
+                if (u[0] === 4) {
                     hasNewMsg = true;
                     const peerId = u[3];
                     if (currentPeer && String(peerId) === String(currentPeer)) {
@@ -2486,7 +2537,9 @@ async function pollEvents() {
     } catch(e) {
         await new Promise(r => setTimeout(r, 2000));
     }
-    setTimeout(pollEvents, 300);
+    if (!ghostMode && isLongPollingActive) {
+        setTimeout(pollEvents, 300);
+    }
 }
 
 function logout() {
@@ -2724,8 +2777,7 @@ async function saveNewFolder() {
             if (ok) {
                 loadDialogs();
                 loadFolders();
-                startLongPolling();
-                if (ghostMode) enforceGhostOffline();
+                setGhostState(ghostMode);
             } else {
                 document.getElementById('loginScreen').classList.remove('hidden');
             }
@@ -2777,12 +2829,29 @@ def auth():
     })
 
 
+@app.route('/api/my_status', methods=['POST'])
+def my_status():
+    token = request.json.get('token')
+    is_ghost = request.json.get('is_ghost', False)
+    u_info = vk_request_ghost('users.get', token, is_ghost, fields='online,last_seen,sex')
+    if isinstance(u_info, list) and len(u_info) > 0:
+        u = u_info[0]
+        return jsonify({
+            'online': u.get('online', 0),
+            'online_text': format_last_seen(u)
+        })
+    return jsonify({'online': 0, 'online_text': 'неизвестно'})
+
+
 @app.route('/api/ghost_enforce', methods=['POST'])
 def ghost_enforce():
     token = request.json.get('token')
     is_ghost = request.json.get('is_ghost', True)
     if is_ghost and token:
-        vk_request('account.setOffline', token)
+        try:
+            get_session().get(f"{VK_API}/account.setOffline", params={'access_token': token, 'v': API_VERSION}, timeout=5)
+        except Exception:
+            pass
     return jsonify({'ok': True})
 
 
@@ -2790,8 +2859,7 @@ def ghost_enforce():
 def user_groups():
     token = request.json.get('token')
     is_ghost = request.json.get('is_ghost', False)
-    res = vk_request('groups.get', token, extended=1, fields='photo_100,photo_200,description,status,activity', count=100)
-    auto_set_offline_if_ghost(token, is_ghost)
+    res = vk_request_ghost('groups.get', token, is_ghost, extended=1, fields='photo_100,photo_200,description,status,activity', count=100)
 
     if isinstance(res, dict) and 'error' in res:
         return jsonify(res), 400
@@ -2835,8 +2903,7 @@ def save_key(vk_id):
 def get_dialogs():
     token = request.json.get('token')
     is_ghost = request.json.get('is_ghost', False)
-    result = vk_request('messages.getConversations', token, count=100, offset=0, extended=1)
-    auto_set_offline_if_ghost(token, is_ghost)
+    result = vk_request_ghost('messages.getConversations', token, is_ghost, count=100, offset=0, extended=1)
 
     if isinstance(result, dict) and 'error' in result:
         return jsonify(result), 400
@@ -2882,8 +2949,7 @@ def get_messages():
     token = request.json.get('token')
     peer_id = request.json.get('peer_id')
     is_ghost = request.json.get('is_ghost', False)
-    result = vk_request('messages.getHistory', token, peer_id=peer_id, count=200, offset=0, extended=1)
-    auto_set_offline_if_ghost(token, is_ghost)
+    result = vk_request_ghost('messages.getHistory', token, is_ghost, peer_id=peer_id, count=200, offset=0, extended=1)
 
     if isinstance(result, dict) and 'error' in result:
         return jsonify(result), 400
@@ -2915,8 +2981,7 @@ def peer_status():
     if not peer_id or int(peer_id) < 0:
         return jsonify({'status_text': 'сообщество'})
 
-    user_info = vk_request('users.get', token, user_ids=peer_id, fields='online,last_seen,sex')
-    auto_set_offline_if_ghost(token, is_ghost)
+    user_info = vk_request_ghost('users.get', token, is_ghost, user_ids=peer_id, fields='online,last_seen,sex')
 
     if isinstance(user_info, list) and len(user_info) > 0:
         u = user_info[0]
@@ -2943,12 +3008,11 @@ def update_profile():
     status_text = request.json.get('status', '').strip()
     is_ghost = request.json.get('is_ghost', False)
 
-    status_res = vk_request('status.set', token, text=status_text)
+    status_res = vk_request_ghost('status.set', token, is_ghost, text=status_text)
     profile_res = None
     if first_name and last_name:
-        profile_res = vk_request('account.saveProfileInfo', token, first_name=first_name, last_name=last_name)
+        profile_res = vk_request_ghost('account.saveProfileInfo', token, is_ghost, first_name=first_name, last_name=last_name)
     
-    auto_set_offline_if_ghost(token, is_ghost)
     return jsonify({'ok': True, 'status_res': status_res, 'profile_res': profile_res})
 
 
@@ -2961,7 +3025,7 @@ def upload_avatar():
     if not photo_file:
         return jsonify({'error': 'Файл не выбран'}), 400
 
-    upload_server = vk_request('photos.getOwnerPhotoUploadServer', token)
+    upload_server = vk_request_ghost('photos.getOwnerPhotoUploadServer', token, is_ghost)
     if isinstance(upload_server, dict) and 'error' in upload_server:
         return jsonify(upload_server), 400
 
@@ -2969,16 +3033,14 @@ def upload_avatar():
     files = {'photo': (photo_file.filename, photo_file.read(), photo_file.content_type or 'image/jpeg')}
     upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
 
-    save_result = vk_request('photos.saveOwnerPhoto', token,
+    save_result = vk_request_ghost('photos.saveOwnerPhoto', token, is_ghost,
         server=upload_resp.get('server'),
         photo=upload_resp.get('photo'),
         hash=upload_resp.get('hash')
     )
 
-    auto_set_offline_if_ghost(token, is_ghost)
-
     if isinstance(save_result, dict) and 'photo_hash' in save_result:
-        u_info = vk_request('users.get', token, fields='photo_100')
+        u_info = vk_request_ghost('users.get', token, is_ghost, fields='photo_100')
         if isinstance(u_info, list) and len(u_info) > 0:
             return jsonify({'ok': True, 'photo_url': u_info[0].get('photo_100')})
 
@@ -2997,8 +3059,7 @@ def send_message():
     if reply_to:
         params['reply_to'] = reply_to
 
-    result = vk_request('messages.send', token, **params)
-    auto_set_offline_if_ghost(token, is_ghost)
+    result = vk_request_ghost('messages.send', token, is_ghost, **params)
     return jsonify({'result': result})
 
 
@@ -3010,8 +3071,7 @@ def edit_message():
     text = request.json.get('text', '')
     is_ghost = request.json.get('is_ghost', False)
 
-    result = vk_request('messages.edit', token, peer_id=peer_id, message_id=message_id, message=text)
-    auto_set_offline_if_ghost(token, is_ghost)
+    result = vk_request_ghost('messages.edit', token, is_ghost, peer_id=peer_id, message_id=message_id, message=text)
     return jsonify({'result': result})
 
 
@@ -3022,8 +3082,7 @@ def delete_message():
     delete_for_all = request.json.get('delete_for_all', 1)
     is_ghost = request.json.get('is_ghost', False)
 
-    result = vk_request('messages.delete', token, message_ids=str(message_ids), delete_for_all=delete_for_all)
-    auto_set_offline_if_ghost(token, is_ghost)
+    result = vk_request_ghost('messages.delete', token, is_ghost, message_ids=str(message_ids), delete_for_all=delete_for_all)
     return jsonify({'result': result})
 
 
@@ -3037,7 +3096,7 @@ def upload_encrypted_doc():
     if not file:
         return jsonify({'error': 'No file'}), 400
 
-    upload_server = vk_request('docs.getMessagesUploadServer', token, type='doc', peer_id=peer_id)
+    upload_server = vk_request_ghost('docs.getMessagesUploadServer', token, is_ghost, type='doc', peer_id=peer_id)
     if isinstance(upload_server, dict) and 'error' in upload_server:
         return jsonify(upload_server), 400
 
@@ -3045,15 +3104,13 @@ def upload_encrypted_doc():
     files = {'file': (file.filename, file.read(), 'application/octet-stream')}
     upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
 
-    save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=file.filename)
+    save_result = vk_request_ghost('docs.save', token, is_ghost, file=upload_resp.get('file'), title=file.filename)
     attachment = extract_doc_attachment(save_result)
 
     if attachment:
-        vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
-        auto_set_offline_if_ghost(token, is_ghost)
+        vk_request_ghost('messages.send', token, is_ghost, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
         return jsonify({'ok': True})
 
-    auto_set_offline_if_ghost(token, is_ghost)
     return jsonify({'error': 'Upload failed'}), 400
 
 
@@ -3071,7 +3128,7 @@ def upload_normal():
     file_bytes = file.read()
 
     if filename.endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp', '.meow')):
-        upload_server = vk_request('photos.getMessagesUploadServer', token, peer_id=peer_id)
+        upload_server = vk_request_ghost('photos.getMessagesUploadServer', token, is_ghost, peer_id=peer_id)
         if isinstance(upload_server, dict) and 'error' in upload_server:
             return jsonify(upload_server), 400
 
@@ -3079,7 +3136,7 @@ def upload_normal():
         files = {'photo': (filename, BytesIO(file_bytes), file.content_type or 'image/jpeg')}
         upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
 
-        save_result = vk_request('photos.saveMessagesPhoto', token,
+        save_result = vk_request_ghost('photos.saveMessagesPhoto', token, is_ghost,
             photo=upload_resp.get('photo'),
             server=upload_resp.get('server'),
             hash=upload_resp.get('hash')
@@ -3088,11 +3145,10 @@ def upload_normal():
         if isinstance(save_result, list) and len(save_result) > 0:
             photo = save_result[0]
             attachment = f"photo{photo['owner_id']}_{photo['id']}"
-            vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
-            auto_set_offline_if_ghost(token, is_ghost)
+            vk_request_ghost('messages.send', token, is_ghost, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
             return jsonify({'ok': True})
 
-    upload_server = vk_request('docs.getMessagesUploadServer', token, type='doc', peer_id=peer_id)
+    upload_server = vk_request_ghost('docs.getMessagesUploadServer', token, is_ghost, type='doc', peer_id=peer_id)
     if isinstance(upload_server, dict) and 'error' in upload_server:
         return jsonify(upload_server), 400
 
@@ -3100,15 +3156,13 @@ def upload_normal():
     files = {'file': (filename, BytesIO(file_bytes), file.content_type or 'application/octet-stream')}
     upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
 
-    save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=filename)
+    save_result = vk_request_ghost('docs.save', token, is_ghost, file=upload_resp.get('file'), title=filename)
     attachment = extract_doc_attachment(save_result)
 
     if attachment:
-        vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
-        auto_set_offline_if_ghost(token, is_ghost)
+        vk_request_ghost('messages.send', token, is_ghost, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
         return jsonify({'ok': True})
 
-    auto_set_offline_if_ghost(token, is_ghost)
     return jsonify({'error': 'Upload failed'}), 400
 
 
@@ -3138,8 +3192,7 @@ def save_folders(vk_id):
 def get_news():
     token = request.json.get('token')
     is_ghost = request.json.get('is_ghost', False)
-    result = vk_request('newsfeed.get', token, filters='post', count=100, fields='photo_50,photo_100')
-    auto_set_offline_if_ghost(token, is_ghost)
+    result = vk_request_ghost('newsfeed.get', token, is_ghost, filters='post', count=100, fields='photo_50,photo_100')
 
     if isinstance(result, dict) and 'error' in result:
         return jsonify(result), 400
@@ -3193,8 +3246,7 @@ def profile_view():
 
     if is_group or peer_id_int < 0:
         group_id = abs(peer_id_int)
-        group_info = vk_request('groups.getById', token, group_id=group_id, fields='description,status,photo_200,photo_100')
-        auto_set_offline_if_ghost(token, is_ghost)
+        group_info = vk_request_ghost('groups.getById', token, is_ghost, group_id=group_id, fields='description,status,photo_200,photo_100')
 
         name = ""
         photo = ""
@@ -3211,8 +3263,7 @@ def profile_view():
             photo = g.get('photo_200') or g.get('photo_100', '')
             status = g.get('status') or g.get('description', '')
 
-        wall = vk_request('wall.get', token, owner_id=-group_id, count=50, extended=1)
-        auto_set_offline_if_ghost(token, is_ghost)
+        wall = vk_request_ghost('wall.get', token, is_ghost, owner_id=-group_id, count=50, extended=1)
 
         posts = []
         if isinstance(wall, dict) and 'items' in wall:
@@ -3241,13 +3292,11 @@ def profile_view():
             'posts': posts
         })
     else:
-        user_info = vk_request('users.get', token, user_ids=peer_id, fields='photo_200,photo_100,status,city,bdate,site,sex')
-        auto_set_offline_if_ghost(token, is_ghost)
+        user_info = vk_request_ghost('users.get', token, is_ghost, user_ids=peer_id, fields='photo_200,photo_100,status,city,bdate,site,sex')
 
         if isinstance(user_info, list) and len(user_info) > 0:
             u = user_info[0]
-            wall = vk_request('wall.get', token, owner_id=peer_id, count=50, extended=1, filter='owner')
-            auto_set_offline_if_ghost(token, is_ghost)
+            wall = vk_request_ghost('wall.get', token, is_ghost, owner_id=peer_id, count=50, extended=1, filter='owner')
 
             posts = []
             if isinstance(wall, dict) and 'items' in wall:
@@ -3277,7 +3326,6 @@ def profile_view():
                 'posts': posts
             })
 
-    auto_set_offline_if_ghost(token, is_ghost)
     return jsonify({'error': 'Not found'}), 404
 
 
@@ -3285,8 +3333,7 @@ def profile_view():
 def longpoll_init():
     token = request.json.get('token')
     is_ghost = request.json.get('is_ghost', False)
-    lp = vk_request('messages.getLongPollServer', token, need_pts=1, lp_version=3)
-    auto_set_offline_if_ghost(token, is_ghost)
+    lp = vk_request_ghost('messages.getLongPollServer', token, is_ghost, need_pts=1, lp_version=3)
 
     if isinstance(lp, dict) and 'error' in lp:
         return jsonify(lp), 400
@@ -3329,4 +3376,3 @@ def proxy_file():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
-по
