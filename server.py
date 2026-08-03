@@ -19,7 +19,6 @@ FIREBASE_API_KEY = os.environ.get('FIREBASE_API_KEY', '')
 
 KEYS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'keys_storage.json')
 
-# Thread-safe HTTP sessions
 _session_local = threading.local()
 
 def get_session():
@@ -28,7 +27,6 @@ def get_session():
     return _session_local.session
 
 def load_local_keys():
-    """Load keys from local disk storage"""
     if os.path.exists(KEYS_FILE):
         try:
             with open(KEYS_FILE, 'r', encoding='utf-8') as f:
@@ -39,7 +37,6 @@ def load_local_keys():
     return {}
 
 def save_local_keys(data):
-    """Save keys to local disk storage"""
     try:
         with open(KEYS_FILE, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
@@ -47,7 +44,6 @@ def save_local_keys(data):
         print("Local key save error:", e)
 
 def firebase_get(path):
-    """GET data from Firebase Realtime Database with Auth Parameter"""
     if not FIREBASE_DB_URL:
         return None
     url = f"{FIREBASE_DB_URL.rstrip('/')}/{path}.json"
@@ -62,7 +58,6 @@ def firebase_get(path):
     return None
 
 def firebase_put(path, data):
-    """PUT data to Firebase Realtime Database (ONLY Public Keys / non-private data)"""
     if not FIREBASE_DB_URL:
         return False
     url = f"{FIREBASE_DB_URL.rstrip('/')}/{path}.json"
@@ -73,10 +68,9 @@ def firebase_put(path, data):
         return resp.status_code == 200
     except Exception as e:
         print("Firebase PUT error:", e)
-        return False
+    return False
 
 def get_stored_key(vk_id):
-    """Try Firebase first for public key, fallback to local storage"""
     vk_id_str = str(vk_id)
     if FIREBASE_DB_URL:
         fb_data = firebase_get(f"public_keys/{vk_id_str}")
@@ -86,7 +80,6 @@ def get_stored_key(vk_id):
     return local_data.get(vk_id_str)
 
 def store_key(vk_id, data):
-    """Save private keys locally ONLY, and push public key to Firebase"""
     vk_id_str = str(vk_id)
     local_data = load_local_keys()
     local_data[vk_id_str] = data
@@ -99,7 +92,6 @@ def store_key(vk_id, data):
         })
 
 def vk_request(method, token, **params):
-    """Proxy request to VK API with thread-safe HTTP session"""
     params['access_token'] = token
     params['v'] = API_VERSION
     try:
@@ -109,18 +101,35 @@ def vk_request(method, token, **params):
     except Exception as e:
         return {'error': str(e)}
 
-def enforce_ghost_offline(token, is_ghost):
-    """Helper to force account.setOffline in background when Ghost mode is active"""
+def auto_set_offline_if_ghost(token, is_ghost):
+    """Immediately call account.setOffline right after API call if ghost mode is active"""
     if is_ghost and token:
-        def _set_off():
-            try:
-                vk_request('account.setOffline', token)
-            except Exception:
-                pass
-        threading.Thread(target=_set_off).start()
+        try:
+            vk_request('account.setOffline', token)
+        except Exception:
+            pass
+
+def format_last_seen(u):
+    online = u.get('online', 0)
+    sex = u.get('sex', 1)
+    if online == 1:
+        return "в сети"
+    
+    last_seen = u.get('last_seen', {})
+    time_sec = last_seen.get('time')
+    if time_sec:
+        dt = datetime.fromtimestamp(time_sec)
+        now = datetime.now()
+        verb = "была" if sex == 1 else "был"
+        if dt.date() == now.date():
+            return f"{verb} в сети в {dt.strftime('%H:%M')}"
+        elif (now.date() - dt.date()).days == 1:
+            return f"{verb} в сети вчера в {dt.strftime('%H:%M')}"
+        else:
+            return f"{verb} в сети {dt.strftime('%d.%m в %H:%M')}"
+    return "не в сети"
 
 def extract_doc_attachment(save_result):
-    """Safely extract doc attachment string from VK API response"""
     if not save_result or (isinstance(save_result, dict) and 'error' in save_result):
         return None
     
@@ -144,7 +153,7 @@ def extract_doc_attachment(save_result):
     return None
 
 SW_JS = """
-const CACHE_NAME = 'vk-meow-v4-cache';
+const CACHE_NAME = 'vk-meow-v5-cache';
 const STATIC_ASSETS = ['/', '/sw.js'];
 
 self.addEventListener('install', (evt) => {
@@ -235,7 +244,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .header-title{font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:0.5px}
 
 .header-subtitle{font-size:12px;color:#8e8e93;display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.header-subtitle.ghost-active{color:#a855f7;font-weight:600}
 .header-subtitle.typing{color:#34c759;font-weight:500;animation:pulseTyping 1.2s infinite alternate}
 @keyframes pulseTyping{from{opacity:0.6}to{opacity:1}}
 .header-actions{display:flex;gap:6px;align-items:center}
@@ -327,6 +335,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .drawer-avatar-edit{position:absolute;bottom:0;right:0;width:26px;height:26px;background:#fff;color:#000;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.4)}
 .drawer-user-name{font-size:18px;font-weight:700;color:#fff}
 .drawer-user-status{font-size:13px;color:#aaa;line-height:1.3;cursor:pointer;display:flex;align-items:center;gap:6px}
+.drawer-user-online-text{font-size:12px;color:#34c759;font-weight:500;margin-top:2px}
+.drawer-user-online-text.offline{color:#8e8e93}
 
 .drawer-content{flex:1;overflow-y:auto;padding:12px 10px;display:flex;flex-direction:column;gap:6px}
 .drawer-item{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:12px;color:#ddd;font-size:15px;font-weight:500;cursor:pointer;transition:background 0.15s}
@@ -423,7 +433,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 .upload-toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(28,28,30,0.95);border:1px solid #3a3a3c;color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;z-index:900;display:flex;align-items:center;gap:10px;box-shadow:0 4px 16px rgba(0,0,0,0.5)}
 
 /* Bottom Nav */
-.bottom-nav{height:50px;background:#0d0d0d;border-top:1px solid #1a1a1a;display:flex;justify-content:space-around;align-items:center;flex-shrink:0}
+.bottom-nav{height:50px;background:#0d0d0d;border-top:1px solid #1a1a1a;display:flex;justify-space-around;align-items:center;flex-shrink:0}
 .nav-item{flex:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;color:#666}
 .nav-item.active{color:#fff}
 .nav-item span{font-size:10px}
@@ -471,7 +481,8 @@ input:checked + .slider:before{transform:translateX(20px)}
 </div>
 </div>
 <div class="drawer-user-name" id="drawerName">Имя Фамилия</div>
-<div class="drawer-user-status" id="drawerStatus" onclick="openProfileEditModal()">
+<div class="drawer-user-online-text" id="drawerOnlineStatus">в сети</div>
+<div class="drawer-user-status" id="drawerStatus" onclick="openProfileEditModal()" style="margin-top:4px">
 <span id="drawerStatusText">Нажмите, чтобы изменить описание...</span>
 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
 </div>
@@ -821,21 +832,16 @@ Kate Mobile API • True Client-Side E2EE
 </div>
 
 <script>
-/* SERVICE WORKER REGISTRATION FOR MAXIMUM SPEED & OFFLINE CACHING */
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW reg error:', err));
     });
 }
 
-/* =========================================================================
-   TRUE CLIENT-SIDE E2EE ENGINE & KATE MOBILE API
-   ========================================================================= */
-
 const ENCRYPT_PREFIX = "ENC2:";
 let token = localStorage.getItem('vk_token');
 let password = localStorage.getItem('vk_pass');
-let ghostMode = localStorage.getItem('ghost_mode') !== 'false';
+let ghostMode = localStorage.getItem('ghost_mode') === 'true';
 let soundEnabled = localStorage.getItem('sound_enabled') !== 'false';
 let encryptionEnabled = localStorage.getItem('encryption_enabled') !== 'false';
 
@@ -843,7 +849,6 @@ let currentPeer = null;
 let currentUser = null;
 let dialogsData = [];
 let userGroupsData = [];
-let longPollTimer = null;
 let longPollTs = null;
 let longPollKey = null;
 let longPollServer = null;
@@ -888,31 +893,17 @@ function closePhotoViewer() {
 function toggleGhostMode() {
     ghostMode = !ghostMode;
     setGhostState(ghostMode);
-    if (ghostMode) forceGhostOffline();
+    if (ghostMode) enforceGhostOffline();
 }
 
 function setGhostState(val) {
     ghostMode = val;
-    localStorage.setItem('ghost_mode', val);
+    localStorage.setItem('ghost_mode', val ? 'true' : 'false');
     const chk = document.getElementById('ghostToggle');
     if (chk) chk.checked = val;
-    updateGhostSubtitleDisplay();
 }
 
-function updateGhostSubtitleDisplay() {
-    const sub = document.getElementById('dialogsHeaderSubtitle');
-    if (sub) {
-        if (ghostMode) {
-            sub.textContent = 'офлайн (Настоящий призрак 👻)';
-            sub.classList.add('ghost-active');
-        } else {
-            sub.textContent = 'в сети [Обычно]';
-            sub.classList.remove('ghost-active');
-        }
-    }
-}
-
-async function forceGhostOffline() {
+async function enforceGhostOffline() {
     if (!token) return;
     try {
         await fetch('/api/ghost_enforce', {
@@ -930,7 +921,7 @@ function toggleSoundNotifications() {
 
 function setSoundState(val) {
     soundEnabled = val;
-    localStorage.setItem('sound_enabled', val);
+    localStorage.setItem('sound_enabled', val ? 'true' : 'false');
     const chk = document.getElementById('soundToggle');
     if (chk) chk.checked = val;
 }
@@ -942,7 +933,7 @@ function toggleEncryptionMode() {
 
 function setEncryptionState(val) {
     encryptionEnabled = val;
-    localStorage.setItem('encryption_enabled', val);
+    localStorage.setItem('encryption_enabled', val ? 'true' : 'false');
     const chk = document.getElementById('encryptToggle');
     if (chk) chk.checked = val;
 }
@@ -985,17 +976,6 @@ async function clearAppCache() {
     }
 }
 
-async function flashOnlineStatus() {
-    if (!ghostMode || !token) return;
-    try {
-        await fetch('/api/ghost_flash', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ token })
-        });
-    } catch(e){}
-}
-
 function bufToB64(buf) {
     let binary = '';
     const bytes = new Uint8Array(buf);
@@ -1010,7 +990,6 @@ function b64ToBuf(b64) {
     return bytes.buffer;
 }
 
-/* DELFAN FINGERPRINT GENERATOR */
 async function generateDelfanFingerprint(pubKeyStr) {
     const msgUint8 = new TextEncoder().encode(pubKeyStr + (myVkId || ''));
     const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
@@ -1095,7 +1074,6 @@ async function regenerateKeysPrompt() {
     }
 }
 
-/* HIGH-SECURITY PBKDF2 (600,000 ITERATIONS) */
 async function deriveMasterKey(pass, saltStr) {
     const enc = new TextEncoder();
     const keyMaterial = await window.crypto.subtle.importKey(
@@ -1258,10 +1236,6 @@ async function clientDecryptData(encObj) {
     return await decryptAESGCM(sessionKey, b64ToBuf(encObj.payload));
 }
 
-/* =========================================================================
-   UI & APP LOGIC
-   ========================================================================= */
-
 const AUTH_URL = 'https://oauth.vk.com/authorize?client_id=3682744&scope=messages,audio,photos,video,docs,notes,pages,status,wall,groups,email,stats,notifications,offline&redirect_uri=https://oauth.vk.com/blank.html&response_type=token';
 
 function getToken() { window.open(AUTH_URL, '_blank'); }
@@ -1295,7 +1269,7 @@ async function login() {
             loadFolders();
             startLongPolling();
             updateDrawerProfile();
-            if (ghostMode) forceGhostOffline();
+            if (ghostMode) enforceGhostOffline();
         }
     } finally {
         hideUploadProgress();
@@ -1306,7 +1280,7 @@ function showDialogsScreen() {
     document.getElementById('dialogsScreen').classList.remove('hidden');
     if (currentUser) {
         document.getElementById('dialogsHeaderTitle').textContent = 'VK Meow';
-        updateGhostSubtitleDisplay();
+        document.getElementById('dialogsHeaderSubtitle').textContent = 'Личные чаты';
         updateDrawerProfile();
     }
 }
@@ -1315,6 +1289,20 @@ function updateDrawerProfile() {
     if (!currentUser) return;
     document.getElementById('drawerAvatar').src = currentUser.photo || '';
     document.getElementById('drawerName').textContent = currentUser.name || '';
+    
+    const onlineElem = document.getElementById('drawerOnlineStatus');
+    if (onlineElem) {
+        if (currentUser.online_text) {
+            onlineElem.textContent = currentUser.online_text;
+            if (currentUser.online_text === 'в сети') onlineElem.classList.remove('offline');
+            else onlineElem.classList.add('offline');
+        } else {
+            onlineElem.textContent = currentUser.online ? 'в сети' : 'офлайн';
+            if (currentUser.online) onlineElem.classList.remove('offline');
+            else onlineElem.classList.add('offline');
+        }
+    }
+
     if (currentUser.status) {
         document.getElementById('drawerStatusText').textContent = currentUser.status;
     } else {
@@ -1378,7 +1366,6 @@ async function saveProfileChanges() {
     const lastName = document.getElementById('editLastName').value.trim();
     const statusText = document.getElementById('editStatusInput').value.trim();
 
-    await flashOnlineStatus();
     showUploadProgress('Сохранение в VK (Kate Mobile)...');
     try {
         const res = await fetch('/api/profile/update', {
@@ -1412,7 +1399,6 @@ async function uploadAvatarFile(e) {
     const file = e.target.files[0];
     if (!file) return;
 
-    await flashOnlineStatus();
     showUploadProgress('Обновление аватара (Kate Mobile)...');
     const formData = new FormData();
     formData.append('token', token);
@@ -1437,7 +1423,6 @@ async function uploadAvatarFile(e) {
     }
 }
 
-/* DIALOG PREVIEW BUILDING (TG-STYLE + BLUR) */
 function buildDialogPreviewHTML(d) {
     let rawText = d.last_message || '';
     const atts = d.last_attachments || [];
@@ -1518,7 +1503,6 @@ function renderDialogsListFiltered() {
     for (let i = 0; i < dialogsData.length; i++) {
         const d = dialogsData[i];
         
-        // FILTERVK SYSTEM CHAT (ID 100) FROM PERSONAL
         if (currentFolder === 'all') {
             if (d.type !== 'user' || String(d.id) === '100') continue;
         } else if (currentFolder === 'groups') {
@@ -1559,9 +1543,9 @@ function renderUserGroupsList() {
         div.className = 'dialog';
         div.onclick = () => openProfileView(-g.id, true);
 
-        const avatar = g.photo || g.photo_100 || g.photo_200 || 'https://vk.com/images/camera_100.png';
+        const avatar = g.photo || g.photo_200 || g.photo_100 || 'https://vk.com/images/camera_100.png';
 
-        div.innerHTML = `<div class="dialog-avatar-wrap"><img class="dialog-avatar" src="${avatar}" onerror="this.src='https://vk.com/images/camera_100.png'"></div><div class="dialog-info"><div class="dialog-top"><div class="dialog-name">${escapeHtml(g.name)}</div></div><div class="dialog-bottom"><div class="dialog-preview">${escapeHtml(g.activity || g.description || 'Сообщество VK (нажмите для просмотра постов)')}</div></div></div>`;
+        div.innerHTML = `<div class="dialog-avatar-wrap"><img class="dialog-avatar" src="${avatar}" onerror="this.src='https://vk.com/images/camera_100.png'"></div><div class="dialog-info"><div class="dialog-top"><div class="dialog-name">${escapeHtml(g.name)}</div></div><div class="dialog-bottom"><div class="dialog-preview">${escapeHtml(g.activity || g.description || 'Канал/Сообщество (нажмите для просмотра постов)')}</div></div></div>`;
         list.appendChild(div);
     }
 }
@@ -1644,7 +1628,6 @@ async function loadMessages(initialScroll = false) {
     } catch(e){}
 }
 
-/* RENDER MESSAGE ITEM */
 function renderMessageItem(container, msg) {
     const containerDiv = document.createElement('div');
     containerDiv.className = 'msg-container';
@@ -1842,7 +1825,6 @@ async function confirmDeleteMessage() {
     const deleteForAll = document.getElementById('deleteForAllCheck').checked ? 1 : 0;
     
     closeDeleteModal();
-    await flashOnlineStatus();
     showUploadProgress('Удаление...');
     
     const elem = document.getElementById(`msg-${msgId}`);
@@ -2118,7 +2100,6 @@ async function sendMessage() {
     const text = input.value.trim();
     if (!text || !currentPeer) return;
 
-    await flashOnlineStatus();
     showUploadProgress('Отправка...');
     input.value = '';
     handleInputTyping();
@@ -2178,7 +2159,6 @@ function getSupportedMimeType(kind) {
 
 async function sendMediaBlob(blob, filename, mimeType) {
     if (!currentPeer) return;
-    await flashOnlineStatus();
     showUploadProgress('Отправка медиа...');
     
     try {
@@ -2215,7 +2195,6 @@ async function sendMediaBlob(blob, filename, mimeType) {
     }
 }
 
-/* VOICE RECORDING (.mgs) */
 let voiceRecorder = null;
 let voiceChunks = [];
 let voiceTimerInterval = null;
@@ -2274,7 +2253,6 @@ async function stopAndSendVoiceRecording() {
     voiceRecorder.stop();
 }
 
-/* TG CIRCLE RECORDING (.mkru) */
 let circleRecorder = null;
 let circleChunks = [];
 let circleStream = null;
@@ -2453,7 +2431,7 @@ function playNotificationSound() {
     }
 }
 
-/* REAL LONG POLLING LOOP */
+/* PASSIVE LONG POLLING LOOP - DOES NOT TRIGGER ONLINE IN VK */
 async function startLongPolling() {
     try {
         const res = await fetch('/api/longpoll/init', {
@@ -2490,11 +2468,20 @@ async function pollEvents() {
             longPollTs = data.ts;
         }
         if (data.updates && data.updates.length > 0) {
-            playNotificationSound();
-            if (currentPeer) {
-                loadMessages(false);
+            let hasNewMsg = false;
+            for (const u of data.updates) {
+                if (u[0] === 4) { // Code 4 = New message event
+                    hasNewMsg = true;
+                    const peerId = u[3];
+                    if (currentPeer && String(peerId) === String(currentPeer)) {
+                        loadMessages(false);
+                    }
+                }
             }
-            loadDialogs();
+            if (hasNewMsg) {
+                playNotificationSound();
+                loadDialogs();
+            }
         }
     } catch(e) {
         await new Promise(r => setTimeout(r, 2000));
@@ -2516,7 +2503,6 @@ document.getElementById('msgInput').addEventListener('keypress', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
 
-/* FOLDER MANAGEMENT */
 let currentFolder = 'all';
 let customFolders = [];
 
@@ -2617,7 +2603,7 @@ async function loadNewsFeed() {
                     <div class="news-item-text">${escapeHtml(item.text || '')}</div>
                     ${photo}
                     <div class="news-item-actions">
-                        <div class="news-action" onclick="flashOnlineStatus()">❤ ${item.likes || 0}</div>
+                        <div class="news-action">❤ ${item.likes || 0}</div>
                         <div class="news-action">💬 ${item.comments || 0}</div>
                         <div class="news-action">↗ ${item.reposts || 0}</div>
                     </div>
@@ -2629,7 +2615,6 @@ async function loadNewsFeed() {
     hideUploadProgress();
 }
 
-/* PROFILE VIEW & CHANNEL POSTS VIEW */
 async function openProfileView(peerId, isGroup) {
     showUploadProgress('Загрузка профиля и всех постов...');
     try {
@@ -2663,7 +2648,7 @@ async function openProfileView(peerId, isGroup) {
                     <div class="news-item-text">${escapeHtml(post.text || '')}</div>
                     ${photo}
                     <div class="news-item-actions">
-                        <div class="news-action" onclick="flashOnlineStatus()">❤ ${post.likes || 0}</div>
+                        <div class="news-action">❤ ${post.likes || 0}</div>
                         <div class="news-action">💬 ${post.comments || 0}</div>
                         <div class="news-action">↗ ${post.reposts || 0}</div>
                     </div>
@@ -2683,7 +2668,6 @@ function closeProfileView() {
     document.getElementById('profileViewModal').classList.remove('active');
 }
 
-/* CREATE FOLDER */
 function openCreateFolderModal() {
     document.getElementById('newFolderName').value = '';
     const list = document.getElementById('folderCreateList');
@@ -2729,7 +2713,6 @@ async function saveNewFolder() {
     hideUploadProgress();
 }
 
-/* AUTO-LOGIN RESTORATION ON PAGE RELOAD */
 (async () => {
     if (token && password && localStorage.getItem('vk_user')) {
         try {
@@ -2742,7 +2725,7 @@ async function saveNewFolder() {
                 loadDialogs();
                 loadFolders();
                 startLongPolling();
-                if (ghostMode) forceGhostOffline();
+                if (ghostMode) enforceGhostOffline();
             } else {
                 document.getElementById('loginScreen').classList.remove('hidden');
             }
@@ -2774,10 +2757,13 @@ def auth():
     if not token_match:
         return jsonify({'error': 'Токен не найден в ссылке'}), 400
     token = token_match.group(1)
-    user_info = vk_request('users.get', token, fields='photo_100,online,status')
+    user_info = vk_request('users.get', token, fields='photo_100,online,last_seen,sex,status')
     if isinstance(user_info, dict) and 'error' in user_info:
         return jsonify({'error': 'Неверный или просроченный токен'}), 400
     user = user_info[0] if isinstance(user_info, list) else user_info
+    
+    online_text = format_last_seen(user)
+    
     return jsonify({
         'token': token,
         'user': {
@@ -2785,6 +2771,7 @@ def auth():
             'name': user.get('first_name', '') + ' ' + user.get('last_name', ''),
             'photo': user.get('photo_100', ''),
             'online': user.get('online', 0),
+            'online_text': online_text,
             'status': user.get('status', '')
         }
     })
@@ -2794,20 +2781,8 @@ def auth():
 def ghost_enforce():
     token = request.json.get('token')
     is_ghost = request.json.get('is_ghost', True)
-    enforce_ghost_offline(token, is_ghost)
-    return jsonify({'ok': True})
-
-
-@app.route('/api/ghost_flash', methods=['POST'])
-def ghost_flash():
-    token = request.json.get('token')
-    if token:
-        vk_request('account.setOnline', token)
-        def set_back_offline():
-            import time
-            time.sleep(1.5)
-            vk_request('account.setOffline', token)
-        threading.Thread(target=set_back_offline).start()
+    if is_ghost and token:
+        vk_request('account.setOffline', token)
     return jsonify({'ok': True})
 
 
@@ -2816,7 +2791,8 @@ def user_groups():
     token = request.json.get('token')
     is_ghost = request.json.get('is_ghost', False)
     res = vk_request('groups.get', token, extended=1, fields='photo_100,photo_200,description,status,activity', count=100)
-    enforce_ghost_offline(token, is_ghost)
+    auto_set_offline_if_ghost(token, is_ghost)
+
     if isinstance(res, dict) and 'error' in res:
         return jsonify(res), 400
     
@@ -2860,7 +2836,7 @@ def get_dialogs():
     token = request.json.get('token')
     is_ghost = request.json.get('is_ghost', False)
     result = vk_request('messages.getConversations', token, count=100, offset=0, extended=1)
-    enforce_ghost_offline(token, is_ghost)
+    auto_set_offline_if_ghost(token, is_ghost)
 
     if isinstance(result, dict) and 'error' in result:
         return jsonify(result), 400
@@ -2907,7 +2883,7 @@ def get_messages():
     peer_id = request.json.get('peer_id')
     is_ghost = request.json.get('is_ghost', False)
     result = vk_request('messages.getHistory', token, peer_id=peer_id, count=200, offset=0, extended=1)
-    enforce_ghost_offline(token, is_ghost)
+    auto_set_offline_if_ghost(token, is_ghost)
 
     if isinstance(result, dict) and 'error' in result:
         return jsonify(result), 400
@@ -2940,32 +2916,12 @@ def peer_status():
         return jsonify({'status_text': 'сообщество'})
 
     user_info = vk_request('users.get', token, user_ids=peer_id, fields='online,last_seen,sex')
-    enforce_ghost_offline(token, is_ghost)
+    auto_set_offline_if_ghost(token, is_ghost)
 
     if isinstance(user_info, list) and len(user_info) > 0:
         u = user_info[0]
-        online = u.get('online', 0)
-        sex = u.get('sex', 1)
-        
-        if online == 1:
-            return jsonify({'status_text': 'в сети', 'online': True})
-            
-        last_seen = u.get('last_seen', {})
-        time_sec = last_seen.get('time')
-        if time_sec:
-            dt = datetime.fromtimestamp(time_sec)
-            now = datetime.now()
-            verb = "была" if sex == 1 else "был"
-            
-            if dt.date() == now.date():
-                formatted_time = dt.strftime('%H:%M')
-                return jsonify({'status_text': f'{verb} в сети в {formatted_time}', 'online': False})
-            elif (now.date() - dt.date()).days == 1:
-                formatted_time = dt.strftime('%H:%M')
-                return jsonify({'status_text': f'{verb} в сети вчера в {formatted_time}', 'online': False})
-            else:
-                formatted_date = dt.strftime('%d.%m в %H:%M')
-                return jsonify({'status_text': f'{verb} в сети {formatted_date}', 'online': False})
+        status_str = format_last_seen(u)
+        return jsonify({'status_text': status_str, 'online': u.get('online', 0) == 1})
 
     return jsonify({'status_text': 'офлайн', 'online': False})
 
@@ -2992,7 +2948,7 @@ def update_profile():
     if first_name and last_name:
         profile_res = vk_request('account.saveProfileInfo', token, first_name=first_name, last_name=last_name)
     
-    enforce_ghost_offline(token, is_ghost)
+    auto_set_offline_if_ghost(token, is_ghost)
     return jsonify({'ok': True, 'status_res': status_res, 'profile_res': profile_res})
 
 
@@ -3019,7 +2975,7 @@ def upload_avatar():
         hash=upload_resp.get('hash')
     )
 
-    enforce_ghost_offline(token, is_ghost)
+    auto_set_offline_if_ghost(token, is_ghost)
 
     if isinstance(save_result, dict) and 'photo_hash' in save_result:
         u_info = vk_request('users.get', token, fields='photo_100')
@@ -3042,7 +2998,7 @@ def send_message():
         params['reply_to'] = reply_to
 
     result = vk_request('messages.send', token, **params)
-    enforce_ghost_offline(token, is_ghost)
+    auto_set_offline_if_ghost(token, is_ghost)
     return jsonify({'result': result})
 
 
@@ -3055,7 +3011,7 @@ def edit_message():
     is_ghost = request.json.get('is_ghost', False)
 
     result = vk_request('messages.edit', token, peer_id=peer_id, message_id=message_id, message=text)
-    enforce_ghost_offline(token, is_ghost)
+    auto_set_offline_if_ghost(token, is_ghost)
     return jsonify({'result': result})
 
 
@@ -3067,7 +3023,7 @@ def delete_message():
     is_ghost = request.json.get('is_ghost', False)
 
     result = vk_request('messages.delete', token, message_ids=str(message_ids), delete_for_all=delete_for_all)
-    enforce_ghost_offline(token, is_ghost)
+    auto_set_offline_if_ghost(token, is_ghost)
     return jsonify({'result': result})
 
 
@@ -3094,10 +3050,10 @@ def upload_encrypted_doc():
 
     if attachment:
         vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
-        enforce_ghost_offline(token, is_ghost)
+        auto_set_offline_if_ghost(token, is_ghost)
         return jsonify({'ok': True})
 
-    enforce_ghost_offline(token, is_ghost)
+    auto_set_offline_if_ghost(token, is_ghost)
     return jsonify({'error': 'Upload failed'}), 400
 
 
@@ -3133,7 +3089,7 @@ def upload_normal():
             photo = save_result[0]
             attachment = f"photo{photo['owner_id']}_{photo['id']}"
             vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
-            enforce_ghost_offline(token, is_ghost)
+            auto_set_offline_if_ghost(token, is_ghost)
             return jsonify({'ok': True})
 
     upload_server = vk_request('docs.getMessagesUploadServer', token, type='doc', peer_id=peer_id)
@@ -3149,10 +3105,10 @@ def upload_normal():
 
     if attachment:
         vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
-        enforce_ghost_offline(token, is_ghost)
+        auto_set_offline_if_ghost(token, is_ghost)
         return jsonify({'ok': True})
 
-    enforce_ghost_offline(token, is_ghost)
+    auto_set_offline_if_ghost(token, is_ghost)
     return jsonify({'error': 'Upload failed'}), 400
 
 
@@ -3183,7 +3139,7 @@ def get_news():
     token = request.json.get('token')
     is_ghost = request.json.get('is_ghost', False)
     result = vk_request('newsfeed.get', token, filters='post', count=100, fields='photo_50,photo_100')
-    enforce_ghost_offline(token, is_ghost)
+    auto_set_offline_if_ghost(token, is_ghost)
 
     if isinstance(result, dict) and 'error' in result:
         return jsonify(result), 400
@@ -3230,61 +3186,83 @@ def profile_view():
     is_group = request.json.get('is_group', False)
     is_ghost = request.json.get('is_ghost', False)
 
-    if is_group or int(peer_id) < 0:
-        group_id = abs(int(peer_id))
+    try:
+        peer_id_int = int(peer_id)
+    except (ValueError, TypeError):
+        peer_id_int = 0
+
+    if is_group or peer_id_int < 0:
+        group_id = abs(peer_id_int)
         group_info = vk_request('groups.getById', token, group_id=group_id, fields='description,status,photo_200,photo_100')
-        enforce_ghost_offline(token, is_ghost)
+        auto_set_offline_if_ghost(token, is_ghost)
+
+        name = ""
+        photo = ""
+        status = ""
 
         if isinstance(group_info, list) and len(group_info) > 0:
             g = group_info[0]
-            wall = vk_request('wall.get', token, owner_id=-group_id, count=100, extended=1)
-            enforce_ghost_offline(token, is_ghost)
+            name = g.get('name', '')
+            photo = g.get('photo_200') or g.get('photo_100', '')
+            status = g.get('status') or g.get('description', '')
+        elif isinstance(group_info, dict) and 'groups' in group_info:
+            g = group_info['groups'][0]
+            name = g.get('name', '')
+            photo = g.get('photo_200') or g.get('photo_100', '')
+            status = g.get('status') or g.get('description', '')
 
-            posts = []
-            if isinstance(wall, dict) and 'items' in wall:
-                for p in wall.get('items', []):
-                    photo = None
-                    for a in p.get('attachments', []):
-                        if a.get('type') == 'photo':
-                            sizes = a.get('photo', {}).get('sizes', [])
-                            if sizes:
-                                photo = sizes[-1].get('url', '')
-                            break
-                    posts.append({
-                        'text': p.get('text', ''),
-                        'photo': photo,
-                        'likes': p.get('likes', {}).get('count', 0),
-                        'comments': p.get('comments', {}).get('count', 0),
-                        'reposts': p.get('reposts', {}).get('count', 0)
-                    })
-            return jsonify({
-                'name': g.get('name', ''),
-                'photo': g.get('photo_200') or g.get('photo_100', ''),
-                'status': g.get('status') or g.get('description', ''),
-                'posts': posts
-            })
+        wall = vk_request('wall.get', token, owner_id=-group_id, count=50, extended=1)
+        auto_set_offline_if_ghost(token, is_ghost)
+
+        posts = []
+        if isinstance(wall, dict) and 'items' in wall:
+            items = wall.get('items', [])
+            for p in items:
+                photo_url = None
+                for a in p.get('attachments', []):
+                    if a.get('type') == 'photo':
+                        sizes = a.get('photo', {}).get('sizes', [])
+                        if sizes:
+                            photo_url = sizes[-1].get('url', '')
+                        break
+                posts.append({
+                    'id': p.get('id'),
+                    'text': p.get('text', ''),
+                    'photo': photo_url,
+                    'likes': p.get('likes', {}).get('count', 0),
+                    'comments': p.get('comments', {}).get('count', 0),
+                    'reposts': p.get('reposts', {}).get('count', 0)
+                })
+
+        return jsonify({
+            'name': name,
+            'photo': photo,
+            'status': status,
+            'posts': posts
+        })
     else:
         user_info = vk_request('users.get', token, user_ids=peer_id, fields='photo_200,photo_100,status,city,bdate,site,sex')
-        enforce_ghost_offline(token, is_ghost)
+        auto_set_offline_if_ghost(token, is_ghost)
 
         if isinstance(user_info, list) and len(user_info) > 0:
             u = user_info[0]
-            wall = vk_request('wall.get', token, owner_id=peer_id, count=100, extended=1, filter='owner')
-            enforce_ghost_offline(token, is_ghost)
+            wall = vk_request('wall.get', token, owner_id=peer_id, count=50, extended=1, filter='owner')
+            auto_set_offline_if_ghost(token, is_ghost)
 
             posts = []
             if isinstance(wall, dict) and 'items' in wall:
                 for p in wall.get('items', []):
-                    photo = None
+                    photo_url = None
                     for a in p.get('attachments', []):
                         if a.get('type') == 'photo':
                             sizes = a.get('photo', {}).get('sizes', [])
                             if sizes:
-                                photo = sizes[-1].get('url', '')
+                                photo_url = sizes[-1].get('url', '')
                             break
                     posts.append({
+                        'id': p.get('id'),
                         'text': p.get('text', ''),
-                        'photo': photo,
+                        'photo': photo_url,
                         'likes': p.get('likes', {}).get('count', 0),
                         'comments': p.get('comments', {}).get('count', 0),
                         'reposts': p.get('reposts', {}).get('count', 0)
@@ -3298,7 +3276,8 @@ def profile_view():
                 'site': u.get('site', ''),
                 'posts': posts
             })
-    enforce_ghost_offline(token, is_ghost)
+
+    auto_set_offline_if_ghost(token, is_ghost)
     return jsonify({'error': 'Not found'}), 404
 
 
@@ -3307,7 +3286,7 @@ def longpoll_init():
     token = request.json.get('token')
     is_ghost = request.json.get('is_ghost', False)
     lp = vk_request('messages.getLongPollServer', token, need_pts=1, lp_version=3)
-    enforce_ghost_offline(token, is_ghost)
+    auto_set_offline_if_ghost(token, is_ghost)
 
     if isinstance(lp, dict) and 'error' in lp:
         return jsonify(lp), 400
@@ -3350,3 +3329,4 @@ def proxy_file():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+по
