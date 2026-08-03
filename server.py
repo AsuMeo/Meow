@@ -109,6 +109,16 @@ def vk_request(method, token, **params):
     except Exception as e:
         return {'error': str(e)}
 
+def enforce_ghost_offline(token, is_ghost):
+    """Helper to force account.setOffline in background when Ghost mode is active"""
+    if is_ghost and token:
+        def _set_off():
+            try:
+                vk_request('account.setOffline', token)
+            except Exception:
+                pass
+        threading.Thread(target=_set_off).start()
+
 def extract_doc_attachment(save_result):
     """Safely extract doc attachment string from VK API response"""
     if not save_result or (isinstance(save_result, dict) and 'error' in save_result):
@@ -134,7 +144,7 @@ def extract_doc_attachment(save_result):
     return None
 
 SW_JS = """
-const CACHE_NAME = 'vk-meow-v3-cache';
+const CACHE_NAME = 'vk-meow-v4-cache';
 const STATIC_ASSETS = ['/', '/sw.js'];
 
 self.addEventListener('install', (evt) => {
@@ -225,6 +235,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .header-title{font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:0.5px}
 
 .header-subtitle{font-size:12px;color:#8e8e93;display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.header-subtitle.ghost-active{color:#a855f7;font-weight:600}
 .header-subtitle.typing{color:#34c759;font-weight:500;animation:pulseTyping 1.2s infinite alternate}
 @keyframes pulseTyping{from{opacity:0.6}to{opacity:1}}
 .header-actions{display:flex;gap:6px;align-items:center}
@@ -503,7 +514,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 <div class="drawer-item" onclick="clearAppCache()">
 <div class="drawer-item-left">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
-<span>Очистить кэш</span>
+<span id="cacheSizeText">Очистить кэш (0.0 MB)</span>
 </div>
 </div>
 
@@ -877,6 +888,7 @@ function closePhotoViewer() {
 function toggleGhostMode() {
     ghostMode = !ghostMode;
     setGhostState(ghostMode);
+    if (ghostMode) forceGhostOffline();
 }
 
 function setGhostState(val) {
@@ -884,6 +896,31 @@ function setGhostState(val) {
     localStorage.setItem('ghost_mode', val);
     const chk = document.getElementById('ghostToggle');
     if (chk) chk.checked = val;
+    updateGhostSubtitleDisplay();
+}
+
+function updateGhostSubtitleDisplay() {
+    const sub = document.getElementById('dialogsHeaderSubtitle');
+    if (sub) {
+        if (ghostMode) {
+            sub.textContent = 'офлайн (Настоящий призрак 👻)';
+            sub.classList.add('ghost-active');
+        } else {
+            sub.textContent = 'в сети [Обычно]';
+            sub.classList.remove('ghost-active');
+        }
+    }
+}
+
+async function forceGhostOffline() {
+    if (!token) return;
+    try {
+        await fetch('/api/ghost_enforce', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ token, is_ghost: true })
+        });
+    } catch(e){}
 }
 
 function toggleSoundNotifications() {
@@ -910,6 +947,29 @@ function setEncryptionState(val) {
     if (chk) chk.checked = val;
 }
 
+async function updateCacheSizeDisplay() {
+    let totalBytes = 0;
+    if ('caches' in window) {
+        try {
+            const keys = await caches.keys();
+            for (const key of keys) {
+                const cache = await caches.open(key);
+                const requests = await cache.keys();
+                for (const req of requests) {
+                    const res = await cache.match(req);
+                    if (res) {
+                        const blob = await res.clone().blob();
+                        totalBytes += blob.size;
+                    }
+                }
+            }
+        } catch(e) {}
+    }
+    const mb = (totalBytes / (1024 * 1024)).toFixed(1);
+    const elem = document.getElementById('cacheSizeText');
+    if (elem) elem.textContent = `Очистить кэш (${mb} MB)`;
+}
+
 async function clearAppCache() {
     if (confirm("Очистить локальный кэш медиа и расшифрованных данных?")) {
         showUploadProgress("Очистка кэша...");
@@ -919,6 +979,7 @@ async function clearAppCache() {
             await Promise.all(keys.map(k => caches.delete(k)));
         }
         hideUploadProgress();
+        await updateCacheSizeDisplay();
         alert("Кэш успешно очищен!");
         location.reload();
     }
@@ -1234,6 +1295,7 @@ async function login() {
             loadFolders();
             startLongPolling();
             updateDrawerProfile();
+            if (ghostMode) forceGhostOffline();
         }
     } finally {
         hideUploadProgress();
@@ -1244,7 +1306,7 @@ function showDialogsScreen() {
     document.getElementById('dialogsScreen').classList.remove('hidden');
     if (currentUser) {
         document.getElementById('dialogsHeaderTitle').textContent = 'VK Meow';
-        document.getElementById('dialogsHeaderSubtitle').textContent = 'Личные чаты';
+        updateGhostSubtitleDisplay();
         updateDrawerProfile();
     }
 }
@@ -1262,12 +1324,14 @@ function updateDrawerProfile() {
     setGhostState(ghostMode);
     setSoundState(soundEnabled);
     setEncryptionState(encryptionEnabled);
+    updateCacheSizeDisplay();
 }
 
 let touchStartX = 0;
 let touchStartY = 0;
 
 function openDrawer() {
+    updateCacheSizeDisplay();
     document.getElementById('drawerOverlay').classList.add('active');
     document.getElementById('drawer').classList.add('active');
 }
@@ -1320,7 +1384,7 @@ async function saveProfileChanges() {
         const res = await fetch('/api/profile/update', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ token, first_name: firstName, last_name: lastName, status: statusText })
+            body: JSON.stringify({ token, first_name: firstName, last_name: lastName, status: statusText, is_ghost: ghostMode })
         });
         const data = await res.json();
         if (data.ok) {
@@ -1353,6 +1417,7 @@ async function uploadAvatarFile(e) {
     const formData = new FormData();
     formData.append('token', token);
     formData.append('photo', file);
+    formData.append('is_ghost', ghostMode ? 'true' : 'false');
 
     try {
         const res = await fetch('/api/profile/upload_avatar', { method: 'POST', body: formData });
@@ -1434,33 +1499,49 @@ async function fastDecryptDialogPreviews(dialogs) {
 
 async function loadDialogs() {
     try {
-        const res = await fetch('/api/dialogs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
+        const res = await fetch('/api/dialogs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, is_ghost: ghostMode }) });
         const data = await res.json();
         if (data.error) return;
         dialogsData = data.dialogs;
-        const list = document.getElementById('dialogsList');
-        list.innerHTML = '';
-
-        for (let i = 0; i < data.dialogs.length; i++) {
-            const d = data.dialogs[i];
-            const div = document.createElement('div');
-            div.className = 'dialog';
-            div.onclick = () => openChat(i);
-            const time = d.date ? new Date(d.date * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : '';
-
-            const previewHTML = buildDialogPreviewHTML(d);
-
-            div.innerHTML = `<div class="dialog-avatar-wrap" onclick="event.stopPropagation();openProfileView(${d.id}, ${d.type === 'group' ? 'true' : 'false'})"><img class="dialog-avatar" src="${d.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'"><div class="dialog-online-dot ${d.online ? '' : 'offline'}" id="dot-${d.id}"></div></div><div class="dialog-info"><div class="dialog-top"><div class="dialog-name">${escapeHtml(d.name)}</div><div class="dialog-time">${time}</div></div><div class="dialog-bottom" id="preview-${d.id}"><div class="dialog-preview ${d.typing ? 'typing' : ''}">${d.typing ? 'печатает...' : previewHTML}</div>${d.unread > 0 ? `<div class="dialog-unread-blue">${d.unread}</div>` : ''}</div></div>`;
-            list.appendChild(div);
+        
+        if (currentFolder !== 'news' && currentFolder !== 'channels') {
+            renderDialogsListFiltered();
         }
-
         fastDecryptDialogPreviews(data.dialogs);
     } catch(e){}
 }
 
+function renderDialogsListFiltered() {
+    const list = document.getElementById('dialogsList');
+    list.innerHTML = '';
+
+    for (let i = 0; i < dialogsData.length; i++) {
+        const d = dialogsData[i];
+        
+        // FILTERVK SYSTEM CHAT (ID 100) FROM PERSONAL
+        if (currentFolder === 'all') {
+            if (d.type !== 'user' || String(d.id) === '100') continue;
+        } else if (currentFolder === 'groups') {
+            if (d.type !== 'chat' && d.type !== 'group' && String(d.id) !== '100') continue;
+        } else if (currentFolder !== 'channels' && currentFolder !== 'news') {
+            const folderData = customFolders.find(f => f.id === currentFolder);
+            if (folderData && !folderData.peers.includes(String(d.id))) continue;
+        }
+
+        const div = document.createElement('div');
+        div.className = 'dialog';
+        div.onclick = () => openChat(i);
+        const time = d.date ? new Date(d.date * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : '';
+        const previewHTML = buildDialogPreviewHTML(d);
+
+        div.innerHTML = `<div class="dialog-avatar-wrap" onclick="event.stopPropagation();openProfileView(${d.id}, ${d.type === 'group' ? 'true' : 'false'})"><img class="dialog-avatar" src="${d.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'"><div class="dialog-online-dot ${d.online ? '' : 'offline'}" id="dot-${d.id}"></div></div><div class="dialog-info"><div class="dialog-top"><div class="dialog-name">${escapeHtml(d.name)}</div><div class="dialog-time">${time}</div></div><div class="dialog-bottom" id="preview-${d.id}"><div class="dialog-preview ${d.typing ? 'typing' : ''}">${d.typing ? 'печатает...' : previewHTML}</div>${d.unread > 0 ? `<div class="dialog-unread-blue">${d.unread}</div>` : ''}</div></div>`;
+        list.appendChild(div);
+    }
+}
+
 async function loadUserGroups() {
     try {
-        const res = await fetch('/api/user_groups', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ token }) });
+        const res = await fetch('/api/user_groups', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ token, is_ghost: ghostMode }) });
         const data = await res.json();
         if (data.groups) {
             userGroupsData = data.groups;
@@ -1478,7 +1559,9 @@ function renderUserGroupsList() {
         div.className = 'dialog';
         div.onclick = () => openProfileView(-g.id, true);
 
-        div.innerHTML = `<div class="dialog-avatar-wrap"><img class="dialog-avatar" src="${g.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'"></div><div class="dialog-info"><div class="dialog-top"><div class="dialog-name">${escapeHtml(g.name)}</div></div><div class="dialog-bottom"><div class="dialog-preview">${escapeHtml(g.activity || g.description || 'Сообщество VK')}</div></div></div>`;
+        const avatar = g.photo || g.photo_100 || g.photo_200 || 'https://vk.com/images/camera_100.png';
+
+        div.innerHTML = `<div class="dialog-avatar-wrap"><img class="dialog-avatar" src="${avatar}" onerror="this.src='https://vk.com/images/camera_100.png'"></div><div class="dialog-info"><div class="dialog-top"><div class="dialog-name">${escapeHtml(g.name)}</div></div><div class="dialog-bottom"><div class="dialog-preview">${escapeHtml(g.activity || g.description || 'Сообщество VK (нажмите для просмотра постов)')}</div></div></div>`;
         list.appendChild(div);
     }
 }
@@ -1511,7 +1594,7 @@ async function fetchPeerStatus() {
         const res = await fetch('/api/peer_status', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ token, peer_id: currentPeer })
+            body: JSON.stringify({ token, peer_id: currentPeer, is_ghost: ghostMode })
         });
         const data = await res.json();
         const statusElem = document.getElementById('chatEncryptStatus');
@@ -1537,7 +1620,7 @@ function triggerTypingSignal() {
 async function loadMessages(initialScroll = false) {
     if (!currentPeer) return;
     try {
-        const res = await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, peer_id: currentPeer }) });
+        const res = await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, peer_id: currentPeer, is_ghost: ghostMode }) });
         const data = await res.json();
         const container = document.getElementById('messages');
         
@@ -1769,7 +1852,7 @@ async function confirmDeleteMessage() {
         fetch('/api/delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token, message_ids: msgId, delete_for_all: deleteForAll })
+            body: JSON.stringify({ token, message_ids: msgId, delete_for_all: deleteForAll, is_ghost: ghostMode })
         });
     } finally {
         setTimeout(hideUploadProgress, 300);
@@ -2054,7 +2137,7 @@ async function sendMessage() {
         }
     }
 
-    const payload = { token, peer_id: currentPeer, text: sendText };
+    const payload = { token, peer_id: currentPeer, text: sendText, is_ghost: ghostMode };
     if (replyToMsg) payload.reply_to = replyToMsg.id;
     
     cancelReplyOrEdit();
@@ -2064,7 +2147,7 @@ async function sendMessage() {
             await fetch('/api/edit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token, peer_id: currentPeer, message_id: editMsg.id, text: sendText })
+                body: JSON.stringify({ token, peer_id: currentPeer, message_id: editMsg.id, text: sendText, is_ghost: ghostMode })
             });
         } else {
             await fetch('/api/send', {
@@ -2117,6 +2200,8 @@ async function sendMediaBlob(blob, filename, mimeType) {
             formData.append('token', token);
             formData.append('peer_id', currentPeer);
             formData.append('file', blob, filename);
+            formData.append('is_ghost', ghostMode ? 'true' : 'false');
+
             const res = await fetch('/api/upload_normal', { method: 'POST', body: formData });
             if (!res.ok) {
                 throw new Error("Ошибка при не зашифрованной загрузке файла");
@@ -2334,6 +2419,7 @@ async function uploadEncryptedMedia(blob, filename, mimeType) {
     formData.append('token', token);
     formData.append('peer_id', currentPeer);
     formData.append('file', encBlob, `enc_${Date.now()}.${ext}`);
+    formData.append('is_ghost', ghostMode ? 'true' : 'false');
 
     const res = await fetch('/api/upload_encrypted_doc', { method: 'POST', body: formData });
     const data = await res.json();
@@ -2373,7 +2459,7 @@ async function startLongPolling() {
         const res = await fetch('/api/longpoll/init', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ token })
+            body: JSON.stringify({ token, is_ghost: ghostMode })
         });
         const data = await res.json();
         if (data.server && data.key && data.ts) {
@@ -2508,26 +2594,6 @@ async function switchFolder(folder) {
         dialogsList.classList.remove('hidden');
         newsFeed.classList.add('hidden');
         await loadDialogs();
-
-        const items = dialogsList.querySelectorAll('.dialog');
-        items.forEach((item, i) => {
-            const d = dialogsData[i];
-            if (!d) return;
-            if (folder === 'groups') {
-                if (d.type !== 'chat' && d.type !== 'group') {
-                    item.style.display = 'none';
-                }
-            } else if (folder === 'all') {
-                if (d.type !== 'user') {
-                    item.style.display = 'none';
-                }
-            } else {
-                const folderData = customFolders.find(f => f.id === folder);
-                if (folderData && !folderData.peers.includes(String(d.id))) {
-                    item.style.display = 'none';
-                }
-            }
-        });
     }
 }
 
@@ -2536,7 +2602,7 @@ async function loadNewsFeed() {
     feed.innerHTML = '';
     showUploadProgress('Загрузка полной ленты новостей...');
     try {
-        const res = await fetch('/api/news', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({token}) });
+        const res = await fetch('/api/news', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({token, is_ghost: ghostMode}) });
         const data = await res.json();
         if (data.items) {
             for (const item of data.items) {
@@ -2563,19 +2629,19 @@ async function loadNewsFeed() {
     hideUploadProgress();
 }
 
-/* PROFILE VIEW */
+/* PROFILE VIEW & CHANNEL POSTS VIEW */
 async function openProfileView(peerId, isGroup) {
     showUploadProgress('Загрузка профиля и всех постов...');
     try {
         const res = await fetch('/api/profile_view', {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({token, peer_id: peerId, is_group: isGroup})
+            body: JSON.stringify({token, peer_id: peerId, is_group: isGroup, is_ghost: ghostMode})
         });
         const data = await res.json();
         if (data.error) { hideUploadProgress(); return; }
 
-        document.getElementById('profileViewAvatar').src = data.photo || '';
+        document.getElementById('profileViewAvatar').src = data.photo || 'https://vk.com/images/camera_100.png';
         document.getElementById('profileViewName').textContent = data.name || '...';
         document.getElementById('profileViewStatus').textContent = data.status || '';
         document.getElementById('profileViewHeaderTitle').textContent = data.name || 'Профиль';
@@ -2676,6 +2742,7 @@ async function saveNewFolder() {
                 loadDialogs();
                 loadFolders();
                 startLongPolling();
+                if (ghostMode) forceGhostOffline();
             } else {
                 document.getElementById('loginScreen').classList.remove('hidden');
             }
@@ -2723,6 +2790,14 @@ def auth():
     })
 
 
+@app.route('/api/ghost_enforce', methods=['POST'])
+def ghost_enforce():
+    token = request.json.get('token')
+    is_ghost = request.json.get('is_ghost', True)
+    enforce_ghost_offline(token, is_ghost)
+    return jsonify({'ok': True})
+
+
 @app.route('/api/ghost_flash', methods=['POST'])
 def ghost_flash():
     token = request.json.get('token')
@@ -2739,10 +2814,20 @@ def ghost_flash():
 @app.route('/api/user_groups', methods=['POST'])
 def user_groups():
     token = request.json.get('token')
-    res = vk_request('groups.get', token, extended=1, fields='photo_100,description,status,activity', count=100)
+    is_ghost = request.json.get('is_ghost', False)
+    res = vk_request('groups.get', token, extended=1, fields='photo_100,photo_200,description,status,activity', count=100)
+    enforce_ghost_offline(token, is_ghost)
     if isinstance(res, dict) and 'error' in res:
         return jsonify(res), 400
-    return jsonify({'groups': res.get('items', [])})
+    
+    items = res.get('items', [])
+    for g in items:
+        if 'photo_200' in g and g['photo_200']:
+            g['photo'] = g['photo_200']
+        elif 'photo_100' in g and g['photo_100']:
+            g['photo'] = g['photo_100']
+
+    return jsonify({'groups': items})
 
 
 @app.route('/api/keys/<vk_id>', methods=['GET'])
@@ -2773,7 +2858,10 @@ def save_key(vk_id):
 @app.route('/api/dialogs', methods=['POST'])
 def get_dialogs():
     token = request.json.get('token')
+    is_ghost = request.json.get('is_ghost', False)
     result = vk_request('messages.getConversations', token, count=100, offset=0, extended=1)
+    enforce_ghost_offline(token, is_ghost)
+
     if isinstance(result, dict) and 'error' in result:
         return jsonify(result), 400
     dialogs = []
@@ -2817,7 +2905,10 @@ def get_dialogs():
 def get_messages():
     token = request.json.get('token')
     peer_id = request.json.get('peer_id')
+    is_ghost = request.json.get('is_ghost', False)
     result = vk_request('messages.getHistory', token, peer_id=peer_id, count=200, offset=0, extended=1)
+    enforce_ghost_offline(token, is_ghost)
+
     if isinstance(result, dict) and 'error' in result:
         return jsonify(result), 400
     messages = []
@@ -2843,11 +2934,14 @@ def get_messages():
 def peer_status():
     token = request.json.get('token')
     peer_id = request.json.get('peer_id')
+    is_ghost = request.json.get('is_ghost', False)
     
     if not peer_id or int(peer_id) < 0:
         return jsonify({'status_text': 'сообщество'})
 
     user_info = vk_request('users.get', token, user_ids=peer_id, fields='online,last_seen,sex')
+    enforce_ghost_offline(token, is_ghost)
+
     if isinstance(user_info, list) and len(user_info) > 0:
         u = user_info[0]
         online = u.get('online', 0)
@@ -2891,12 +2985,14 @@ def update_profile():
     first_name = request.json.get('first_name', '').strip()
     last_name = request.json.get('last_name', '').strip()
     status_text = request.json.get('status', '').strip()
+    is_ghost = request.json.get('is_ghost', False)
 
     status_res = vk_request('status.set', token, text=status_text)
     profile_res = None
     if first_name and last_name:
         profile_res = vk_request('account.saveProfileInfo', token, first_name=first_name, last_name=last_name)
     
+    enforce_ghost_offline(token, is_ghost)
     return jsonify({'ok': True, 'status_res': status_res, 'profile_res': profile_res})
 
 
@@ -2904,6 +3000,7 @@ def update_profile():
 def upload_avatar():
     token = request.form.get('token')
     photo_file = request.files.get('photo')
+    is_ghost = request.form.get('is_ghost') == 'true'
 
     if not photo_file:
         return jsonify({'error': 'Файл не выбран'}), 400
@@ -2922,6 +3019,8 @@ def upload_avatar():
         hash=upload_resp.get('hash')
     )
 
+    enforce_ghost_offline(token, is_ghost)
+
     if isinstance(save_result, dict) and 'photo_hash' in save_result:
         u_info = vk_request('users.get', token, fields='photo_100')
         if isinstance(u_info, list) and len(u_info) > 0:
@@ -2936,12 +3035,14 @@ def send_message():
     peer_id = request.json.get('peer_id')
     text = request.json.get('text', '')
     reply_to = request.json.get('reply_to')
+    is_ghost = request.json.get('is_ghost', False)
     
     params = {'peer_id': peer_id, 'message': text, 'random_id': random.randint(1, 2147483647)}
     if reply_to:
         params['reply_to'] = reply_to
 
     result = vk_request('messages.send', token, **params)
+    enforce_ghost_offline(token, is_ghost)
     return jsonify({'result': result})
 
 
@@ -2951,7 +3052,10 @@ def edit_message():
     peer_id = request.json.get('peer_id')
     message_id = request.json.get('message_id')
     text = request.json.get('text', '')
+    is_ghost = request.json.get('is_ghost', False)
+
     result = vk_request('messages.edit', token, peer_id=peer_id, message_id=message_id, message=text)
+    enforce_ghost_offline(token, is_ghost)
     return jsonify({'result': result})
 
 
@@ -2960,7 +3064,10 @@ def delete_message():
     token = request.json.get('token')
     message_ids = request.json.get('message_ids')
     delete_for_all = request.json.get('delete_for_all', 1)
+    is_ghost = request.json.get('is_ghost', False)
+
     result = vk_request('messages.delete', token, message_ids=str(message_ids), delete_for_all=delete_for_all)
+    enforce_ghost_offline(token, is_ghost)
     return jsonify({'result': result})
 
 
@@ -2969,6 +3076,7 @@ def upload_encrypted_doc():
     token = request.form.get('token')
     peer_id = request.form.get('peer_id')
     file = request.files.get('file')
+    is_ghost = request.form.get('is_ghost') == 'true'
 
     if not file:
         return jsonify({'error': 'No file'}), 400
@@ -2986,8 +3094,10 @@ def upload_encrypted_doc():
 
     if attachment:
         vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
+        enforce_ghost_offline(token, is_ghost)
         return jsonify({'ok': True})
 
+    enforce_ghost_offline(token, is_ghost)
     return jsonify({'error': 'Upload failed'}), 400
 
 
@@ -2996,6 +3106,7 @@ def upload_normal():
     token = request.form.get('token')
     peer_id = request.form.get('peer_id')
     file = request.files.get('file')
+    is_ghost = request.form.get('is_ghost') == 'true'
 
     if not file:
         return jsonify({'error': 'No file'}), 400
@@ -3022,6 +3133,7 @@ def upload_normal():
             photo = save_result[0]
             attachment = f"photo{photo['owner_id']}_{photo['id']}"
             vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
+            enforce_ghost_offline(token, is_ghost)
             return jsonify({'ok': True})
 
     upload_server = vk_request('docs.getMessagesUploadServer', token, type='doc', peer_id=peer_id)
@@ -3037,8 +3149,10 @@ def upload_normal():
 
     if attachment:
         vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
+        enforce_ghost_offline(token, is_ghost)
         return jsonify({'ok': True})
 
+    enforce_ghost_offline(token, is_ghost)
     return jsonify({'error': 'Upload failed'}), 400
 
 
@@ -3067,7 +3181,10 @@ def save_folders(vk_id):
 @app.route('/api/news', methods=['POST'])
 def get_news():
     token = request.json.get('token')
-    result = vk_request('newsfeed.get', token, filters='post', count=100, fields='photo_50')
+    is_ghost = request.json.get('is_ghost', False)
+    result = vk_request('newsfeed.get', token, filters='post', count=100, fields='photo_50,photo_100')
+    enforce_ghost_offline(token, is_ghost)
+
     if isinstance(result, dict) and 'error' in result:
         return jsonify(result), 400
     items = []
@@ -3078,11 +3195,11 @@ def get_news():
         if source_id > 0:
             author = profiles.get(source_id, {})
             author_name = author.get('first_name', '') + ' ' + author.get('last_name', '')
-            author_photo = author.get('photo_50', '')
+            author_photo = author.get('photo_100') or author.get('photo_50', '')
         else:
             author = groups.get(-source_id, {})
             author_name = author.get('name', 'Group')
-            author_photo = author.get('photo_50', '')
+            author_photo = author.get('photo_100') or author.get('photo_50', '')
 
         photo = None
         attachments = item.get('attachments', [])
@@ -3111,13 +3228,18 @@ def profile_view():
     token = request.json.get('token')
     peer_id = request.json.get('peer_id')
     is_group = request.json.get('is_group', False)
+    is_ghost = request.json.get('is_ghost', False)
 
     if is_group or int(peer_id) < 0:
         group_id = abs(int(peer_id))
-        group_info = vk_request('groups.getById', token, group_id=group_id, fields='description,status,photo_200')
+        group_info = vk_request('groups.getById', token, group_id=group_id, fields='description,status,photo_200,photo_100')
+        enforce_ghost_offline(token, is_ghost)
+
         if isinstance(group_info, list) and len(group_info) > 0:
             g = group_info[0]
             wall = vk_request('wall.get', token, owner_id=-group_id, count=100, extended=1)
+            enforce_ghost_offline(token, is_ghost)
+
             posts = []
             if isinstance(wall, dict) and 'items' in wall:
                 for p in wall.get('items', []):
@@ -3137,15 +3259,19 @@ def profile_view():
                     })
             return jsonify({
                 'name': g.get('name', ''),
-                'photo': g.get('photo_200', ''),
-                'status': g.get('status', ''),
+                'photo': g.get('photo_200') or g.get('photo_100', ''),
+                'status': g.get('status') or g.get('description', ''),
                 'posts': posts
             })
     else:
-        user_info = vk_request('users.get', token, user_ids=peer_id, fields='photo_200,status,city,bdate,site,sex')
+        user_info = vk_request('users.get', token, user_ids=peer_id, fields='photo_200,photo_100,status,city,bdate,site,sex')
+        enforce_ghost_offline(token, is_ghost)
+
         if isinstance(user_info, list) and len(user_info) > 0:
             u = user_info[0]
             wall = vk_request('wall.get', token, owner_id=peer_id, count=100, extended=1, filter='owner')
+            enforce_ghost_offline(token, is_ghost)
+
             posts = []
             if isinstance(wall, dict) and 'items' in wall:
                 for p in wall.get('items', []):
@@ -3165,20 +3291,24 @@ def profile_view():
                     })
             return jsonify({
                 'name': u.get('first_name', '') + ' ' + u.get('last_name', ''),
-                'photo': u.get('photo_200', ''),
+                'photo': u.get('photo_200') or u.get('photo_100', ''),
                 'status': u.get('status', ''),
                 'city': u.get('city', {}).get('title', ''),
                 'bdate': u.get('bdate', ''),
                 'site': u.get('site', ''),
                 'posts': posts
             })
+    enforce_ghost_offline(token, is_ghost)
     return jsonify({'error': 'Not found'}), 404
 
 
 @app.route('/api/longpoll/init', methods=['POST'])
 def longpoll_init():
     token = request.json.get('token')
+    is_ghost = request.json.get('is_ghost', False)
     lp = vk_request('messages.getLongPollServer', token, need_pts=1, lp_version=3)
+    enforce_ghost_offline(token, is_ghost)
+
     if isinstance(lp, dict) and 'error' in lp:
         return jsonify(lp), 400
     return jsonify({
