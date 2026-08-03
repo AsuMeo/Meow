@@ -1,4 +1,4 @@
-import os
+import import
 import re
 import json
 import random
@@ -118,6 +118,13 @@ def vk_request(method, token, **params):
     try:
         resp = get_session().get(f"{VK_API}/{method}", params=params, timeout=10)
         data = resp.json()
+        if isinstance(data, dict) and data.get('error'):
+            error = data['error']
+            return {
+                'error': error,
+                'error_code': error.get('error_code'),
+                'error_msg': error.get('error_msg', 'VK API error')
+            }
         return data.get('response', data.get('error'))
     except Exception as e:
         return {'error': str(e)}
@@ -879,7 +886,7 @@ Kate Mobile API • Cloud Realtime E2EE
 </div>
 <div class="header-actions">
 <button class="header-btn" id="searchChatBtn" onclick="toggleChatSearch()" title="Поиск по сообщениям">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.85"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="11"/><line x1="11" y1="11" x2="13.5" y2="13.5"/></svg>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg>
 </button>
 <button class="mark-read-btn hidden" id="manualMarkReadBtn" onclick="manualMarkChatAsRead()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align:middle;margin-right:4px"><polyline points="20 6 9 17 4 12"/></svg>Прочитать</button>
 </div>
@@ -891,9 +898,9 @@ Kate Mobile API • Cloud Realtime E2EE
 <input type="text" id="chatSearchInput" placeholder="Поиск по сообщениям..." style="flex:1;background:transparent;border:none;padding:8px 0;color:#fff;font-size:14px;outline:none" oninput="searchInChat()">
 </div>
 <div id="searchCounter" style="font-size:12px;color:#888;white-space:nowrap">0/0</div>
-<button class="header-btn" onclick="prevSearchResult()" style="width:32px;height:32px">↑</button>
-<button class="header-btn" onclick="nextSearchResult()" style="width:32px;height:32px">↓</button>
-<button class="header-btn" onclick="toggleChatSearch()" style="width:32px;height:32px">✕</button>
+<button class="header-btn" onclick="prevSearchResult()" title="Предыдущий результат" style="width:32px;height:32px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 6-6 6 6"/></svg></button>
+<button class="header-btn" onclick="nextSearchResult()" title="Следующий результат" style="width:32px;height:32px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 10 6 6 6-6"/></svg></button>
+<button class="header-btn" onclick="toggleChatSearch()" title="Закрыть поиск" style="width:32px;height:32px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
 </div>
 
 <div class="pinned-msg-bar hidden" id="pinnedMsgBar">
@@ -1063,6 +1070,12 @@ if ('serviceWorker' in navigator) {
 const SVG_LIKE = `<svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
 const SVG_COMMENT = `<svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>`;
 const SVG_SHARE = `<svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>`;
+const SVG_SEARCH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg>`;
+const SVG_CLOSE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>`;
+const SVG_UP = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 6-6 6 6"/></svg>`;
+const SVG_DOWN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 10 6 6 6-6"/></svg>`;
+const SVG_FILE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>`;
+const SVG_LOCK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>`;
 
 const ENCRYPT_PREFIX = "ENC2:";
 let token = localStorage.getItem('vk_token');
@@ -1086,8 +1099,12 @@ let myVkId = null;
 
 let localKeyPair = null;
 let peerKeysCache = {};
+let clientCryptoPromise = null;
 
 let renderedMsgIds = new Set();
+let decryptedCache = {};
+let decryptInFlight = new Map();
+let chatGeneration = 0;
 
 let replyToMsg = null;
 let editMsg = null;
@@ -1388,6 +1405,16 @@ async function initClientCrypto(forceNew = false) {
     }
 }
 
+async function ensureClientCrypto() {
+    if (localKeyPair) return true;
+    if (!clientCryptoPromise) {
+        clientCryptoPromise = initClientCrypto().finally(() => {
+            clientCryptoPromise = null;
+        });
+    }
+    return await clientCryptoPromise;
+}
+
 async function getPeerPubKey(peerId) {
     if (peerKeysCache[peerId]) return peerKeysCache[peerId];
     if (String(peerId) === String(myVkId)) {
@@ -1414,9 +1441,8 @@ async function getPeerPubKey(peerId) {
 }
 
 async function clientEncryptData(peerKey, plainBuf) {
-    if (!localKeyPair) {
-        await initClientCrypto();
-    }
+    if (!localKeyPair) await ensureClientCrypto();
+    if (!localKeyPair) throw new Error('Ключи шифрования не готовы');
     const sessionKey = await window.crypto.subtle.generateKey(
         { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]
     );
@@ -1435,9 +1461,7 @@ async function clientEncryptData(peerKey, plainBuf) {
 }
 
 async function clientDecryptData(encObj) {
-    if (!localKeyPair) {
-        await initClientCrypto();
-    }
+    if (!localKeyPair) await ensureClientCrypto();
     if (!localKeyPair) return null;
     let rawSession = null;
 
@@ -1456,6 +1480,50 @@ async function clientDecryptData(encObj) {
     );
 
     return await decryptAESGCM(sessionKey, b64ToBuf(encObj.payload));
+}
+
+async function decryptMessageText(msgId, encryptedText, generationAtStart) {
+    if (!encryptedText || !encryptedText.startsWith(ENCRYPT_PREFIX)) return null;
+    if (Object.prototype.hasOwnProperty.call(decryptedCache, msgId)) {
+        return decryptedCache[msgId];
+    }
+    if (decryptInFlight.has(msgId)) return decryptInFlight.get(msgId);
+
+    const promise = (async () => {
+        for (const delay of [0, 250, 1000]) {
+            if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+            try {
+                if (!await ensureClientCrypto()) {
+                    throw new Error('Ключи шифрования не готовы');
+                }
+                const encObj = JSON.parse(encryptedText.substring(ENCRYPT_PREFIX.length));
+                const decBuf = await clientDecryptData(encObj);
+                if (!decBuf) throw new Error('Сообщение зашифровано другим ключом');
+
+                const plainText = new TextDecoder().decode(decBuf);
+                decryptedCache[msgId] = plainText;
+
+                if (generationAtStart === chatGeneration) {
+                    const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
+                    if (textElem) textElem.innerHTML = escapeHtml(plainText);
+                    const searchInput = document.getElementById('chatSearchInput');
+                    if (searchInput?.value.trim()) searchInChat();
+                }
+                return plainText;
+            } catch (error) {
+                console.warn('Decrypt attempt failed', msgId, error);
+            }
+        }
+
+        const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
+        if (textElem && generationAtStart === chatGeneration) {
+            textElem.innerHTML = `${SVG_LOCK}<span>Не удалось расшифровать</span>`;
+        }
+        return null;
+    })().finally(() => decryptInFlight.delete(msgId));
+
+    decryptInFlight.set(msgId, promise);
+    return promise;
 }
 
 const AUTH_URL = 'https://oauth.vk.com/authorize?client_id=3682744&scope=messages,audio,photos,video,docs,notes,pages,status,wall,groups,email,stats,notifications,offline&redirect_uri=https://oauth.vk.com/blank.html&response_type=token';
@@ -1706,6 +1774,8 @@ async function fastDecryptDialogPreviews(dialogs) {
         if (d.last_message && d.last_message.startsWith(ENCRYPT_PREFIX)) {
             setTimeout(async () => {
                 try {
+                    if (!localKeyPair) await initClientCrypto();
+                    if (!localKeyPair) return;
                     const encObj = JSON.parse(d.last_message.substring(ENCRYPT_PREFIX.length));
                     const decBuf = await clientDecryptData(encObj);
                     if (decBuf) {
@@ -1986,6 +2056,7 @@ function renderUserGroupsListTGStyle() {
 }
 
 function openChatByObject(d) {
+    chatGeneration++;
     currentPeer = d.id;
     document.getElementById('chatTitle').textContent = d.name;
     document.getElementById('chatAvatar').src = d.photo || 'https://vk.com/images/camera_100.png';
@@ -2117,6 +2188,7 @@ function prevSearchResult() {
 }
 
 function backToDialogs() {
+    chatGeneration++;
     document.getElementById('chatScreen').classList.remove('active');
     currentPeer = null;
     renderedMsgIds.clear();
@@ -2160,9 +2232,12 @@ function triggerTypingSignal() {
 
 async function loadMessages(initialScroll = false) {
     if (!currentPeer) return;
+    const peerAtRequestStart = String(currentPeer);
+    const generationAtRequestStart = chatGeneration;
     try {
         const res = await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, peer_id: currentPeer }) });
         const data = await res.json();
+        if (String(currentPeer) !== peerAtRequestStart || chatGeneration !== generationAtRequestStart) return;
         const container = document.getElementById('messages');
         
         if (data.messages) {
@@ -2224,7 +2299,7 @@ function renderMessageItem(containerOrFragment, msg) {
     if (!msg.out && msg.name) html += `<div class="msg-author">${escapeHtml(msg.name)}</div>`;
 
     let displayText = msg.text || '';
-        let isPureCircle = false;
+    let isPureCircle = false;
     let isSticker = false;
 
     // Check for sticker in attachments
@@ -2238,27 +2313,13 @@ function renderMessageItem(containerOrFragment, msg) {
         }
     }
 
-if (isEncrypted) {
-        if (decryptedCache[msg.id]) {
+    if (isEncrypted) {
+        if (Object.prototype.hasOwnProperty.call(decryptedCache, msg.id)) {
             displayText = decryptedCache[msg.id];
             html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
         } else {
-            html += `<div class="msg-text"><span class="decrypting-shimmer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Расшифровка...</span></div>`;
-            setTimeout(async () => {
-                try {
-                    const encObj = JSON.parse(msg.text.substring(ENCRYPT_PREFIX.length));
-                    const decBuf = await clientDecryptData(encObj);
-                    if (decBuf) {
-                        const plainText = new TextDecoder().decode(decBuf);
-                        decryptedCache[msg.id] = plainText;
-                        const textElem = document.getElementById('msg-' + msg.id)?.querySelector('.msg-text');
-                        if (textElem) textElem.innerHTML = escapeHtml(plainText);
-                    }
-                } catch(e) {
-                    const textElem = document.getElementById('msg-' + msg.id)?.querySelector('.msg-text');
-                    if (textElem) textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Не удалось расшифровать';
-                }
-            }, 10);
+            html += `<div class="msg-text"><span class="decrypting-shimmer">${SVG_LOCK}<span>Расшифровка...</span></span></div>`;
+            decryptMessageText(msg.id, msg.text, chatGeneration);
         }
     } else {
         if (displayText) html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
@@ -2355,7 +2416,7 @@ if (isEncrypted) {
 
                     setTimeout(() => processEncryptedAttachment(docId, doc.url, ext || title), 10);
                 } else {
-                    html += `<div class="msg-file" onclick="window.open('${doc.url}', '_blank')"><span class="msg-file-icon">📎</span><div class="msg-file-info"><div class="msg-file-name">${escapeHtml(doc.title || 'Файл')}</div><div class="msg-file-size">${(doc.size / 1024).toFixed(1)} KB</div></div></div>`;
+                    html += `<div class="msg-file" onclick="window.open('${doc.url}', '_blank')"><span class="msg-file-icon">${SVG_FILE}</span><div class="msg-file-info"><div class="msg-file-name">${escapeHtml(doc.title || 'Файл')}</div><div class="msg-file-size">${(doc.size / 1024).toFixed(1)} KB</div></div></div>`;
                 }
             }
         }
@@ -2968,8 +3029,9 @@ async function sendMediaBlob(blob, filename, mimeType) {
             formData.append('file', blob, filename);
 
             const res = await fetch('/api/upload_normal', { method: 'POST', body: formData });
-            if (!res.ok) {
-                throw new Error("Ошибка при не зашифрованной загрузке файла");
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || data.error || !data.ok) {
+                throw new Error(data.error || "Ошибка при отправке файла");
             }
         }
     } catch(e) {
@@ -3355,18 +3417,7 @@ async function pollEvents() {
                         }
                         // Force decrypt if encrypted
                         if (text && text.startsWith(ENCRYPT_PREFIX)) {
-                            setTimeout(async () => {
-                                try {
-                                    const encObj = JSON.parse(text.substring(ENCRYPT_PREFIX.length));
-                                    const decBuf = await clientDecryptData(encObj);
-                                    if (decBuf) {
-                                        const plainText = new TextDecoder().decode(decBuf);
-                                        decryptedCache[msgId] = plainText;
-                                        const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
-                                        if (textElem) textElem.innerHTML = escapeHtml(plainText);
-                                    }
-                                } catch(e) {}
-                            }, 50);
+                            decryptMessageText(msgId, text, chatGeneration);
                         }
                     }
                 } else if (eventCode === 3) {
@@ -4075,13 +4126,17 @@ def upload_encrypted_doc():
     upload_url = upload_server.get('upload_url')
     files = {'file': (file.filename, file.read(), 'application/octet-stream')}
     upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
+    if not upload_resp.get('file'):
+        return jsonify({'error': upload_resp.get('error', 'VK upload failed')}), 400
 
     save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=file.filename)
     attachment = extract_doc_attachment(save_result)
 
     if attachment:
-        vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
-        return jsonify({'ok': True})
+        send_result = vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
+        if isinstance(send_result, dict) and send_result.get('error'):
+            return jsonify({'error': send_result.get('error_msg', 'VK message send failed')}), 400
+        return jsonify({'ok': True, 'message_id': send_result})
 
     return jsonify({'error': 'Upload failed'}), 400
 
@@ -4106,6 +4161,8 @@ def upload_normal():
         upload_url = upload_server.get('upload_url')
         files = {'photo': (filename, BytesIO(file_bytes), file.content_type or 'image/jpeg')}
         upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
+        if not upload_resp.get('photo'):
+            return jsonify({'error': upload_resp.get('error', 'VK photo upload failed')}), 400
 
         save_result = vk_request('photos.saveMessagesPhoto', token,
             photo=upload_resp.get('photo'),
@@ -4116,8 +4173,10 @@ def upload_normal():
         if isinstance(save_result, list) and len(save_result) > 0:
             photo = save_result[0]
             attachment = f"photo{photo['owner_id']}_{photo['id']}"
-            vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
-            return jsonify({'ok': True})
+            send_result = vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
+            if isinstance(send_result, dict) and send_result.get('error'):
+                return jsonify({'error': send_result.get('error_msg', 'VK message send failed')}), 400
+            return jsonify({'ok': True, 'message_id': send_result})
 
     upload_server = vk_request('docs.getMessagesUploadServer', token, type='doc', peer_id=peer_id)
     if isinstance(upload_server, dict) and 'error' in upload_server:
@@ -4126,13 +4185,17 @@ def upload_normal():
     upload_url = upload_server.get('upload_url')
     files = {'file': (filename, BytesIO(file_bytes), file.content_type or 'application/octet-stream')}
     upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
+    if not upload_resp.get('file'):
+        return jsonify({'error': upload_resp.get('error', 'VK upload failed')}), 400
 
     save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=filename)
     attachment = extract_doc_attachment(save_result)
 
     if attachment:
-        vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
-        return jsonify({'ok': True})
+        send_result = vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
+        if isinstance(send_result, dict) and send_result.get('error'):
+            return jsonify({'error': send_result.get('error_msg', 'VK message send failed')}), 400
+        return jsonify({'ok': True, 'message_id': send_result})
 
     return jsonify({'error': 'Upload failed'}), 400
 
