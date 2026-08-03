@@ -1,0 +1,6 @@
+flask==3.0.3
+flask-socketio==5.3.6
+python-socketio==5.11.0
+eventlet==0.35.2
+gunicorn==21.2.0
+firebase-admin==6.5.0
