@@ -133,6 +133,59 @@ def extract_doc_attachment(save_result):
             
     return None
 
+SW_JS = """
+const CACHE_NAME = 'vk-meow-v3-cache';
+const STATIC_ASSETS = ['/', '/sw.js'];
+
+self.addEventListener('install', (evt) => {
+    evt.waitUntil(
+        caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
+    );
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', (evt) => {
+    evt.waitUntil(
+        caches.keys().then((keys) =>
+            Promise.all(keys.map((k) => k !== CACHE_NAME && caches.delete(k)))
+        )
+    );
+    self.clients.claim();
+});
+
+self.addEventListener('fetch', (evt) => {
+    const url = evt.request.url;
+
+    if (
+        evt.request.destination === 'image' ||
+        url.includes('/api/proxy_file') ||
+        url.includes('vk.com/images/') ||
+        url.includes('userapi.com/')
+    ) {
+        evt.respondWith(
+            caches.open(CACHE_NAME).then(async (cache) => {
+                const cached = await cache.match(evt.request);
+                if (cached) return cached;
+                try {
+                    const response = await fetch(evt.request);
+                    if (response.status === 200) {
+                        cache.put(evt.request, response.clone());
+                    }
+                    return response;
+                } catch (e) {
+                    return cached;
+                }
+            })
+        );
+        return;
+    }
+
+    evt.respondWith(
+        fetch(evt.request).catch(() => caches.match(evt.request))
+    );
+});
+"""
+
 HTML = """
 <!DOCTYPE html>
 <html lang="ru">
@@ -195,7 +248,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 /* TG Style Dialog Preview Thumbs */
 .dialog-preview-wrap{display:flex;align-items:center;gap:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;font-size:13px;color:#888}
 .dialog-preview-thumb{width:20px;height:20px;border-radius:4px;object-fit:cover;filter:blur(2.5px);flex-shrink:0;background:#333;display:inline-block}
-.dialog-preview-thumb.circle{border-radius:50%}
 
 /* Folder Tabs */
 .folder-tabs{display:flex;gap:4px;padding:8px 12px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;background:#0d0d0d;border-bottom:1px solid #1c1c1c}
@@ -437,6 +489,24 @@ input:checked + .slider:before{transform:translateX(20px)}
 </label>
 </div>
 
+<div class="drawer-item" onclick="toggleEncryptionMode()">
+<div class="drawer-item-left">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+<span>Шифрование E2EE</span>
+</div>
+<label class="switch" onclick="event.stopPropagation()">
+<input type="checkbox" id="encryptToggle" onchange="setEncryptionState(this.checked)">
+<span class="slider"></span>
+</label>
+</div>
+
+<div class="drawer-item" onclick="clearAppCache()">
+<div class="drawer-item-left">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+<span>Очистить кэш</span>
+</div>
+</div>
+
 <div class="drawer-item" onclick="openProfileEditModal()">
 <div class="drawer-item-left">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -564,6 +634,7 @@ Kate Mobile API • True Client-Side E2EE
 <!-- Folder Tabs -->
 <div class="folder-tabs" id="folderTabs">
 <div class="folder-tab active" onclick="switchFolder('all')" data-folder="all">Личные</div>
+<div class="folder-tab" onclick="switchFolder('groups')" data-folder="groups">Группы</div>
 <div class="folder-tab" onclick="switchFolder('channels')" data-folder="channels">Каналы</div>
 <div class="folder-tab" onclick="switchFolder('news')" data-folder="news">Новости</div>
 </div>
@@ -739,6 +810,13 @@ Kate Mobile API • True Client-Side E2EE
 </div>
 
 <script>
+/* SERVICE WORKER REGISTRATION FOR MAXIMUM SPEED & OFFLINE CACHING */
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW reg error:', err));
+    });
+}
+
 /* =========================================================================
    TRUE CLIENT-SIDE E2EE ENGINE & KATE MOBILE API
    ========================================================================= */
@@ -748,15 +826,16 @@ let token = localStorage.getItem('vk_token');
 let password = localStorage.getItem('vk_pass');
 let ghostMode = localStorage.getItem('ghost_mode') !== 'false';
 let soundEnabled = localStorage.getItem('sound_enabled') !== 'false';
+let encryptionEnabled = localStorage.getItem('encryption_enabled') !== 'false';
 
 let currentPeer = null;
 let currentUser = null;
 let dialogsData = [];
+let userGroupsData = [];
 let longPollTimer = null;
 let longPollTs = null;
 let longPollKey = null;
 let longPollServer = null;
-let encryptionEnabled = true;
 let myVkId = null;
 
 let localKeyPair = null;
@@ -817,6 +896,32 @@ function setSoundState(val) {
     localStorage.setItem('sound_enabled', val);
     const chk = document.getElementById('soundToggle');
     if (chk) chk.checked = val;
+}
+
+function toggleEncryptionMode() {
+    encryptionEnabled = !encryptionEnabled;
+    setEncryptionState(encryptionEnabled);
+}
+
+function setEncryptionState(val) {
+    encryptionEnabled = val;
+    localStorage.setItem('encryption_enabled', val);
+    const chk = document.getElementById('encryptToggle');
+    if (chk) chk.checked = val;
+}
+
+async function clearAppCache() {
+    if (confirm("Очистить локальный кэш медиа и расшифрованных данных?")) {
+        showUploadProgress("Очистка кэша...");
+        decryptedCache = {};
+        if ('caches' in window) {
+            const keys = await caches.keys();
+            await Promise.all(keys.map(k => caches.delete(k)));
+        }
+        hideUploadProgress();
+        alert("Кэш успешно очищен!");
+        location.reload();
+    }
 }
 
 async function flashOnlineStatus() {
@@ -1156,6 +1261,7 @@ function updateDrawerProfile() {
     
     setGhostState(ghostMode);
     setSoundState(soundEnabled);
+    setEncryptionState(encryptionEnabled);
 }
 
 let touchStartX = 0;
@@ -1350,6 +1456,31 @@ async function loadDialogs() {
 
         fastDecryptDialogPreviews(data.dialogs);
     } catch(e){}
+}
+
+async function loadUserGroups() {
+    try {
+        const res = await fetch('/api/user_groups', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ token }) });
+        const data = await res.json();
+        if (data.groups) {
+            userGroupsData = data.groups;
+            renderUserGroupsList();
+        }
+    } catch(e){}
+}
+
+function renderUserGroupsList() {
+    const list = document.getElementById('dialogsList');
+    list.innerHTML = '';
+
+    for (const g of userGroupsData) {
+        const div = document.createElement('div');
+        div.className = 'dialog';
+        div.onclick = () => openProfileView(-g.id, true);
+
+        div.innerHTML = `<div class="dialog-avatar-wrap"><img class="dialog-avatar" src="${g.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'"></div><div class="dialog-info"><div class="dialog-top"><div class="dialog-name">${escapeHtml(g.name)}</div></div><div class="dialog-bottom"><div class="dialog-preview">${escapeHtml(g.activity || g.description || 'Сообщество VK')}</div></div></div>`;
+        list.appendChild(div);
+    }
 }
 
 async function openChat(index) {
@@ -2325,6 +2456,12 @@ function renderFolderTabs() {
     allTab.onclick = () => switchFolder('all');
     tabs.appendChild(allTab);
 
+    const groupsTab = document.createElement('div');
+    groupsTab.className = 'folder-tab ' + (currentFolder === 'groups' ? 'active' : '');
+    groupsTab.textContent = 'Группы';
+    groupsTab.onclick = () => switchFolder('groups');
+    tabs.appendChild(groupsTab);
+
     const channelsTab = document.createElement('div');
     channelsTab.className = 'folder-tab ' + (currentFolder === 'channels' ? 'active' : '');
     channelsTab.textContent = 'Каналы';
@@ -2363,6 +2500,10 @@ async function switchFolder(folder) {
         dialogsList.classList.add('hidden');
         newsFeed.classList.remove('hidden');
         loadNewsFeed();
+    } else if (folder === 'channels') {
+        dialogsList.classList.remove('hidden');
+        newsFeed.classList.add('hidden');
+        await loadUserGroups();
     } else {
         dialogsList.classList.remove('hidden');
         newsFeed.classList.add('hidden');
@@ -2372,8 +2513,8 @@ async function switchFolder(folder) {
         items.forEach((item, i) => {
             const d = dialogsData[i];
             if (!d) return;
-            if (folder === 'channels') {
-                if (d.type !== 'group' && d.type !== 'chat') {
+            if (folder === 'groups') {
+                if (d.type !== 'chat' && d.type !== 'group') {
                     item.style.display = 'none';
                 }
             } else if (folder === 'all') {
@@ -2554,6 +2695,11 @@ def index():
     return render_template_string(HTML)
 
 
+@app.route('/sw.js')
+def service_worker():
+    return Response(SW_JS, mimetype='application/javascript')
+
+
 @app.route('/api/auth', methods=['POST'])
 def auth():
     url = request.json.get('url', '')
@@ -2588,6 +2734,15 @@ def ghost_flash():
             vk_request('account.setOffline', token)
         threading.Thread(target=set_back_offline).start()
     return jsonify({'ok': True})
+
+
+@app.route('/api/user_groups', methods=['POST'])
+def user_groups():
+    token = request.json.get('token')
+    res = vk_request('groups.get', token, extended=1, fields='photo_100,description,status,activity', count=100)
+    if isinstance(res, dict) and 'error' in res:
+        return jsonify(res), 400
+    return jsonify({'groups': res.get('items', [])})
 
 
 @app.route('/api/keys/<vk_id>', methods=['GET'])
