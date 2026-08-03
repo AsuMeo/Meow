@@ -879,7 +879,7 @@ Kate Mobile API • Cloud Realtime E2EE
 </div>
 <div class="header-actions">
 <button class="header-btn" id="searchChatBtn" onclick="toggleChatSearch()" title="Поиск по сообщениям">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.85"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="11"/><line x1="11" y1="11" x2="13.5" y2="13.5"/></svg>
 </button>
 <button class="mark-read-btn hidden" id="manualMarkReadBtn" onclick="manualMarkChatAsRead()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align:middle;margin-right:4px"><polyline points="20 6 9 17 4 12"/></svg>Прочитать</button>
 </div>
@@ -1086,7 +1086,7 @@ let myVkId = null;
 
 let localKeyPair = null;
 let peerKeysCache = {};
-let decryptedCache = {};
+
 let renderedMsgIds = new Set();
 
 let replyToMsg = null;
@@ -1992,7 +1992,6 @@ function openChatByObject(d) {
     document.getElementById('chatScreen').classList.add('active');
 
     renderedMsgIds.clear();
-    decryptedCache = {}; // Очищаем кэш расшифровки при входе в чат
     document.getElementById('messages').innerHTML = '';
     messagesOffset = 0;
     allMessagesLoaded = false;
@@ -2225,10 +2224,21 @@ function renderMessageItem(containerOrFragment, msg) {
     if (!msg.out && msg.name) html += `<div class="msg-author">${escapeHtml(msg.name)}</div>`;
 
     let displayText = msg.text || '';
-    let isPureCircle = false;
+        let isPureCircle = false;
     let isSticker = false;
-    
-    if (isEncrypted) {
+
+    // Check for sticker in attachments
+    if (msg.attachments) {
+        for (const a of msg.attachments) {
+            if (a.type === 'doc') {
+                const t = (a.doc?.title || '').toLowerCase();
+                const e = (a.doc?.ext || '').toLowerCase();
+                if (e === 'mst' || t.endsWith('.mst')) isSticker = true;
+            }
+        }
+    }
+
+if (isEncrypted) {
         if (decryptedCache[msg.id]) {
             displayText = decryptedCache[msg.id];
             html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
@@ -2308,9 +2318,9 @@ function renderMessageItem(containerOrFragment, msg) {
 
                 const isCustomEnc = title.startsWith('enc_') || 
                     ext === 'meow' || ext === 'mer' || ext === 'mkru' || ext === 'mgs' ||
-                    ext === 'enc' || ext === 'mec' || ext === 'meg' || ext === 'mur' ||
+                    ext === 'enc' || ext === 'mec' || ext === 'meg' || ext === 'mur' || ext === 'mst' || ext === 'mmu' ||
                     title.endsWith('.meow') || title.endsWith('.mer') || title.endsWith('.mkru') || title.endsWith('.mgs') ||
-                    title.endsWith('.mec') || title.endsWith('.meg');
+                    title.endsWith('.mec') || title.endsWith('.meg') || title.endsWith('.mst') || title.endsWith('.mmu');
 
                 if (isCustomEnc) {
                     const docId = `doc_${doc.owner_id}_${doc.id}`;
@@ -2330,6 +2340,7 @@ function renderMessageItem(containerOrFragment, msg) {
                         </div>`;
                     } else if (ext === 'mst' || title.endsWith('.mst')) {
                         html += `<div id="${docId}" style="width:140px;height:140px;display:flex;align-items:center;justify-content:center"><span class="loader"></span></div>`;
+                        isSticker = true;
                     } else if (ext === 'mmu' || title.endsWith('.mmu')) {
                         html += `<div class="tg-voice-container" id="${docId}">
                             <div class="tg-voice-play-btn"><span class="loader"></span></div>
@@ -2756,7 +2767,7 @@ function renderDecryptedMedia(elem, data) {
         vid.src = data.blobUrl;
         vid.controls = true;
         elem.replaceWith(vid);
-    } else if ((data.name && data.name.endsWith('.mst')) || (data.extInfo && data.extInfo.includes('mst'))) {
+    } else if ((data.name && data.name.endsWith('.mst')) || (data.extInfo && data.extInfo.includes('mst')) || data.mime === 'image/png') {
         // Sticker
         const img = document.createElement('img');
         img.style.width = '140px';
@@ -2772,6 +2783,7 @@ function renderDecryptedMedia(elem, data) {
             parentMsg.style.padding = '0';
             parentMsg.style.borderRadius = '0';
             parentMsg.style.boxShadow = 'none';
+            parentMsg.style.maxWidth = '160px';
         }
         elem.replaceWith(img);
     } else if ((data.name && data.name.endsWith('.mmu')) || (data.extInfo && data.extInfo.includes('mmu'))) {
@@ -3165,7 +3177,7 @@ async function uploadEncryptedMedia(blob, filename, mimeType) {
     else if (filename.endsWith('.mgs') || mimeType.includes('mgs')) ext = 'mgs';
     else if (filename.endsWith('.meow') || mimeType.startsWith('image/')) ext = 'meow';
     else if (filename.endsWith('.mer') || mimeType.startsWith('video/')) ext = 'mer';
-    else if (filename.endsWith('.mst')) ext = 'mst';
+    else if (filename.endsWith('.mst') || mimeType === 'image/png') ext = 'mst';
     else if (filename.endsWith('.mmu') || mimeType.startsWith('audio/')) ext = 'mmu';
 
     const formData = new FormData();
@@ -3191,6 +3203,8 @@ async function handleFile(e) {
             name = `video_${Date.now()}.mer`;
         } else if (file.type.startsWith('audio/')) {
             name = `music_${Date.now()}.mmu`;
+        } else if (file.name.endsWith('.mst')) {
+            name = file.name;
         }
         await sendMediaBlob(file, name, file.type || 'application/octet-stream');
     } finally {
@@ -3232,7 +3246,7 @@ async function createStickerFromPhoto() {
                 img.src = URL.createObjectURL(file);
             });
 
-            await sendMediaBlob(blob, `sticker_${Date.now()}.mst`, 'image/png');
+            await sendMediaBlob(blob, `sticker_${Date.now()}.mst`, 'application/octet-stream');
         } catch(err) {
             alert('Ошибка создания стикера: ' + err.message);
             hideUploadProgress();
@@ -3331,13 +3345,28 @@ async function pollEvents() {
                             out: isOut ? 1 : 0,
                             name: isOut ? 'Вы' : d?.name || 'Собеседник',
                             photo: '',
-                            attachments: u[7] && u[7].attach1_type ? [] : []
+                            attachments: []
                         };
                         if (!renderedMsgIds.has(msgId)) {
                             renderedMsgIds.add(msgId);
                             const container = document.getElementById('messages');
                             renderMessageItem(container, newMsg);
                             container.scrollTop = container.scrollHeight;
+                        }
+                        // Force decrypt if encrypted
+                        if (text && text.startsWith(ENCRYPT_PREFIX)) {
+                            setTimeout(async () => {
+                                try {
+                                    const encObj = JSON.parse(text.substring(ENCRYPT_PREFIX.length));
+                                    const decBuf = await clientDecryptData(encObj);
+                                    if (decBuf) {
+                                        const plainText = new TextDecoder().decode(decBuf);
+                                        decryptedCache[msgId] = plainText;
+                                        const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
+                                        if (textElem) textElem.innerHTML = escapeHtml(plainText);
+                                    }
+                                } catch(e) {}
+                            }, 50);
                         }
                     }
                 } else if (eventCode === 3) {
