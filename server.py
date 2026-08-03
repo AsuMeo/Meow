@@ -192,6 +192,56 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .dialogs-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .dialog{display:flex;align-items:center;padding:12px 14px;cursor:pointer;border-bottom:1px solid #111}
 .dialog:active{background:#111}
+.dialog-avatar-wrap{position:relative;width:50px;height:50px;flex-shrink:0;margin-right:12px}
+.dialog-avatar{width:50px;height:50px;border-radius:50%;object-fit:cover;background:#222;display:block}
+.dialog-online-dot{position:absolute;bottom:2px;right:2px;width:14px;height:14px;border-radius:50%;background:#34c759;border:2.5px solid #000;z-index:2}
+.dialog-online-dot.offline{background:#8e8e93}
+.dialog-typing{font-size:12px;color:#34c759;font-weight:500;font-style:italic}
+.dialog-preview.typing{color:#34c759}
+.dialog-unread-blue{min-width:20px;height:20px;border-radius:50%;background:#0a84ff;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 6px;flex-shrink:0}
+/* Folder Tabs */
+.folder-tabs{display:flex;gap:4px;padding:8px 12px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;background:#0d0d0d;border-bottom:1px solid #1c1c1c}
+.folder-tabs::-webkit-scrollbar{display:none}
+.folder-tab{white-space:nowrap;padding:6px 14px;border-radius:16px;background:#1c1c1e;color:#8e8e93;font-size:13px;font-weight:500;cursor:pointer;border:1px solid transparent;transition:all 0.15s}
+.folder-tab.active{background:#2c2c2e;color:#fff;border-color:#3a3a3c}
+.folder-tab:active{background:#333}
+
+/* News Feed */
+.news-feed{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 12px}
+.news-item{background:#141416;border-radius:16px;padding:14px;margin-bottom:10px;border:1px solid #1c1c1c}
+.news-item-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.news-item-avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;background:#222}
+.news-item-name{font-size:14px;font-weight:600;color:#fff}
+.news-item-time{font-size:11px;color:#666}
+.news-item-text{font-size:14px;color:#ddd;line-height:1.5;margin-bottom:10px}
+.news-item-photo{width:100%;border-radius:12px;margin-top:8px;max-height:300px;object-fit:cover}
+.news-item-actions{display:flex;gap:16px;margin-top:10px;padding-top:10px;border-top:1px solid #222}
+.news-action{display:flex;align-items:center;gap:4px;color:#8e8e93;font-size:13px;cursor:pointer}
+.news-action:active{color:#fff}
+
+/* Profile View Modal */
+.profile-view-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:650;display:flex;flex-direction:column;overflow:hidden;transform:translateY(100%);transition:transform 0.25s cubic-bezier(0.1,0.9,0.2,1)}
+.profile-view-modal.active{transform:translateY(0)}
+.profile-view-header{height:56px;background:#0d0d0d;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #1c1c1c;flex-shrink:0}
+.profile-view-cover{height:140px;background:linear-gradient(135deg,#1c1c1e,#2c2c2e);position:relative}
+.profile-view-avatar-wrap{position:relative;margin-top:-50px;padding:0 16px;display:flex;align-items:flex-end;gap:12px}
+.profile-view-avatar{width:100px;height:100px;border-radius:50%;object-fit:cover;background:#222;border:4px solid #000}
+.profile-view-name-wrap{flex:1;padding-bottom:8px}
+.profile-view-name{font-size:20px;font-weight:700;color:#fff}
+.profile-view-status{font-size:13px;color:#8e8e93;margin-top:2px}
+.profile-view-info{padding:16px;display:flex;flex-direction:column;gap:12px}
+.profile-view-info-item{display:flex;align-items:center;gap:10px;color:#aaa;font-size:14px}
+.profile-view-posts{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 12px 20px}
+.profile-view-post-title{font-size:16px;font-weight:700;color:#fff;padding:12px 4px}
+.profile-view-empty{color:#666;text-align:center;padding:40px 20px;font-size:14px}
+
+/* Create Folder Modal */
+.folder-create-list{max-height:300px;overflow-y:auto;-webkit-overflow-scrolling:touch;margin:10px 0}
+.folder-create-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;cursor:pointer}
+.folder-create-item:active{background:rgba(255,255,255,0.05)}
+.folder-create-item img{width:40px;height:40px;border-radius:50%;object-fit:cover;background:#222}
+.folder-create-item input[type="checkbox"]{width:20px;height:20px;accent-color:#fff}
+
 .dialog-avatar{width:50px;height:50px;border-radius:50%;object-fit:cover;margin-right:12px;flex-shrink:0;background:#222}
 .dialog-info{flex:1;min-width:0}
 .dialog-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
@@ -341,6 +391,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <span id="uploadToastText">Загрузка...</span>
 </div>
 
+<!-- Audio for notifications -->
+<audio id="notifSound" preload="auto">
+<source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZURE" type="audio/wav">
+</audio>
+
 <!-- Navigation Drawer Overlay & Side Panel -->
 <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
 <div class="drawer" id="drawer">
@@ -444,7 +499,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </div>
 </div>
 
+<!-- Folder Tabs -->
+<div class="folder-tabs" id="folderTabs">
+<div class="folder-tab active" onclick="switchFolder('all')" data-folder="all">Все</div>
+<div class="folder-tab" onclick="switchFolder('channels')" data-folder="channels">Каналы</div>
+<div class="folder-tab" onclick="switchFolder('news')" data-folder="news">Новости</div>
+</div>
+
 <div class="dialogs-list" id="dialogsList"></div>
+<div class="news-feed hidden" id="newsFeed"></div>
 
 <div class="bottom-nav">
 <div class="nav-item active" onclick="showDialogs()">
@@ -472,7 +535,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <polyline points="12 19 5 12 12 5"></polyline>
 </svg>
 </div>
-<img class="header-avatar" id="chatAvatar" src="" alt="" onclick="backToDialogs()">
+<img class="header-avatar" id="chatAvatar" src="" alt="" onclick="openProfileView(currentPeer, currentPeer < 0)" style="cursor:pointer">
 <div class="header-info" onclick="backToDialogs()">
 <div class="header-title" id="chatTitle">...</div>
 <div class="header-subtitle" id="chatEncryptStatus">в сети</div>
@@ -575,6 +638,45 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 </div>
 
+<!-- Profile View Modal -->
+<div class="profile-view-modal" id="profileViewModal">
+<div class="profile-view-header">
+<div class="header-back" onclick="closeProfileView()" style="margin-right:10px">
+<svg viewBox="0 0 24 24" style="width:22px;height:22px;stroke:#fff;stroke-width:2.5px;fill:none">
+<line x1="19" y1="12" x2="5" y2="12"></line>
+<polyline points="12 19 5 12 12 5"></polyline>
+</svg>
+</div>
+<div class="header-title" id="profileViewHeaderTitle">Профиль</div>
+</div>
+<div class="profile-view-cover" id="profileViewCover"></div>
+<div class="profile-view-avatar-wrap">
+<img class="profile-view-avatar" id="profileViewAvatar" src="" alt="">
+<div class="profile-view-name-wrap">
+<div class="profile-view-name" id="profileViewName">...</div>
+<div class="profile-view-status" id="profileViewStatus">...</div>
+</div>
+</div>
+<div class="profile-view-info" id="profileViewInfo"></div>
+<div class="profile-view-posts" id="profileViewPosts">
+<div class="profile-view-post-title">Посты</div>
+<div id="profilePostsList"></div>
+</div>
+</div>
+
+<!-- Create Folder Modal -->
+<div class="modal hidden" id="createFolderModal">
+<div class="modal-content">
+<div class="modal-title">Создать папку</div>
+<input type="text" class="token-input" id="newFolderName" placeholder="Название папки">
+<div class="folder-create-list" id="folderCreateList"></div>
+<div style="display:flex;gap:8px;margin-top:8px">
+<button class="btn btn-secondary" style="flex:1" onclick="closeCreateFolderModal()">Отмена</button>
+<button class="btn" style="flex:1" onclick="saveNewFolder()">Создать</button>
+</div>
+</div>
+</div>
+
 <script>
 /* =========================================================================
    PURE CLIENT-SIDE E2EE ENGINE & CLOUD PERSISTENCE
@@ -599,6 +701,8 @@ let editMsg = null;
 let selectedMsgForAction = null;
 let typingTimeout = null;
 let peerTypingTimer = null;
+let dialogTypingTimers = {};
+let lastDialogHash = '';
 
 function showUploadProgress(text) {
     const toast = document.getElementById('uploadToast');
@@ -825,6 +929,7 @@ async function login() {
             document.getElementById('loginScreen').classList.add('hidden');
             showDialogsScreen();
             loadDialogs();
+            loadFolders();
             startPolling();
             updateDrawerProfile();
         }
@@ -965,21 +1070,32 @@ async function loadDialogs() {
         const data = await res.json();
         if (data.error) return;
         dialogsData = data.dialogs;
-        const list = document.getElementById('dialogsList'); list.innerHTML = '';
-        
+        const list = document.getElementById('dialogsList');
+
+        const newHash = data.dialogs.map(d => d.id + ':' + d.unread + ':' + (d.last_message || '').slice(0, 30)).join('|');
+        if (lastDialogHash === newHash && list.children.length > 0) {
+            for (const d of data.dialogs) {
+                const dot = document.getElementById('dot-' + d.id);
+                if (dot) dot.className = 'dialog-online-dot ' + (d.online ? '' : 'offline');
+            }
+            return;
+        }
+        lastDialogHash = newHash;
+        list.innerHTML = '';
+
         for (let i = 0; i < data.dialogs.length; i++) {
             const d = data.dialogs[i];
             const div = document.createElement('div');
             div.className = 'dialog';
             div.onclick = () => openChat(i);
             const time = d.date ? new Date(d.date * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : '';
-            
+
             let preview = d.last_message || '';
             if (preview.startsWith(ENCRYPT_PREFIX)) {
                 preview = '🔒 Зашифрованное сообщение';
             }
-            
-            div.innerHTML = `<img class="dialog-avatar" src="${d.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'"><div class="dialog-info"><div class="dialog-top"><div class="dialog-name">${escapeHtml(d.name)}</div><div class="dialog-time">${time}</div></div><div class="dialog-bottom"><div class="dialog-preview">${escapeHtml(preview)}</div>${d.unread > 0 ? `<div class="dialog-unread">${d.unread}</div>` : ''}</div></div>`;
+
+            div.innerHTML = `<div class="dialog-avatar-wrap" onclick="event.stopPropagation();openProfileView(${d.id}, ${d.type === 'group' ? 'true' : 'false'})"><img class="dialog-avatar" src="${d.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'"><div class="dialog-online-dot ${d.online ? '' : 'offline'}" id="dot-${d.id}"></div></div><div class="dialog-info"><div class="dialog-top"><div class="dialog-name">${escapeHtml(d.name)}</div><div class="dialog-time">${time}</div></div><div class="dialog-bottom" id="preview-${d.id}"><div class="dialog-preview ${d.typing ? 'typing' : ''}">${d.typing ? 'печатает...' : escapeHtml(preview)}</div>${d.unread > 0 ? `<div class="dialog-unread-blue">${d.unread}</div>` : ''}</div></div>`;
             list.appendChild(div);
         }
     } catch(e){}
@@ -1043,6 +1159,28 @@ function setPeerTypingDisplay() {
         statusElem.classList.remove('typing');
         fetchPeerStatus();
     }, 2500);
+}
+
+function setDialogTyping(peerId) {
+    const previewWrap = document.getElementById('preview-' + peerId);
+    if (previewWrap) {
+        const previewText = previewWrap.querySelector('.dialog-preview');
+        if (previewText) {
+            previewText.textContent = 'печатает...';
+            previewText.classList.add('typing');
+        }
+    }
+    if (dialogTypingTimers[peerId]) clearTimeout(dialogTypingTimers[peerId]);
+    dialogTypingTimers[peerId] = setTimeout(() => {
+        const pw = document.getElementById('preview-' + peerId);
+        if (pw) {
+            const pt = pw.querySelector('.dialog-preview');
+            if (pt) {
+                pt.classList.remove('typing');
+                loadDialogs();
+            }
+        }
+    }, 3500);
 }
 
 async function loadMessages() {
@@ -1870,14 +2008,45 @@ function toggleEncrypt() {
     document.getElementById('encryptBtn').classList.toggle('active', encryptionEnabled);
 }
 
+let lastMessageCount = 0;
+let lastDialogsUnread = 0;
+
+function playNotificationSound() {
+    const audio = document.getElementById('notifSound');
+    if (audio) {
+        audio.currentTime = 0;
+        audio.play().catch(e => {});
+    }
+}
+
 function startPolling() {
     if (pollInterval) clearInterval(pollInterval);
-    pollInterval = setInterval(() => { 
+    pollInterval = setInterval(async () => { 
         if (currentPeer) {
-            loadMessages();
+            const oldCount = document.getElementById('messages').children.length;
+            await loadMessages();
+            const newCount = document.getElementById('messages').children.length;
+            if (newCount > oldCount && document.getElementById('chatScreen').classList.contains('active')) {
+                const msgs = document.getElementById('messages').querySelectorAll('.msg-in');
+                if (msgs.length > 0) {
+                    const lastMsg = msgs[msgs.length - 1];
+                    if (!lastMsg.classList.contains('notified')) {
+                        lastMsg.classList.add('notified');
+                        playNotificationSound();
+                    }
+                }
+            }
             fetchPeerStatus();
-        } 
-    }, 2000);
+        } else {
+            const oldUnread = lastDialogsUnread;
+            await loadDialogs();
+            const newUnread = dialogsData.reduce((sum, d) => sum + (d.unread || 0), 0);
+            if (newUnread > oldUnread) {
+                playNotificationSound();
+            }
+            lastDialogsUnread = newUnread;
+        }
+    }, 2500);
 }
 
 function logout() {
@@ -1894,6 +2063,228 @@ document.getElementById('msgInput').addEventListener('keypress', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
 
+/* FOLDER MANAGEMENT */
+let currentFolder = 'all';
+let customFolders = [];
+
+async function loadFolders() {
+    try {
+        const res = await fetch(`/api/folders/${myVkId}`);
+        if (res.ok) {
+            const data = await res.json();
+            customFolders = data.folders || [];
+            renderFolderTabs();
+        }
+    } catch(e) {}
+}
+
+function renderFolderTabs() {
+    const tabs = document.getElementById('folderTabs');
+    if (!tabs) return;
+    tabs.innerHTML = '';
+
+    const allTab = document.createElement('div');
+    allTab.className = 'folder-tab ' + (currentFolder === 'all' ? 'active' : '');
+    allTab.textContent = 'Все';
+    allTab.onclick = () => switchFolder('all');
+    tabs.appendChild(allTab);
+
+    const channelsTab = document.createElement('div');
+    channelsTab.className = 'folder-tab ' + (currentFolder === 'channels' ? 'active' : '');
+    channelsTab.textContent = 'Каналы';
+    channelsTab.onclick = () => switchFolder('channels');
+    tabs.appendChild(channelsTab);
+
+    const newsTab = document.createElement('div');
+    newsTab.className = 'folder-tab ' + (currentFolder === 'news' ? 'active' : '');
+    newsTab.textContent = 'Новости';
+    newsTab.onclick = () => switchFolder('news');
+    tabs.appendChild(newsTab);
+
+    for (const f of customFolders) {
+        const tab = document.createElement('div');
+        tab.className = 'folder-tab ' + (currentFolder === f.id ? 'active' : '');
+        tab.textContent = f.name;
+        tab.onclick = () => switchFolder(f.id);
+        tabs.appendChild(tab);
+    }
+
+    const addTab = document.createElement('div');
+    addTab.className = 'folder-tab';
+    addTab.textContent = '+';
+    addTab.onclick = openCreateFolderModal;
+    tabs.appendChild(addTab);
+}
+
+async function switchFolder(folder) {
+    currentFolder = folder;
+    renderFolderTabs();
+
+    const dialogsList = document.getElementById('dialogsList');
+    const newsFeed = document.getElementById('newsFeed');
+
+    if (folder === 'news') {
+        dialogsList.classList.add('hidden');
+        newsFeed.classList.remove('hidden');
+        loadNewsFeed();
+    } else {
+        dialogsList.classList.remove('hidden');
+        newsFeed.classList.add('hidden');
+        await loadDialogs();
+
+        if (folder === 'channels') {
+            const items = dialogsList.querySelectorAll('.dialog');
+            items.forEach((item, i) => {
+                if (dialogsData[i] && dialogsData[i].type !== 'group') {
+                    item.style.display = 'none';
+                }
+            });
+        } else if (folder !== 'all') {
+            const folderData = customFolders.find(f => f.id === folder);
+            if (folderData) {
+                const items = dialogsList.querySelectorAll('.dialog');
+                items.forEach((item, i) => {
+                    if (dialogsData[i] && !folderData.peers.includes(String(dialogsData[i].id))) {
+                        item.style.display = 'none';
+                    }
+                });
+            }
+        }
+    }
+}
+
+async function loadNewsFeed() {
+    const feed = document.getElementById('newsFeed');
+    feed.innerHTML = '';
+    showUploadProgress('Загрузка новостей...');
+    try {
+        const res = await fetch('/api/news', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({token}) });
+        const data = await res.json();
+        if (data.items) {
+            for (const item of data.items) {
+                const div = document.createElement('div');
+                div.className = 'news-item';
+                const photo = item.photo ? `<img class="news-item-photo" src="${item.photo}" onerror="this.style.display='none'">` : '';
+                div.innerHTML = `
+                    <div class="news-item-header">
+                        <img class="news-item-avatar" src="${item.author_photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
+                        <div><div class="news-item-name">${escapeHtml(item.author_name)}</div><div class="news-item-time">${item.time || ''}</div></div>
+                    </div>
+                    <div class="news-item-text">${escapeHtml(item.text || '')}</div>
+                    ${photo}
+                    <div class="news-item-actions">
+                        <div class="news-action">❤ ${item.likes || 0}</div>
+                        <div class="news-action">💬 ${item.comments || 0}</div>
+                        <div class="news-action">↗ ${item.reposts || 0}</div>
+                    </div>
+                `;
+                feed.appendChild(div);
+            }
+        }
+    } catch(e) {}
+    hideUploadProgress();
+}
+
+/* PROFILE VIEW */
+async function openProfileView(peerId, isGroup) {
+    showUploadProgress('Загрузка профиля...');
+    try {
+        const res = await fetch('/api/profile_view', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({token, peer_id: peerId, is_group: isGroup})
+        });
+        const data = await res.json();
+        if (data.error) { hideUploadProgress(); return; }
+
+        document.getElementById('profileViewAvatar').src = data.photo || '';
+        document.getElementById('profileViewName').textContent = data.name || '...';
+        document.getElementById('profileViewStatus').textContent = data.status || '';
+        document.getElementById('profileViewHeaderTitle').textContent = data.name || 'Профиль';
+
+        const infoDiv = document.getElementById('profileViewInfo');
+        infoDiv.innerHTML = '';
+        if (data.city) infoDiv.innerHTML += `<div class="profile-view-info-item">📍 ${escapeHtml(data.city)}</div>`;
+        if (data.bdate) infoDiv.innerHTML += `<div class="profile-view-info-item">🎂 ${escapeHtml(data.bdate)}</div>`;
+        if (data.site) infoDiv.innerHTML += `<div class="profile-view-info-item">🔗 ${escapeHtml(data.site)}</div>`;
+
+        const postsList = document.getElementById('profilePostsList');
+        postsList.innerHTML = '';
+        if (data.posts && data.posts.length > 0) {
+            for (const post of data.posts) {
+                const div = document.createElement('div');
+                div.className = 'news-item';
+                const photo = post.photo ? `<img class="news-item-photo" src="${post.photo}" onerror="this.style.display='none'">` : '';
+                div.innerHTML = `
+                    <div class="news-item-text">${escapeHtml(post.text || '')}</div>
+                    ${photo}
+                    <div class="news-item-actions">
+                        <div class="news-action">❤ ${post.likes || 0}</div>
+                        <div class="news-action">💬 ${post.comments || 0}</div>
+                        <div class="news-action">↗ ${post.reposts || 0}</div>
+                    </div>
+                `;
+                postsList.appendChild(div);
+            }
+        } else {
+            postsList.innerHTML = '<div class="profile-view-empty">Нет постов для отображения</div>';
+        }
+
+        document.getElementById('profileViewModal').classList.add('active');
+    } catch(e) {}
+    hideUploadProgress();
+}
+
+function closeProfileView() {
+    document.getElementById('profileViewModal').classList.remove('active');
+}
+
+/* CREATE FOLDER */
+function openCreateFolderModal() {
+    document.getElementById('newFolderName').value = '';
+    const list = document.getElementById('folderCreateList');
+    list.innerHTML = '';
+    for (const d of dialogsData) {
+        if (d.type !== 'group') {
+            const item = document.createElement('div');
+            item.className = 'folder-create-item';
+            item.innerHTML = `
+                <input type="checkbox" value="${d.id}" id="chk-${d.id}">
+                <img src="${d.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
+                <span>${escapeHtml(d.name)}</span>
+            `;
+            list.appendChild(item);
+        }
+    }
+    document.getElementById('createFolderModal').classList.remove('hidden');
+}
+
+function closeCreateFolderModal() {
+    document.getElementById('createFolderModal').classList.add('hidden');
+}
+
+async function saveNewFolder() {
+    const name = document.getElementById('newFolderName').value.trim();
+    if (!name) return;
+
+    const peers = [];
+    document.querySelectorAll('#folderCreateList input[type="checkbox"]:checked').forEach(chk => {
+        peers.push(chk.value);
+    });
+
+    showUploadProgress('Сохранение папки...');
+    try {
+        await fetch(`/api/folders/${myVkId}`, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({name, peers})
+        });
+        await loadFolders();
+        closeCreateFolderModal();
+    } catch(e) {}
+    hideUploadProgress();
+}
+
 /* AUTO-LOGIN RESTORATION ON PAGE RELOAD */
 (async () => {
     if (token && password && localStorage.getItem('vk_user')) {
@@ -1905,6 +2296,7 @@ document.getElementById('msgInput').addEventListener('keypress', e => {
             const ok = await initClientCrypto();
             if (ok) {
                 loadDialogs();
+                loadFolders();
                 startPolling();
             } else {
                 document.getElementById('loginScreen').classList.remove('hidden');
@@ -2000,7 +2392,8 @@ def get_dialogs():
             'photo': photo,
             'unread': conv.get('unread_count', 0),
             'last_message': msg.get('text', ''),
-            'date': msg.get('date', 0)
+            'date': msg.get('date', 0),
+            'online': profile.get('online', 0) if peer_type == 'user' else 0
         })
     return jsonify({'dialogs': dialogs})
 
@@ -2233,6 +2626,139 @@ def upload_normal():
         return jsonify({'ok': True})
 
     return jsonify({'error': 'Upload failed'}), 400
+
+
+@app.route('/api/folders/<vk_id>', methods=['GET'])
+def get_folders(vk_id):
+    stored = get_stored_key(f"folders_{vk_id}")
+    if stored and 'folders' in stored:
+        return jsonify({'folders': stored['folders']})
+    return jsonify({'folders': []})
+
+
+@app.route('/api/folders/<vk_id>', methods=['POST'])
+def save_folders(vk_id):
+    data = request.json
+    existing = get_stored_key(f"folders_{vk_id}") or {'folders': []}
+    folder_id = 'folder_' + str(random.randint(1000, 9999))
+    existing['folders'] = existing.get('folders', []) + [{
+        'id': folder_id,
+        'name': data.get('name', 'Папка'),
+        'peers': data.get('peers', [])
+    }]
+    store_key(f"folders_{vk_id}", existing)
+    return jsonify({'ok': True})
+
+
+@app.route('/api/news', methods=['POST'])
+def get_news():
+    token = request.json.get('token')
+    result = vk_request('newsfeed.get', token, filters='post', count=20, fields='photo_50')
+    if isinstance(result, dict) and 'error' in result:
+        return jsonify(result), 400
+    items = []
+    profiles = {p['id']: p for p in result.get('profiles', [])}
+    groups = {g['id']: g for g in result.get('groups', [])}
+    for item in result.get('items', []):
+        source_id = item.get('source_id', 0)
+        if source_id > 0:
+            author = profiles.get(source_id, {})
+            author_name = author.get('first_name', '') + ' ' + author.get('last_name', '')
+            author_photo = author.get('photo_50', '')
+        else:
+            author = groups.get(-source_id, {})
+            author_name = author.get('name', 'Group')
+            author_photo = author.get('photo_50', '')
+
+        photo = None
+        attachments = item.get('attachments', [])
+        for a in attachments:
+            if a.get('type') == 'photo':
+                sizes = a.get('photo', {}).get('sizes', [])
+                if sizes:
+                    photo = sizes[-1].get('url', '')
+                break
+
+        items.append({
+            'author_name': author_name.strip(),
+            'author_photo': author_photo,
+            'text': item.get('text', ''),
+            'photo': photo,
+            'time': datetime.fromtimestamp(item.get('date', 0)).strftime('%H:%M') if item.get('date') else '',
+            'likes': item.get('likes', {}).get('count', 0),
+            'comments': item.get('comments', {}).get('count', 0),
+            'reposts': item.get('reposts', {}).get('count', 0)
+        })
+    return jsonify({'items': items})
+
+
+@app.route('/api/profile_view', methods=['POST'])
+def profile_view():
+    token = request.json.get('token')
+    peer_id = request.json.get('peer_id')
+    is_group = request.json.get('is_group', False)
+
+    if is_group or int(peer_id) < 0:
+        group_id = abs(int(peer_id))
+        group_info = vk_request('groups.getById', token, group_id=group_id, fields='description,status,photo_200')
+        if isinstance(group_info, list) and len(group_info) > 0:
+            g = group_info[0]
+            wall = vk_request('wall.get', token, owner_id=-group_id, count=10, extended=1)
+            posts = []
+            if isinstance(wall, dict) and 'items' in wall:
+                for p in wall.get('items', []):
+                    photo = None
+                    for a in p.get('attachments', []):
+                        if a.get('type') == 'photo':
+                            sizes = a.get('photo', {}).get('sizes', [])
+                            if sizes:
+                                photo = sizes[-1].get('url', '')
+                            break
+                    posts.append({
+                        'text': p.get('text', ''),
+                        'photo': photo,
+                        'likes': p.get('likes', {}).get('count', 0),
+                        'comments': p.get('comments', {}).get('count', 0),
+                        'reposts': p.get('reposts', {}).get('count', 0)
+                    })
+            return jsonify({
+                'name': g.get('name', ''),
+                'photo': g.get('photo_200', ''),
+                'status': g.get('status', ''),
+                'posts': posts
+            })
+    else:
+        user_info = vk_request('users.get', token, user_ids=peer_id, fields='photo_200,status,city,bdate,site,sex')
+        if isinstance(user_info, list) and len(user_info) > 0:
+            u = user_info[0]
+            wall = vk_request('wall.get', token, owner_id=peer_id, count=10, extended=1, filter='owner')
+            posts = []
+            if isinstance(wall, dict) and 'items' in wall:
+                for p in wall.get('items', []):
+                    photo = None
+                    for a in p.get('attachments', []):
+                        if a.get('type') == 'photo':
+                            sizes = a.get('photo', {}).get('sizes', [])
+                            if sizes:
+                                photo = sizes[-1].get('url', '')
+                            break
+                    posts.append({
+                        'text': p.get('text', ''),
+                        'photo': photo,
+                        'likes': p.get('likes', {}).get('count', 0),
+                        'comments': p.get('comments', {}).get('count', 0),
+                        'reposts': p.get('reposts', {}).get('count', 0)
+                    })
+            return jsonify({
+                'name': u.get('first_name', '') + ' ' + u.get('last_name', ''),
+                'photo': u.get('photo_200', ''),
+                'status': u.get('status', ''),
+                'city': u.get('city', {}).get('title', ''),
+                'bdate': u.get('bdate', ''),
+                'site': u.get('site', ''),
+                'posts': posts
+            })
+    return jsonify({'error': 'Not found'}), 404
 
 
 @app.route('/api/proxy_file')
