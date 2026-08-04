@@ -1,108 +1,114 @@
-import math
 import os
+import math
 import random
-import threading
 import time
+import threading
 from collections import deque
-
 from flask import Flask, render_template_string, request
 from flask_socketio import SocketIO, emit
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "terraria-online-secret")
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'blockworld-ultimate-2026-secret')
+
 socketio = SocketIO(
     app,
-    cors_allowed_origins="*",
-    async_mode="threading",
+    cors_allowed_origins='*',
+    async_mode='threading',
     ping_interval=15,
     ping_timeout=45,
     logger=False,
     engineio_logger=False,
 )
 
+# --- Константы Мира ---
 TILE = 32
-WORLD_W = 300
-WORLD_H = 100
-TICK = 1.0 / 30.0
+WORLD_W = 350
+WORLD_H = 120
+TICK = 1 / 30
 MAX_PLAYERS = 100
 
 BLOCKS = {
-    1: {"name": "Трава", "color": "#55b957", "solid": True},
-    2: {"name": "Земля", "color": "#9a633d", "solid": True},
-    3: {"name": "Камень", "color": "#777b86", "solid": True},
-    4: {"name": "Дерево", "color": "#9c6338", "solid": True},
-    5: {"name": "Листва", "color": "#3f934b", "solid": False},
+    1: {'name': 'Трава', 'color': '#4caf50', 'top_color': '#81c784', 'solid': True},
+    2: {'name': 'Земля', 'color': '#795548', 'solid': True},
+    3: {'name': 'Камень', 'color': '#607d8b', 'solid': True},
+    4: {'name': 'Дерево', 'color': '#5d4037', 'solid': True},
+    5: {'name': 'Листва', 'color': '#388e3c', 'solid': False},
+    6: {'name': 'Доски', 'color': '#a1887f', 'solid': True},
+    7: {'name': 'Факел', 'color': '#ffb300', 'solid': False, 'light': True},
+    8: {'name': 'Уголь', 'color': '#37474f', 'solid': True},
+    9: {'name': 'Золото', 'color': '#ffd54f', 'solid': True},
 }
 
-lock = threading.RLock()
+world_lock = threading.RLock()
 players = {}
 inputs = {}
+mobs = {}
 world = {}
-entities = {}
-chat_messages = deque(maxlen=40)
-next_entity_id = 1
-loop_started = False
-loop_guard = threading.Lock()
-world_clock = 0.22
+chat_messages = deque(maxlen=50)
+drops = {}
 
-
-def clamp(v, lo, hi):
-    return max(lo, min(hi, v))
+next_mob_id = 1
+next_drop_id = 1
+world_time = 0.25  # 0.0 - 1.0 (День / Ночь)
 
 
 def generate_world():
     rng = random.Random(20260804)
     heights = []
-    height = 43
+    height = 50
+
     for x in range(WORLD_W):
-        if x % 5 == 0:
-            height += rng.choice([-1, 0, 0, 1])
-        height = clamp(height, 29, 55)
+        height += rng.choice([-1, 0, 0, 0, 1, 0, -1, 1])
+        height = max(35, min(75, height))
         heights.append(height)
 
     result = {}
+    # Генерация почвы и руд
     for x, surface in enumerate(heights):
-        result[(x, surface)] = 1
-        for y in range(surface + 1, min(WORLD_H, surface + 5)):
-            result[(x, y)] = 2
-        for y in range(surface + 5, WORLD_H):
-            result[(x, y)] = 3
+        result[(x, surface)] = 1  # Трава
+        for y in range(surface + 1, min(WORLD_H, surface + 7)):
+            result[(x, y)] = 2  # Земля
+        for y in range(surface + 7, WORLD_H):
+            ore_roll = rng.random()
+            if ore_roll < 0.03:
+                result[(x, y)] = 8  # Уголь
+            elif ore_roll < 0.008:
+                result[(x, y)] = 9  # Золото
+            else:
+                result[(x, y)] = 3  # Камень
 
-    # Безопасная поляна появления.
-    for x in range(91, 110):
-        surface = heights[x]
-        for y in range(surface - 10, surface):
-            result.pop((x, y), None)
+    # Генерация пещер
+    for _ in range(40):
+        cx = rng.randint(10, WORLD_W - 10)
+        cy = rng.randint(60, WORLD_H - 10)
+        cr = rng.randint(3, 7)
+        for dx in range(-cr, cr + 1):
+            for dy in range(-cr, cr + 1):
+                if dx * dx + dy * dy <= cr * cr:
+                    tx, ty = cx + dx, cy + dy
+                    if 0 <= tx < WORLD_W and 0 <= ty < WORLD_H:
+                        result.pop((tx, ty), None)
 
-    for x in range(8, WORLD_W - 8, 13):
-        if 86 <= x <= 115:
-            continue
-        surface = heights[x]
-        trunk_h = rng.randint(3, 5)
-        for dy in range(1, trunk_h + 1):
-            result[(x, surface - dy)] = 4
-        top = surface - trunk_h
-        for dx in range(-2, 3):
-            for dy in range(-2, 2):
-                if abs(dx) + abs(dy) <= 3:
-                    result[(x + dx, top + dy)] = 5
-    return result
+    # Генерация деревьев
+    for x in range(5, WORLD_W - 5, 8):
+        if rng.random() > 0.4:
+            surface = heights[x]
+            tree_h = rng.randint(4, 7)
+            for y in range(surface - 1, surface - 1 - tree_h, -1):
+                if y > 0:
+                    result[(x, y)] = 4  # Дерево
+            # Крона
+            top_y = surface - 1 - tree_h
+            for dx in range(-2, 3):
+                for dy in range(-2, 2):
+                    tx, ty = x + dx, top_y + dy
+                    if 0 <= tx < WORLD_W and 0 <= ty < WORLD_H and (tx, ty) not in result:
+                        result[(tx, ty)] = 5  # Листва
+
+    return result, heights
 
 
-world = generate_world()
-
-
-def surface_y(tx):
-    tx = int(clamp(tx, 0, WORLD_W - 1))
-    for ty in range(WORLD_H):
-        if is_solid(tx, ty):
-            return ty
-    return WORLD_H - 1
-
-
-def spawn_point(tx=100):
-    sy = surface_y(tx)
-    return tx * TILE + 4, sy * TILE - 46
+world, surface_heights = generate_world()
 
 
 def is_solid(tx, ty):
@@ -110,15 +116,18 @@ def is_solid(tx, ty):
         return True
     if ty < 0:
         return False
-    block = world.get((tx, ty), 0)
-    return bool(BLOCKS.get(block, {}).get("solid"))
+    block_type = world.get((tx, ty))
+    if not block_type:
+        return False
+    return BLOCKS.get(block_type, {}).get('solid', False)
 
 
-def collides(x, y, w, h):
-    left = math.floor(x / TILE)
-    right = math.floor((x + w - 0.01) / TILE)
-    top = math.floor(y / TILE)
-    bottom = math.floor((y + h - 0.01) / TILE)
+def collides_box(x, y, width, height):
+    left = int(math.floor(x / TILE))
+    right = int(math.floor((x + width - 0.01) / TILE))
+    top = int(math.floor(y / TILE))
+    bottom = int(math.floor((y + height - 0.01) / TILE))
+
     for tx in range(left, right + 1):
         for ty in range(top, bottom + 1):
             if is_solid(tx, ty):
@@ -126,412 +135,1048 @@ def collides(x, y, w, h):
     return False
 
 
-def tile_overlaps_actor(tx, ty):
-    ax, ay, aw, ah = tx * TILE, ty * TILE, TILE, TILE
-    actors = list(players.values()) + list(entities.values())
-    for p in actors:
-        if ax < p["x"] + p["w"] and ax + aw > p["x"] and ay < p["y"] + p["h"] and ay + ah > p["y"]:
-            return True
-    return False
+def get_spawn_point():
+    spawn_x = random.randint(100, 200)
+    surface_y = surface_heights[spawn_x]
+    return spawn_x * TILE, (surface_y - 2) * TILE
 
 
-def move_body(body, dt):
-    # Подшаги не дают пролетать сквозь блоки на большой скорости.
-    dx = body["vx"] * dt
-    dy = body["vy"] * dt
-    steps = max(1, int(math.ceil(max(abs(dx), abs(dy)) / 7.0)))
-    sx, sy = dx / steps, dy / steps
-    body["grounded"] = False
-    for _ in range(steps):
-        nx = body["x"] + sx
-        if not collides(nx, body["y"], body["w"], body["h"]):
-            body["x"] = nx
+def spawn_mob(mtype, x=None, y=None):
+    global next_mob_id
+    if x is None or y is None:
+        sx = random.randint(10, WORLD_W - 10)
+        sy = surface_heights[sx] - 2
+        x = sx * TILE
+        y = sy * TILE
+
+    mob_id = f"mob_{next_mob_id}"
+    next_mob_id += 1
+
+    configs = {
+        'vampire': {'name': 'Вампир-Лорд (БОСС)', 'hp': 300, 'w': 28, 'h': 44, 'color': '#800020', 'speed': 130},
+        'zombie': {'name': 'Зомби', 'hp': 70, 'w': 24, 'h': 40, 'color': '#388e3c', 'speed': 90},
+        'slime': {'name': 'Слизень', 'hp': 40, 'w': 26, 'h': 22, 'color': '#00e676', 'speed': 70},
+        'bunny': {'name': 'Кролик', 'hp': 20, 'w': 20, 'h': 18, 'color': '#ffffff', 'speed': 110},
+    }
+    cfg = configs.get(mtype, configs['zombie'])
+
+    mobs[mob_id] = {
+        'id': mob_id,
+        'type': mtype,
+        'name': cfg['name'],
+        'x': x,
+        'y': y,
+        'vx': 0,
+        'vy': 0,
+        'w': cfg['w'],
+        'h': cfg['h'],
+        'hp': cfg['hp'],
+        'max_hp': cfg['hp'],
+        'color': cfg['color'],
+        'speed': cfg['speed'],
+        'grounded': False,
+        'facing': 1,
+        'dash_cooldown': 0,
+        'dash_active': 0,
+        'jump_cooldown': 0,
+        'target_id': None,
+    }
+    return mob_id
+
+
+# Начальный спавн мобов
+for _ in range(8):
+    spawn_mob('zombie')
+for _ in range(10):
+    spawn_mob('bunny')
+for _ in range(6):
+    spawn_mob('slime')
+spawn_mob('vampire', x=120 * TILE, y=(surface_heights[120] - 3) * TILE)
+
+
+def physics_step(entity, dt, target_vx, wants_jump):
+    gravity = 1150.0
+    jump_speed = 460.0
+
+    # Гравитация
+    entity['vy'] += gravity * dt
+    if entity['vy'] > 950.0:
+        entity['vy'] = 950.0
+
+    # Прыжок
+    if wants_jump and entity['grounded']:
+        entity['vy'] = -jump_speed
+        entity['grounded'] = False
+
+    # Движение по X с АВТО-СТУПЕНЬКОЙ (Auto-step 1 block)
+    entity['vx'] = target_vx
+    dx = entity['vx'] * dt
+
+    if dx != 0:
+        new_x = entity['x'] + dx
+        if not collides_box(new_x, entity['y'], entity['w'], entity['h']):
+            entity['x'] = new_x
         else:
-            body["vx"] = 0
-            sx = 0
-        ny = body["y"] + sy
-        if not collides(body["x"], ny, body["w"], body["h"]):
-            body["y"] = ny
+            # Пробуем авто-подъем на 1 блок вверх (как в Terraria!)
+            step_h = TILE + 1
+            if entity['grounded'] and not collides_box(new_x, entity['y'] - step_h, entity['w'], entity['h']):
+                entity['y'] -= step_h
+                entity['x'] = new_x
+            else:
+                # Плавный прижим к стене
+                step_dir = 1.0 if dx > 0 else -1.0
+                while not collides_box(entity['x'] + step_dir, entity['y'], entity['w'], entity['h']):
+                    entity['x'] += step_dir
+                entity['vx'] = 0
+
+    # Движение по Y
+    dy = entity['vy'] * dt
+    if dy != 0:
+        new_y = entity['y'] + dy
+        if not collides_box(entity['x'], new_y, entity['w'], entity['h']):
+            entity['y'] = new_y
+            entity['grounded'] = False
         else:
-            if sy > 0:
-                body["grounded"] = True
-            body["vy"] = 0
-            sy = 0
-    body["x"] = clamp(body["x"], 0, WORLD_W * TILE - body["w"])
-    if body["y"] > WORLD_H * TILE:
-        body["dead"] = True
+            if entity['vy'] > 0:
+                entity['grounded'] = True
+                entity['y'] = math.floor((entity['y'] + entity['h']) / TILE) * TILE - entity['h']
+            elif entity['vy'] < 0:
+                entity['y'] = math.ceil(entity['y'] / TILE) * TILE
+            entity['vy'] = 0
+
+    # Ограничения карты
+    entity['x'] = max(0, min((WORLD_W - 1) * TILE - entity['w'], entity['x']))
+    entity['y'] = max(0, min((WORLD_H - 1) * TILE - entity['h'], entity['y']))
+
+
+def update_mobs(dt):
+    alive_players = [p for p in players.values() if p['hp'] > 0]
+    vampire_exists = False
+
+    for mob_id, mob in list(mobs.items()):
+        if mob['type'] == 'vampire':
+            vampire_exists = True
+
+        # Поиск ближайшего игрока
+        nearest_p = None
+        min_dist = 999999
+        for p in alive_players:
+            dist = math.hypot(p['x'] - mob['x'], p['y'] - mob['y'])
+            if dist < min_dist:
+                min_dist = dist
+                nearest_p = p
+
+        target_vx = 0
+        wants_jump = False
+
+        if mob['type'] == 'vampire':
+            mob['dash_cooldown'] -= dt
+            if mob['dash_active'] > 0:
+                mob['dash_active'] -= dt
+
+            if nearest_p and min_dist < 500:
+                dir_x = 1 if nearest_p['x'] > mob['x'] else -1
+                mob['facing'] = dir_x
+
+                # СУПЕР СПОСОБНОСТЬ: РЫВОК НА 5 БЛОКОВ (160 px) РАЗ В 3 СЕКУНДЫ!
+                if mob['dash_cooldown'] <= 0:
+                    mob['dash_cooldown'] = 3.0
+                    mob['dash_active'] = 0.35
+                    # Импульсный рывок вперед со звуком и спецэффектами
+                    mob['vx'] = dir_x * 900.0
+                    socketio.emit('vampire_dash', {'id': mob['id'], 'x': mob['x'], 'y': mob['y'], 'dir': dir_x})
+
+                if mob['dash_active'] > 0:
+                    target_vx = mob['facing'] * 850.0
+                else:
+                    target_vx = mob['facing'] * mob['speed']
+
+                if collides_box(mob['x'] + mob['facing'] * 8, mob['y'], mob['w'], mob['h']) and mob['grounded']:
+                    wants_jump = True
+
+                # Атака игрока при столкновении
+                if min_dist < 32:
+                    dmg = 35 if mob['dash_active'] > 0 else 18
+                    damage_player(nearest_p, dmg, knock_dir=mob['facing'])
+
+        elif mob['type'] == 'zombie':
+            if nearest_p and min_dist < 380:
+                dir_x = 1 if nearest_p['x'] > mob['x'] else -1
+                mob['facing'] = dir_x
+                target_vx = dir_x * mob['speed']
+                if collides_box(mob['x'] + dir_x * 8, mob['y'], mob['w'], mob['h']) and mob['grounded']:
+                    wants_jump = True
+
+                if min_dist < 28:
+                    damage_player(nearest_p, 12, knock_dir=dir_x)
+
+        elif mob['type'] == 'slime':
+            mob['jump_cooldown'] -= dt
+            if nearest_p and min_dist < 320:
+                dir_x = 1 if nearest_p['x'] > mob['x'] else -1
+                mob['facing'] = dir_x
+                if mob['grounded'] and mob['jump_cooldown'] <= 0:
+                    mob['jump_cooldown'] = 1.4
+                    wants_jump = True
+                    target_vx = dir_x * 220.0
+                elif not mob['grounded']:
+                    target_vx = mob['facing'] * 180.0
+
+                if min_dist < 26:
+                    damage_player(nearest_p, 8, knock_dir=dir_x)
+
+        elif mob['type'] == 'bunny':
+            if nearest_p and min_dist < 140:
+                dir_x = -1 if nearest_p['x'] > mob['x'] else 1
+                mob['facing'] = dir_x
+                target_vx = dir_x * mob['speed']
+                if mob['grounded'] and random.random() < 0.05:
+                    wants_jump = True
+            else:
+                if random.random() < 0.02:
+                    mob['facing'] = random.choice([-1, 1])
+                if random.random() < 0.3:
+                    target_vx = mob['facing'] * 40.0
+
+        physics_step(mob, dt, target_vx, wants_jump)
+
+    # Гарантируем спавн Вампира-Босса, если умер
+    if not vampire_exists and len(alive_players) > 0:
+        if random.random() < 0.01:
+            p = random.choice(alive_players)
+            bx = clamp(p['x'] + random.choice([-300, 300]), 100, (WORLD_W - 10) * TILE)
+            by = surface_heights[int(bx // TILE)] * TILE - 100
+            spawn_mob('vampire', bx, by)
+            socketio.emit('notice', {'text': '⚠️ ВАМПИР-ЛОРД ВОССТАЛ ИЗ ТЬМЫ!', 'color': '#ff1744'})
+
+
+def damage_player(player, dmg, knock_dir=0):
+    if player['hp'] <= 0 or player.get('invul', 0) > 0:
+        return
+    player['hp'] -= dmg
+    player['invul'] = 0.5  # Время неуязвимости (сек)
+    player['vx'] += knock_dir * 250.0
+    player['vy'] = -200.0
+
+    socketio.emit('effect', {'type': 'damage', 'x': player['x'], 'y': player['y'], 'val': f"-{dmg}"})
+
+    if player['hp'] <= 0:
+        player['hp'] = 0
+        socketio.emit('notice', {'text': f"☠️ {player['name']} погиб в бою!", 'color': '#ff5252'})
+        # Спавн респавна через 2 сек
+        threading.Timer(2.0, respawn_player, args=[player['id']]).start()
+
+
+def respawn_player(sid):
+    with world_lock:
+        if sid in players:
+            p = players[sid]
+            rx, ry = get_spawn_point()
+            p['x'] = rx
+            p['y'] = ry
+            p['hp'] = 100
+            p['vx'] = 0
+            p['vy'] = 0
+
+
+def clamp(val, low, high):
+    return max(low, min(high, val))
 
 
 def player_public(p):
     return {
-        "id": p["id"], "name": p["name"], "x": round(p["x"], 1), "y": round(p["y"], 1),
-        "vx": round(p["vx"], 1), "vy": round(p["vy"], 1), "w": p["w"], "h": p["h"],
-        "color": p["color"], "hp": p["hp"], "max_hp": p["max_hp"], "facing": p["facing"],
+        'id': p['id'],
+        'name': p['name'],
+        'x': round(p['x'], 1),
+        'y': round(p['y'], 1),
+        'vx': round(p['vx'], 1),
+        'vy': round(p['vy'], 1),
+        'hp': p['hp'],
+        'max_hp': p['max_hp'],
+        'color': p['color'],
+        'w': p['w'],
+        'h': p['h'],
+        'facing': p['facing'],
+        'sprinting': p['sprinting'],
+        'holding': p['holding'],
     }
 
 
-def entity_public(e):
-    return {
-        "id": e["id"], "kind": e["kind"], "x": round(e["x"], 1), "y": round(e["y"], 1),
-        "vx": round(e["vx"], 1), "vy": round(e["vy"], 1), "w": e["w"], "h": e["h"],
-        "hp": e["hp"], "max_hp": e["max_hp"], "facing": e["facing"],
-        "dash": round(max(0, e.get("dash_flash", 0)), 2),
-    }
+def update_players(dt):
+    for sid, p in list(players.items()):
+        if p['hp'] <= 0:
+            continue
 
+        if p.get('invul', 0) > 0:
+            p['invul'] -= dt
 
-def make_entity(kind, tx):
-    global next_entity_id
-    specs = {
-        "bunny": (22, 19, 35, 25, 0),
-        "deer": (30, 39, 70, 50, 0),
-        "zombie": (25, 42, 100, 80, 10),
-        "vampire": (27, 44, 320, 175, 18),
-    }
-    w, h, hp, speed, damage = specs[kind]
-    sy = surface_y(tx)
-    e = {
-        "id": next_entity_id, "kind": kind, "x": tx * TILE + 2, "y": sy * TILE - h,
-        "vx": 0.0, "vy": 0.0, "w": w, "h": h, "hp": hp, "max_hp": hp,
-        "speed": speed, "damage": damage, "grounded": False, "dead": False,
-        "facing": random.choice([-1, 1]), "think": random.uniform(0.5, 2.0),
-        "attack_cd": 0.0, "dash_cd": 3.0, "dash_flash": 0.0,
-    }
-    entities[next_entity_id] = e
-    next_entity_id += 1
+        ctrl = inputs.get(sid, {})
 
+        # Движение / Бег
+        dir_x = clamp(int(ctrl.get('x', 0)), -1, 1)
+        sprint = bool(ctrl.get('sprint', False))
+        p['sprinting'] = sprint
 
-def seed_entities():
-    for kind, count in (("bunny", 16), ("deer", 8), ("zombie", 12), ("vampire", 2)):
-        for _ in range(count):
-            tx = random.choice(list(range(12, 82)) + list(range(120, WORLD_W - 12)))
-            make_entity(kind, tx)
+        speed = 310.0 if sprint else 210.0
+        target_vx = dir_x * speed
 
+        if dir_x != 0:
+            p['facing'] = dir_x
 
-seed_entities()
+        wants_jump = False
+        if ctrl.get('jump_request'):
+            wants_jump = True
+            ctrl['jump_request'] = False
 
-
-def respawn_player(p):
-    p["x"], p["y"] = spawn_point()
-    p["vx"] = p["vy"] = 0
-    p["hp"] = p["max_hp"]
-    p["invuln"] = 2.0
-
-
-def damage_player(p, amount, source_x):
-    if p["invuln"] > 0:
-        return
-    p["hp"] -= amount
-    p["invuln"] = 0.7
-    p["vx"] = 220 if p["x"] > source_x else -220
-    p["vy"] = -230
-    if p["hp"] <= 0:
-        respawn_player(p)
-
-
-def update_player(p, control, dt):
-    p["invuln"] = max(0, p["invuln"] - dt)
-    p["coyote"] = 0.11 if p["grounded"] else max(0, p["coyote"] - dt)
-    direction = int(clamp(control.get("x", 0), -1, 1))
-    if direction:
-        p["facing"] = direction
-    target = direction * 245.0
-    accel = 1900.0 if p["grounded"] else 1050.0
-    if direction == 0:
-        accel = 2400.0 if p["grounded"] else 500.0
-    change = clamp(target - p["vx"], -accel * dt, accel * dt)
-    p["vx"] += change
-
-    if control.get("jump_request"):
-        p["jump_buffer"] = 0.13
-    control["jump_request"] = False
-    p["jump_buffer"] = max(0, p["jump_buffer"] - dt)
-    if p["jump_buffer"] > 0 and p["coyote"] > 0:
-        p["vy"] = -455.0
-        p["grounded"] = False
-        p["coyote"] = 0
-        p["jump_buffer"] = 0
-    # Переменная высота прыжка, как в Terraria.
-    if not control.get("jump_held") and p["vy"] < -170:
-        p["vy"] += 1350 * dt
-    p["vy"] = min(900, p["vy"] + 1150 * dt)
-    move_body(p, dt)
-    if p.get("dead"):
-        p["dead"] = False
-        respawn_player(p)
-
-
-def nearest_player(e, radius=520):
-    best, best_d = None, radius * radius
-    for p in players.values():
-        dx = (p["x"] + p["w"] / 2) - (e["x"] + e["w"] / 2)
-        dy = (p["y"] + p["h"] / 2) - (e["y"] + e["h"] / 2)
-        d = dx * dx + dy * dy
-        if d < best_d:
-            best, best_d = p, d
-    return best
-
-
-def update_entity(e, dt):
-    e["think"] -= dt
-    e["attack_cd"] = max(0, e["attack_cd"] - dt)
-    e["dash_cd"] = max(0, e["dash_cd"] - dt)
-    e["dash_flash"] = max(0, e["dash_flash"] - dt)
-    target = nearest_player(e, 700 if e["kind"] == "vampire" else 480)
-
-    if e["kind"] in ("bunny", "deer"):
-        if e["think"] <= 0:
-            e["think"] = random.uniform(1.2, 3.8)
-            e["facing"] = random.choice([-1, 0, 1])
-        if target and abs(target["x"] - e["x"]) < 150:
-            e["facing"] = -1 if target["x"] > e["x"] else 1
-        target_vx = e["facing"] * e["speed"]
-    else:
-        if target:
-            e["facing"] = 1 if target["x"] > e["x"] else -1
-            target_vx = e["facing"] * e["speed"]
-            # Вампир делает настоящий рывок ровно на 5 блоков раз в 3 секунды.
-            if e["kind"] == "vampire" and e["dash_cd"] <= 0 and abs(target["x"] - e["x"]) < 430:
-                distance = 5 * TILE * e["facing"]
-                steps = 20
-                for _ in range(steps):
-                    nx = e["x"] + distance / steps
-                    if collides(nx, e["y"], e["w"], e["h"]):
-                        break
-                    e["x"] = nx
-                e["dash_cd"] = 3.0
-                e["dash_flash"] = 0.35
-        else:
-            target_vx = 0
-
-    e["vx"] += clamp(target_vx - e["vx"], -700 * dt, 700 * dt)
-    # Автопрыжок мобов через препятствия.
-    ahead = e["x"] + (e["w"] + 5 if e["facing"] > 0 else -5)
-    if e["grounded"] and collides(ahead, e["y"] + 4, 3, e["h"] - 4):
-        e["vy"] = -360
-    if e["kind"] == "bunny" and e["grounded"] and random.random() < 0.018:
-        e["vy"] = -300
-    e["vy"] = min(850, e["vy"] + 1100 * dt)
-    move_body(e, dt)
-
-    if target and e["damage"] and e["attack_cd"] <= 0:
-        if abs((e["x"] + e["w"] / 2) - (target["x"] + target["w"] / 2)) < 34 and abs(e["y"] - target["y"]) < 46:
-            damage_player(target, e["damage"], e["x"])
-            e["attack_cd"] = 0.85
-
-
-def attack(sid):
-    p = players.get(sid)
-    if not p or p["attack_cd"] > 0:
-        return
-    p["attack_cd"] = 0.35
-    cx = p["x"] + p["w"] / 2 + p["facing"] * 35
-    cy = p["y"] + p["h"] / 2
-    for e in list(entities.values()):
-        ex, ey = e["x"] + e["w"] / 2, e["y"] + e["h"] / 2
-        if abs(ex - cx) < 50 and abs(ey - cy) < 45:
-            e["hp"] -= 28
-            e["vx"] = p["facing"] * 250
-            e["vy"] = -180
+        physics_step(p, dt, target_vx, wants_jump)
 
 
 def game_loop():
-    global world_clock
-    spawn_timer = 0.0
+    global world_time
+    last_time = time.perf_counter()
+
     while True:
-        started = time.perf_counter()
-        with lock:
-            world_clock = (world_clock + TICK / 180.0) % 1.0
-            for sid, p in list(players.items()):
-                p["attack_cd"] = max(0, p["attack_cd"] - TICK)
-                update_player(p, inputs.setdefault(sid, {"x": 0, "jump_request": False, "jump_held": False}), TICK)
-            for eid, e in list(entities.items()):
-                update_entity(e, TICK)
-                if e["hp"] <= 0 or e.get("dead"):
-                    entities.pop(eid, None)
-            spawn_timer += TICK
-            if spawn_timer > 8 and len(entities) < 38:
-                spawn_timer = 0
-                make_entity(random.choice(["bunny", "deer", "zombie"]), random.choice(list(range(15, 82)) + list(range(120, 285))))
+        now = time.perf_counter()
+        dt = min(0.1, now - last_time)
+        last_time = now
+
+        # Время суток
+        world_time = (world_time + dt / 300.0) % 1.0  # Полный цикл 5 минут
+
+        with world_lock:
+            update_players(dt)
+            update_mobs(dt)
+
             state = {
-                "players": [player_public(p) for p in players.values()],
-                "entities": [entity_public(e) for e in entities.values()],
-                "time": round(world_clock, 4),
+                'time': round(world_time, 4),
+                'players': [player_public(p) for p in players.values()],
+                'mobs': list(mobs.values()),
             }
-        socketio.emit("state", state)
-        elapsed = time.perf_counter() - started
-        socketio.sleep(max(0.001, TICK - elapsed))
+
+        socketio.emit('state', state)
+        socketio.sleep(TICK)
 
 
-def ensure_loop():
-    global loop_started
-    with loop_guard:
-        if not loop_started:
-            loop_started = True
-            socketio.start_background_task(game_loop)
-
-
-@app.route("/")
+@app.route('/')
 def index():
-    ensure_loop()
     return render_template_string(PAGE)
 
 
-@app.route("/health")
-def health():
-    return {"ok": True, "players": len(players), "entities": len(entities)}
-
-
-@socketio.on("connect")
-def on_connect():
-    ensure_loop()
+@socketio.on('connect')
+def connect_player():
     sid = request.sid
-    with lock:
+    with world_lock:
         if len(players) >= MAX_PLAYERS:
             return False
-        x, y = spawn_point()
-        p = {
-            "id": sid, "name": f"Игрок-{random.randint(100, 999)}", "x": x, "y": y,
-            "vx": 0.0, "vy": 0.0, "w": 24, "h": 42, "grounded": False, "dead": False,
-            "color": random.choice(["#ff6b6b", "#ffd166", "#4dd4ac", "#6ea8fe", "#d28cff"]),
-            "hp": 100, "max_hp": 100, "invuln": 1.0, "attack_cd": 0.0,
-            "facing": 1, "coyote": 0.0, "jump_buffer": 0.0,
+
+        sx, sy = get_spawn_point()
+        player = {
+            'id': sid,
+            'name': f'Герой-{random.randint(100, 999)}',
+            'x': sx,
+            'y': sy,
+            'vx': 0,
+            'vy': 0,
+            'w': 22,
+            'h': 42,
+            'hp': 100,
+            'max_hp': 100,
+            'grounded': False,
+            'facing': 1,
+            'sprinting': False,
+            'holding': 1,
+            'color': random.choice(['#e53935', '#d81b60', '#8e24aa', '#1e88e5', '#43a047', '#fb8c00']),
         }
-        players[sid] = p
-        inputs[sid] = {"x": 0, "jump_request": False, "jump_held": False}
+        players[sid] = player
+        inputs[sid] = {'x': 0, 'sprint': False, 'jump_request': False}
+
         initial = {
-            "w": WORLD_W, "h": WORLD_H, "tile": TILE,
-            "blocks": [{"x": x, "y": y, "type": b} for (x, y), b in world.items()],
-            "players": [player_public(v) for v in players.values()],
-            "entities": [entity_public(e) for e in entities.values()],
-            "you": player_public(p), "chat": list(chat_messages), "time": world_clock,
+            'w': WORLD_W,
+            'h': WORLD_H,
+            'tile': TILE,
+            'blocks': [{'x': x, 'y': y, 'type': b} for (x, y), b in world.items()],
+            'players': [player_public(p) for p in players.values()],
+            'mobs': list(mobs.values()),
+            'chat': list(chat_messages),
+            'time': world_time,
+            'you_id': sid,
         }
-    emit("init", initial)
-    socketio.emit("notice", {"text": f"{p['name']} появился в мире"})
+
+    emit('init', initial)
+    socketio.emit('notice', {'text': f"⚔️ {player['name']} зашёл в мир!", 'color': '#81c784'})
 
 
-@socketio.on("disconnect")
-def on_disconnect():
+@socketio.on('disconnect')
+def disconnect_player():
     sid = request.sid
-    with lock:
+    with world_lock:
         p = players.pop(sid, None)
         inputs.pop(sid, None)
     if p:
-        socketio.emit("notice", {"text": f"{p['name']} вышел"})
+        socketio.emit('notice', {'text': f"👋 {p['name']} покинул мир", 'color': '#b0bec5'})
 
 
-@socketio.on("set_name")
-def set_name(data):
-    name = str((data or {}).get("name", "")).strip()[:18]
-    if not name:
+@socketio.on('input')
+def handle_input(data):
+    sid = request.sid
+    if not data or sid not in players:
         return
-    with lock:
-        if request.sid in players:
-            players[request.sid]["name"] = name
-            emit("you", player_public(players[request.sid]))
+    with world_lock:
+        ctrl = inputs.setdefault(sid, {'x': 0, 'sprint': False, 'jump_request': False})
+        ctrl['x'] = clamp(int(data.get('x', 0)), -1, 1)
+        ctrl['sprint'] = bool(data.get('sprint', False))
+        if bool(data.get('jump')):
+            ctrl['jump_request'] = True
 
 
-@socketio.on("input")
-def receive_input(data):
-    data = data or {}
-    with lock:
-        c = inputs.get(request.sid)
-        if c is None:
+@socketio.on('set_holding')
+def set_holding(data):
+    sid = request.sid
+    with world_lock:
+        if sid in players:
+            players[sid]['holding'] = int(data.get('slot', 1))
+
+
+@socketio.on('attack_mob')
+def attack_mob(data):
+    sid = request.sid
+    mob_id = str(data.get('id', ''))
+    with world_lock:
+        p = players.get(sid)
+        m = mobs.get(mob_id)
+        if not p or not m or p['hp'] <= 0:
             return
-        try:
-            c["x"] = int(clamp(int(data.get("x", 0)), -1, 1))
-        except (TypeError, ValueError):
-            c["x"] = 0
-        held = bool(data.get("jump", False))
-        if held and not c["jump_held"]:
-            c["jump_request"] = True
-        c["jump_held"] = held
+
+        dist = math.hypot(p['x'] - m['x'], p['y'] - m['y'])
+        if dist <= TILE * 3.5:
+            damage = random.randint(22, 35)
+            if p['holding'] == 1:  # Меч
+                damage += 15
+
+            m['hp'] -= damage
+            knock_dir = 1 if m['x'] > p['x'] else -1
+            m['vx'] += knock_dir * 300.0
+            m['vy'] = -180.0
+
+            socketio.emit('effect', {'type': 'damage', 'x': m['x'], 'y': m['y'], 'val': f"-{damage}"})
+
+            if m['hp'] <= 0:
+                socketio.emit('notice', {'text': f"💥 {p['name']} уничтожил {m['name']}!", 'color': '#ffd54f'})
+                mobs.pop(mob_id, None)
 
 
-@socketio.on("attack")
-def receive_attack():
-    with lock:
-        attack(request.sid)
-
-
-@socketio.on("edit_block")
+@socketio.on('edit_block')
 def edit_block(data):
+    sid = request.sid
     try:
-        tx, ty = int(data.get("x")), int(data.get("y"))
-        action = str(data.get("action", "place"))
-        block_type = int(data.get("type", 2))
-    except (TypeError, ValueError, AttributeError):
+        tx = int(data.get('x'))
+        ty = int(data.get('y'))
+        action = str(data.get('action', 'place'))
+        btype = int(data.get('type', 2))
+    except (TypeError, ValueError):
         return
-    with lock:
-        p = players.get(request.sid)
-        if not p or not (0 <= tx < WORLD_W and 0 <= ty < WORLD_H):
+
+    with world_lock:
+        p = players.get(sid)
+        if not p or p['hp'] <= 0:
             return
-        px, py = p["x"] + p["w"] / 2, p["y"] + p["h"] / 2
-        if (px - (tx + .5) * TILE) ** 2 + (py - (ty + .5) * TILE) ** 2 > (7 * TILE) ** 2:
+
+        # Проверка дистации (7 блоков)
+        cx = (p['x'] + p['w'] / 2) / TILE
+        cy = (p['y'] + p['h'] / 2) / TILE
+        if (tx - cx) ** 2 + (ty - cy) ** 2 > 64:
             return
-        if action == "break" and (tx, ty) in world:
-            world.pop((tx, ty), None)
-            socketio.emit("world_patch", {"x": tx, "y": ty, "type": 0})
-        elif action == "place" and block_type in BLOCKS and (tx, ty) not in world and not tile_overlaps_actor(tx, ty):
-            world[(tx, ty)] = block_type
-            socketio.emit("world_patch", {"x": tx, "y": ty, "type": block_type})
+
+        if action == 'break':
+            if (tx, ty) in world:
+                del world[(tx, ty)]
+                socketio.emit('world_patch', {'x': tx, 'y': ty, 'type': 0})
+        elif action == 'place' and btype in BLOCKS and (tx, ty) not in world:
+            # Проверка, чтобы не застроить игрока
+            bx = tx * TILE
+            by = ty * TILE
+            if not (bx < p['x'] + p['w'] and bx + TILE > p['x'] and by < p['y'] + p['h'] and by + TILE > p['y']):
+                world[(tx, ty)] = btype
+                socketio.emit('world_patch', {'x': tx, 'y': ty, 'type': btype})
 
 
-@socketio.on("chat")
-def chat(data):
-    text = str((data or {}).get("text", "")).strip()[:160]
-    with lock:
-        p = players.get(request.sid)
+@socketio.on('chat')
+def handle_chat(data):
+    sid = request.sid
+    text = str((data or {}).get('text', '')).strip()[:140]
+    with world_lock:
+        p = players.get(sid)
         if not p or not text:
             return
-        msg = {"name": p["name"], "text": text, "color": p["color"]}
+        msg = {'name': p['name'], 'text': text, 'color': p['color']}
         chat_messages.append(msg)
-    socketio.emit("chat", msg)
+    socketio.emit('chat', msg)
 
 
+@socketio.on('set_name')
+def set_name(data):
+    sid = request.sid
+    name = str((data or {}).get('name', '')).strip()[:18]
+    if name:
+        with world_lock:
+            if sid in players:
+                players[sid]['name'] = name
+
+
+# Запуск игрового потока
+threading.Thread(target=game_loop, daemon=True).start()
+
+
+# --- FRONTEND (HTML5 CANVAS ENGINE + WEBAUDIO + CONTROLS) ---
 PAGE = r'''<!doctype html>
-<html lang="ru"><head><meta charset="utf-8">
+<html lang="ru">
+<head>
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
-<title>Живой мир Online</title>
+<title>BlockWorld Genshin Terraria Railway</title>
 <style>
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101522;color:#fff;font-family:system-ui,Arial;touch-action:none}body{user-select:none;-webkit-user-select:none}#game{position:fixed;inset:0;width:100vw;height:100vh;display:block;image-rendering:pixelated;touch-action:none}.top{position:fixed;z-index:5;top:max(8px,env(safe-area-inset-top));left:10px;right:10px;display:flex;justify-content:space-between;pointer-events:none}.panel{background:#101827dc;border:1px solid #ffffff2d;border-radius:13px;padding:8px 10px;backdrop-filter:blur(8px);font-size:12px;pointer-events:auto;box-shadow:0 5px 20px #0004}.title{font-weight:950;color:#ffd166;letter-spacing:.7px}.name{display:flex;gap:5px;margin-top:5px}.name input{width:112px;background:#202b40;color:#fff;border:1px solid #ffffff25;border-radius:7px;padding:5px;outline:none}.btn,.send{border:0;border-radius:7px;background:#ffd166;color:#171b25;font-weight:900;padding:5px 8px}.stats{text-align:right}.hpbar{width:150px;height:13px;background:#2a1720;border:1px solid #fff4;border-radius:8px;overflow:hidden;margin-top:4px}.hp{height:100%;background:linear-gradient(90deg,#e33,#ff7373);width:100%;transition:width .15s}.controls{position:fixed;z-index:6;left:18px;right:18px;bottom:max(16px,env(safe-area-inset-bottom));display:flex;justify-content:space-between;align-items:end;pointer-events:none}.pad,.actions{display:flex;gap:10px;pointer-events:auto;align-items:end}.control{width:66px;height:66px;border:1px solid #ffffff44;border-radius:50%;background:#101827df;color:#fff;font-size:27px;font-weight:900;box-shadow:0 5px 18px #0006;touch-action:none}.control.on{background:#48658f;transform:scale(.94)}.small{width:49px;height:49px;font-size:19px}.attack{background:#6d2939e8}.selected{border-color:#ffd166;color:#ffd166}.chat{position:fixed;z-index:7;left:10px;bottom:92px;width:min(370px,calc(100vw - 20px));pointer-events:none}.log{max-height:105px;overflow:hidden;text-shadow:0 1px 3px #000}.line{font-size:12px;margin:2px 0}.chatform{display:flex;gap:5px;margin-top:5px;pointer-events:auto}.chatinput{flex:1;min-width:0;background:#101827dc;color:#fff;border:1px solid #ffffff25;border-radius:8px;padding:7px;outline:none}.music{margin-top:5px;width:100%}.rotate{display:none;position:fixed;z-index:20;inset:0;background:#10131b;align-items:center;justify-content:center;text-align:center;padding:30px;font-size:20px;font-weight:900}@media(orientation:portrait) and (max-width:700px){.rotate{display:flex}.top,.controls,.chat{display:none}}@media(max-height:430px){.stats .hint{display:none}.control{width:55px;height:55px}.small{width:44px;height:44px}.chat{bottom:72px}}
-</style></head><body>
-<div class="rotate">Поверни телефон горизонтально ↔</div><canvas id="game"></canvas>
-<div class="top"><div class="panel"><div class="title">ЖИВОЙ МИР ONLINE</div><div id="online">Подключение…</div><div class="name"><input id="name" maxlength="18" placeholder="Имя"><button class="btn" onclick="setName()">OK</button></div><button id="music" class="btn music">♫ Включить музыку</button></div><div class="panel stats"><b id="clock">День</b><div class="hpbar"><div id="hp" class="hp"></div></div><div id="hptext">100 / 100 HP</div><div class="hint">A/D или ◀▶ · Space прыжок · F атака</div></div></div>
-<div class="controls"><div class="pad"><button id="left" class="control">◀</button><button id="right" class="control">▶</button></div><div class="actions"><button id="mode" class="control small selected">＋</button><button id="hit" class="control attack">⚔</button><button id="jump" class="control">▲</button></div></div>
-<div class="chat"><div id="log" class="log"></div><form class="chatform" onsubmit="sendChat(event)"><input id="chatinput" class="chatinput" maxlength="160" placeholder="Чат мира"><button class="send">➤</button></form></div>
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script><script>
-const socket=io({transports:['websocket','polling'],upgrade:true});
-const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
-let worldW=300,worldH=100,T=32,blocks=new Map(),players=new Map(),mobs=new Map(),me=null,camera={x:0,y:0},worldTime=.2;
-let leftHeld=false,rightHeld=false,jumpHeld=false,editMode='place',selectedBlock=2,lastTouch=0;
-const colors={1:'#55b957',2:'#9a633d',3:'#777b86',4:'#9c6338',5:'#3f934b'};
-function resize(){const d=Math.min(devicePixelRatio||1,2);canvas.width=innerWidth*d;canvas.height=innerHeight*d;canvas.style.width=innerWidth+'px';canvas.style.height=innerHeight+'px';ctx.setTransform(d,0,0,d,0,0)}addEventListener('resize',resize);resize();
-const key=(x,y)=>x+','+y;const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-function addLine(i){const e=document.createElement('div');e.className='line';e.innerHTML='<b style="color:'+esc(i.color||'#fff')+'">'+esc(i.name||'Мир')+':</b> '+esc(i.text||'');const l=document.getElementById('log');l.appendChild(e);while(l.children.length>7)l.firstChild.remove();setTimeout(()=>e.remove(),13000)}
-function setName(){let n=document.getElementById('name').value.trim();if(n)socket.emit('set_name',{name:n})}function sendChat(e){e.preventDefault();let i=document.getElementById('chatinput'),t=i.value.trim();if(t)socket.emit('chat',{text:t});i.value=''}
-function direction(){return (rightHeld?1:0)-(leftHeld?1:0)}function sendInput(){socket.emit('input',{x:direction(),jump:jumpHeld})}
-function bindHold(id,side){const b=document.getElementById(id);const down=e=>{e.preventDefault();b.setPointerCapture?.(e.pointerId);b.classList.add('on');if(side<0)leftHeld=true;else rightHeld=true;sendInput()};const up=e=>{e.preventDefault();b.classList.remove('on');if(side<0)leftHeld=false;else rightHeld=false;sendInput()};b.addEventListener('pointerdown',down);b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up)}bindHold('left',-1);bindHold('right',1);
-const jump=document.getElementById('jump');jump.onpointerdown=e=>{e.preventDefault();jump.setPointerCapture?.(e.pointerId);jump.classList.add('on');jumpHeld=true;sendInput()};function jumpUp(e){e.preventDefault();jump.classList.remove('on');jumpHeld=false;sendInput()}jump.onpointerup=jumpUp;jump.onpointercancel=jumpUp;
-const hit=document.getElementById('hit');hit.onpointerdown=e=>{e.preventDefault();hit.classList.add('on');socket.emit('attack')};hit.onpointerup=()=>hit.classList.remove('on');hit.onpointercancel=()=>hit.classList.remove('on');
-document.getElementById('mode').onpointerdown=e=>{e.preventDefault();editMode=editMode==='place'?'break':'place';e.currentTarget.textContent=editMode==='place'?'＋':'−';e.currentTarget.classList.toggle('selected',editMode==='place')};
-addEventListener('keydown',e=>{if(document.activeElement.tagName==='INPUT')return;if(e.code==='KeyA'||e.code==='ArrowLeft')leftHeld=true;if(e.code==='KeyD'||e.code==='ArrowRight')rightHeld=true;if(e.code==='Space'||e.code==='KeyW'||e.code==='ArrowUp'){e.preventDefault();jumpHeld=true}if(e.code==='KeyF')socket.emit('attack');sendInput()});addEventListener('keyup',e=>{if(e.code==='KeyA'||e.code==='ArrowLeft')leftHeld=false;if(e.code==='KeyD'||e.code==='ArrowRight')rightHeld=false;if(e.code==='Space'||e.code==='KeyW'||e.code==='ArrowUp')jumpHeld=false;sendInput()});addEventListener('blur',()=>{leftHeld=rightHeld=jumpHeld=false;sendInput()});setInterval(sendInput,50);
-canvas.onpointerdown=e=>{if(e.pointerType==='mouse'&&e.button===0)return;if(Date.now()-lastTouch<100)return;lastTouch=Date.now();e.preventDefault();let tx=Math.floor((e.clientX+camera.x)/T),ty=Math.floor((e.clientY+camera.y)/T);socket.emit('edit_block',{x:tx,y:ty,action:editMode,type:selectedBlock})};canvas.oncontextmenu=e=>e.preventDefault();
-socket.on('connect',()=>online.textContent='Онлайн: подключено');socket.on('disconnect',()=>online.textContent='Переподключение…');socket.on('init',d=>{worldW=d.w;worldH=d.h;T=d.tile;blocks.clear();d.blocks.forEach(b=>blocks.set(key(b.x,b.y),b.type));players.clear();d.players.forEach(p=>players.set(p.id,p));mobs.clear();d.entities.forEach(e=>mobs.set(e.id,e));me=d.you;players.set(me.id,me);worldTime=d.time;name.value=me.name;d.chat.forEach(addLine)});socket.on('you',p=>{me=p;players.set(p.id,p);name.value=p.name});socket.on('state',d=>{let seen=new Set;d.players.forEach(p=>{seen.add(p.id);players.set(p.id,p);if(me&&p.id===me.id)me=p});for(const id of players.keys())if(!seen.has(id))players.delete(id);mobs.clear();d.entities.forEach(e=>mobs.set(e.id,e));worldTime=d.time});socket.on('world_patch',b=>b.type?blocks.set(key(b.x,b.y),b.type):blocks.delete(key(b.x,b.y)));socket.on('chat',addLine);socket.on('notice',i=>addLine({name:'Мир',text:i.text,color:'#ffd166'}));
-// Оригинальная процедурная музыка: никаких чужих аудиофайлов и проблем с copyright.
-let audio=null,musicTimer=null,noteIndex=0;const melody=[0,4,7,11,7,4,2,7,9,5,2,0,4,9,7,2];function tone(freq,when,dur,vol,type='sine'){let o=audio.createOscillator(),g=audio.createGain();o.type=type;o.frequency.value=freq;g.gain.setValueAtTime(0,when);g.gain.linearRampToValueAtTime(vol,when+.12);g.gain.exponentialRampToValueAtTime(.0001,when+dur);o.connect(g).connect(audio.destination);o.start(when);o.stop(when+dur+.05)}function scheduleMusic(){if(!audio)return;let now=audio.currentTime+.05;for(let i=0;i<4;i++){let n=melody[(noteIndex+i)%melody.length],f=220*Math.pow(2,n/12);tone(f,now+i*.55,.95,.025,'sine');tone(f/2,now+i*.55,1.2,.012,'triangle')}noteIndex=(noteIndex+4)%melody.length}music.onclick=async()=>{if(audio){audio.close();audio=null;clearInterval(musicTimer);music.textContent='♫ Включить музыку';return}audio=new (window.AudioContext||window.webkitAudioContext)();await audio.resume();scheduleMusic();musicTimer=setInterval(scheduleMusic,2100);music.textContent='■ Выключить музыку'};
-function rect(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(Math.round(x),Math.round(y),w,h)}function label(text,x,y,color='#fff'){ctx.font='12px system-ui';ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='#111';ctx.strokeText(text,x,y);ctx.fillStyle=color;ctx.fillText(text,x,y)}
-function drawMob(e){let x=e.x-camera.x,y=e.y-camera.y,f=e.facing||1;if(e.dash>0){ctx.globalAlpha=.22;rect(x-f*35,y,e.w,e.h,'#c972ff');ctx.globalAlpha=1}if(e.kind==='bunny'){rect(x,y+7,e.w,e.h-7,'#eee');rect(x+(f>0?13:3),y,5,12,'#eee');rect(x+(f>0?18:8),y+11,3,3,'#222')}else if(e.kind==='deer'){rect(x+4,y+10,e.w-8,e.h-13,'#b77a45');rect(x+(f>0?20:0),y,e.w-9,18,'#c58a51');rect(x+(f>0?24:4),y+5,3,3,'#111');rect(x+6,y+e.h-8,4,12,'#704426');rect(x+21,y+e.h-8,4,12,'#704426')}else if(e.kind==='zombie'){rect(x,y,e.w,e.h,'#527e54');rect(x+4,y+3,e.w-8,13,'#7eaf73');rect(x+7,y+7,3,3,'#ff5252');rect(x+16,y+7,3,3,'#ff5252')}else{rect(x,y,e.w,e.h,'#29162f');rect(x+3,y+2,e.w-6,15,'#ded4e5');rect(x+7,y+7,3,3,'#ff1744');rect(x+17,y+7,3,3,'#ff1744');rect(x-4,y+13,e.w+8,7,'#6f1d42');label('ВАМПИР',x+e.w/2,y-15,'#ff5d89')}if(e.hp<e.max_hp){rect(x,y-8,e.w,4,'#42151c');rect(x,y-8,e.w*(e.hp/e.max_hp),4,'#ef445c')}}
-function draw(){let w=innerWidth,h=innerHeight;ctx.clearRect(0,0,w,h);let sun=Math.max(0,Math.sin(worldTime*Math.PI*2));let night=1-sun;let sky=ctx.createLinearGradient(0,0,0,h);sky.addColorStop(0,night>.65?'#111b42':'#58abe0');sky.addColorStop(1,night>.65?'#31345e':'#d4efff');ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);let orbX=(worldTime*w*1.4)-w*.2,orbY=85-Math.sin(worldTime*Math.PI)*55;ctx.beginPath();ctx.arc(orbX,orbY,night>.65?18:25,0,Math.PI*2);ctx.fillStyle=night>.65?'#e7edff':'#ffe898';ctx.fill();if(me){let tx=me.x+me.w/2-w/2,ty=me.y+me.h/2-h*.56;camera.x+=(tx-camera.x)*.14;camera.y+=(ty-camera.y)*.14;camera.x=Math.max(0,Math.min(worldW*T-w,camera.x));camera.y=Math.max(0,Math.min(worldH*T-h,camera.y));hp.style.width=(100*me.hp/me.max_hp)+'%';hptext.textContent=me.hp+' / '+me.max_hp+' HP'}clock.textContent=night>.62?'Ночь — враги активны':'День';let x0=Math.floor(camera.x/T)-1,x1=Math.ceil((camera.x+w)/T)+1,y0=Math.floor(camera.y/T)-1,y1=Math.ceil((camera.y+h)/T)+1;for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){let b=blocks.get(key(x,y));if(!b)continue;let px=x*T-camera.x,py=y*T-camera.y;rect(px,py,T,T,colors[b]||'#888');ctx.strokeStyle='#0002';ctx.strokeRect(px,py,T,T);if(b===1)rect(px,py,T,5,'#8ae177');if(b===3){ctx.fillStyle='#ffffff12';ctx.fillRect(px+5,py+7,8,3)}}mobs.forEach(drawMob);players.forEach(p=>{let x=p.x-camera.x,y=p.y-camera.y;if(p.hp<=0)return;rect(x,y,p.w,p.h,p.color);rect(x+4,y+3,p.w-8,13,'#ffd9b5');let eye=p.facing>0?p.w-9:6;rect(x+eye,y+7,3,3,'#171923');label(p.name,x+p.w/2,y-7,p.id===me?.id?'#ffd166':'#fff')});if(night>.1){ctx.fillStyle=`rgba(8,12,38,${night*.42})`;ctx.fillRect(0,0,w,h)}requestAnimationFrame(draw)}draw();
-try{screen.orientation?.lock?.('landscape').catch(()=>{})}catch(e){}
-</script></body></html>'''
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#090a0f;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+#game{position:fixed;inset:0;width:100vw;height:100vh;display:block;touch-action:none;image-rendering:pixelated}
 
+/* HUD UI */
+.hud{position:fixed;z-index:10;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:12px}
+.top-bar{display:flex;justify-content:space-between;align-items:flex-start}
+.card{background:rgba(18,24,38,0.85);border:1px solid rgba(255,255,255,0.15);backdrop-filter:blur(10px);border-radius:14px;padding:10px 14px;pointer-events:auto;box-shadow:0 8px 32px rgba(0,0,0,0.4)}
+.hp-bar-box{width:180px;height:16px;background:#1a2332;border-radius:8px;overflow:hidden;border:1px solid #ffffff22;margin-top:4px}
+.hp-fill{height:100%;background:linear-gradient(90deg, #ff1744, #ff5252);width:100%;transition:width 0.2s}
+.player-name{font-weight:900;font-size:14px;color:#ffd166;display:flex;align-items:center;gap:6px}
 
-if __name__ == "__main__":
-    ensure_loop()
-    socketio.run(
-        app,
-        host="0.0.0.0",
-        port=int(os.environ.get("PORT", "8080")),
-        allow_unsafe_werkzeug=True,
-    )
+.btn-audio{background:#ffd166;color:#111;border:0;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;font-size:12px}
+
+/* HOTBAR */
+.hotbar{display:flex;gap:6px;background:rgba(15,20,30,0.85);padding:6px;border-radius:12px;border:1px solid rgba(255,255,255,0.15);pointer-events:auto;margin:0 auto}
+.slot{width:44px;height:44px;border-radius:8px;background:#20293a;border:2px solid transparent;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;position:relative}
+.slot.active{border-color:#ffd166;background:#32415d;transform:scale(1.08)}
+.slot-num{position:absolute;top:2px;left:4px;font-size:10px;color:#aaa}
+
+/* MOBILE CONTROLS */
+.controls{display:flex;justify-content:space-between;align-items:flex-end;pointer-events:none;width:100%}
+.dpad,.act-btns{display:flex;gap:12px;pointer-events:auto}
+.btn-ctl{width:62px;height:62px;border-radius:50%;background:rgba(20,28,45,0.85);border:1.5px solid rgba(255,255,255,0.25);color:#fff;font-size:26px;font-weight:900;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 20px rgba(0,0,0,0.5);touch-action:none}
+.btn-ctl:active,.btn-ctl.active{background:#ffb300;color:#111;transform:scale(0.92)}
+.btn-ctl.sprint.active{background:#ff1744;color:#fff}
+
+/* CHAT */
+.chat-box{position:fixed;left:12px;bottom:90px;width:320px;z-index:11;pointer-events:none}
+.chat-logs{max-height:120px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;margin-bottom:6px;text-shadow:0 1px 3px #000}
+.chat-msg{font-size:12px;background:rgba(0,0,0,0.4);padding:3px 8px;border-radius:6px;width:fit-content}
+.chat-form{display:flex;gap:6px;pointer-events:auto}
+.chat-input{flex:1;background:rgba(20,28,45,0.9);border:1px solid #ffffff33;border-radius:8px;padding:8px;color:#fff;outline:none}
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<div class="hud">
+  <div class="top-bar">
+    <div class="card">
+      <div class="player-name">⚔️ <span id="p-name">Загрузка...</span></div>
+      <div class="hp-bar-box"><div id="hp-fill" class="hp-fill"></div></div>
+      <div style="font-size:10px;color:#aaa;margin-top:3px" id="online-cnt">Онлайн: 1</div>
+    </div>
+    
+    <div class="card" style="display:flex;gap:8px;align-items:center">
+      <button class="btn-audio" onclick="toggleAudio()">🎵 Музыка: Вкл</button>
+      <button class="btn-audio" style="background:#4fc3f7" onclick="changeName()">✏️ Имя</button>
+    </div>
+  </div>
+
+  <div class="hotbar" id="hotbar">
+    <div class="slot active" onclick="selectSlot(1)"><span class="slot-num">1</span>⚔️</div>
+    <div class="slot" onclick="selectSlot(2)"><span class="slot-num">2</span>⛏️</div>
+    <div class="slot" onclick="selectSlot(3)"><span class="slot-num">3</span>🌱</div>
+    <div class="slot" onclick="selectSlot(4)"><span class="slot-num">4</span>🟫</div>
+    <div class="slot" onclick="selectSlot(5)"><span class="slot-num">5</span>🪙</div>
+    <div class="slot" onclick="selectSlot(6)"><span class="slot-num">6</span>🪵</div>
+    <div class="slot" onclick="selectSlot(7)"><span class="slot-num">7</span>🕯️</div>
+  </div>
+
+  <div class="controls">
+    <div class="dpad">
+      <div class="btn-ctl" id="btn-left">◀</div>
+      <div class="btn-ctl" id="btn-right">▶</div>
+      <div class="btn-ctl sprint" id="btn-sprint" style="font-size:16px">⚡БЕГ</div>
+    </div>
+    <div class="act-btns">
+      <div class="btn-ctl" id="btn-mode" style="font-size:18px">⛏️</div>
+      <div class="btn-ctl" id="btn-jump">▲</div>
+    </div>
+  </div>
+</div>
+
+<div class="chat-box">
+  <div class="chat-logs" id="chat-logs"></div>
+  <form class="chat-form" onsubmit="sendChat(event)">
+    <input class="chat-input" id="chat-in" placeholder="Написать в чат..." maxlength="120">
+  </form>
+</div>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+const socket = io({transports:['websocket','polling']});
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+let T = 32, worldW = 350, worldH = 120;
+let blocks = new Map();
+let players = new Map();
+let mobs = new Map();
+let myId = null;
+let camera = {x:0, y:0};
+let worldTime = 0.25;
+
+// Управление
+let keyState = {left:false, right:false, jump:false, sprint:false};
+let buildMode = 'break'; // break или place
+let selectedSlot = 1;
+let damageTexts = [];
+
+// Слот -> ИД блока
+const slotBlocks = {3:1, 4:2, 5:3, 6:4, 7:7};
+const blockColors = {1:'#4caf50', 2:'#795548', 3:'#607d8b', 4:'#5d4037', 5:'#2e7d32', 6:'#a1887f', 7:'#ffb300', 8:'#37474f', 9:'#ffd54f'};
+
+function resize(){
+  const d = Math.min(devicePixelRatio || 1, 2);
+  canvas.width = innerWidth * d;
+  canvas.height = innerHeight * d;
+  ctx.setTransform(d, 0, 0, d, 0, 0);
+}
+addEventListener('resize', resize);
+resize();
+
+function k(x,y){return x+','+y}
+
+// --- WEBAUDIO GENSHIN MUSIC ENGINE ---
+let audioCtx = None = null;
+let audioEnabled = true;
+
+function initAudio(){
+  if(audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  playGenshinAmbient();
+}
+
+function toggleAudio(){
+  if(!audioCtx) initAudio();
+  audioEnabled = !audioEnabled;
+  if(audioCtx){
+    if(audioEnabled) audioCtx.resume();
+    else audioCtx.suspend();
+  }
+  document.querySelector('.btn-audio').textContent = audioEnabled ? '🎵 Музыка: Вкл' : '🔇 Музыка: Выкл';
+}
+
+// Генерация атмосферной мелодии Геншин Импакт на WebAudio Synthesizer
+function playGenshinAmbient(){
+  if(!audioCtx) return;
+  
+  // Пентатоника Геншина (Dorian/Lydian atmospheric scale)
+  const notes = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99];
+  
+  function playNote(){
+    if(!audioEnabled) { setTimeout(playNote, 2000); return; }
+    
+    let osc = audioCtx.createOscillator();
+    let gain = audioCtx.createGain();
+    
+    let freq = notes[Math.floor(Math.random() * notes.length)];
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    
+    gain.gain.setValueAtTime(0.001, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.08, audioCtx.currentTime + 0.4);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 3.5);
+    
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    osc.start();
+    osc.stop(audioCtx.currentTime + 3.6);
+    
+    setTimeout(playNote, 800 + Math.random() * 1600);
+  }
+  playNote();
+}
+
+function playSfx(type){
+  if(!audioCtx || !audioEnabled) return;
+  let osc = audioCtx.createOscillator();
+  let g = audioCtx.createGain();
+  osc.connect(g); g.connect(audioCtx.destination);
+  let t = audioCtx.currentTime;
+  
+  if(type === 'jump'){
+    osc.frequency.setValueAtTime(150, t);
+    osc.frequency.exponentialRampToValueAtTime(400, t + 0.15);
+    g.gain.setValueAtTime(0.1, t); g.gain.linearRampToValueAtTime(0, t + 0.15);
+    osc.start(t); osc.stop(t + 0.15);
+  } else if(type === 'vampire_dash'){
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(400, t);
+    osc.frequency.exponentialRampToValueAtTime(80, t + 0.35);
+    g.gain.setValueAtTime(0.2, t); g.gain.linearRampToValueAtTime(0, t + 0.35);
+    osc.start(t); osc.stop(t + 0.35);
+  } else if(type === 'hit'){
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(120, t);
+    g.gain.setValueAtTime(0.15, t); g.gain.linearRampToValueAtTime(0, t + 0.1);
+    osc.start(t); osc.stop(t + 0.1);
+  }
+}
+
+// --- ВВОД И УПРАВЛЕНИЕ (ПК + ТАЧ) ---
+function sendInputs(){
+  let x = 0;
+  if(keyState.left) x -= 1;
+  if(keyState.right) x += 1;
+  socket.emit('input', {x: x, sprint: keyState.sprint, jump: keyState.jump});
+}
+
+setInterval(sendInputs, 40);
+
+// Клавиатура ПК
+addEventListener('keydown', e => {
+  initAudio();
+  if(document.activeElement.id === 'chat-in') return;
+  if(e.code==='KeyA'||e.code==='ArrowLeft') keyState.left = true;
+  if(e.code==='KeyD'||e.code==='ArrowRight') keyState.right = true;
+  if(e.code==='KeyW'||e.code==='Space'||e.code==='ArrowUp'){
+    if(!keyState.jump) playSfx('jump');
+    keyState.jump = true;
+  }
+  if(e.shiftKey) keyState.sprint = true;
+  
+  if(e.key >= '1' && e.key <= '7') selectSlot(parseInt(e.key));
+  sendInputs();
+});
+
+addEventListener('keyup', e => {
+  if(e.code==='KeyA'||e.code==='ArrowLeft') keyState.left = false;
+  if(e.code==='KeyD'||e.code==='ArrowRight') keyState.right = false;
+  if(e.code==='KeyW'||e.code==='Space'||e.code==='ArrowUp') keyState.jump = false;
+  if(!e.shiftKey) keyState.sprint = false;
+  sendInputs();
+});
+
+// Кнопки на мобильном экранчике
+function bindBtn(id, key){
+  const el = document.getElementById(id);
+  const start = e => {
+    e.preventDefault();
+    initAudio();
+    el.classList.add('active');
+    keyState[key] = true;
+    if(key==='jump') playSfx('jump');
+    sendInputs();
+  };
+  const end = e => {
+    e.preventDefault();
+    el.classList.remove('active');
+    keyState[key] = false;
+    sendInputs();
+  };
+  el.addEventListener('pointerdown', start);
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+}
+
+bindBtn('btn-left', 'left');
+bindBtn('btn-right', 'right');
+bindBtn('btn-jump', 'jump');
+
+// Бег на кнопку
+const btnSprint = document.getElementById('btn-sprint');
+btnSprint.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  keyState.sprint = !keyState.sprint;
+  btnSprint.classList.toggle('active', keyState.sprint);
+  sendInputs();
+});
+
+document.getElementById('btn-mode').addEventListener('click', () => {
+  buildMode = buildMode === 'break' ? 'place' : 'break';
+  document.getElementById('btn-mode').textContent = buildMode === 'break' ? '⛏️' : '🧱';
+});
+
+function selectSlot(num){
+  selectedSlot = num;
+  document.querySelectorAll('.slot').forEach((s, idx) => {
+    s.classList.toggle('active', idx + 1 === num);
+  });
+  socket.emit('set_holding', {slot: num});
+}
+
+function changeName(){
+  const n = prompt('Введите имя героя:', '');
+  if(n) socket.emit('set_name', {name: n});
+}
+
+function sendChat(e){
+  e.preventDefault();
+  const input = document.getElementById('chat-in');
+  if(input.value.trim()){
+    socket.emit('chat', {text: input.value.trim()});
+    input.value = '';
+  }
+}
+
+// Клик по миру (атака мобов или разрушение/постройка)
+canvas.addEventListener('pointerdown', e => {
+  if(e.target !== canvas) return;
+  initAudio();
+  const rect = canvas.getBoundingClientRect();
+  const clickX = e.clientX - rect.left + camera.x;
+  const clickY = e.clientY - rect.top + camera.y;
+
+  // Проверяем клик по мобам для атаки
+  let attacked = false;
+  mobs.forEach(m => {
+    if(clickX >= m.x - 15 && clickX <= m.x + m.w + 15 && clickY >= m.y - 15 && clickY <= m.y + m.h + 15){
+      socket.emit('attack_mob', {id: m.id});
+      playSfx('hit');
+      attacked = true;
+    }
+  });
+
+  if(!attacked){
+    const tx = Math.floor(clickX / T);
+    const ty = Math.floor(clickY / T);
+    
+    if(selectedSlot === 1 || selectedSlot === 2 || buildMode === 'break'){
+      socket.emit('edit_block', {x: tx, y: ty, action: 'break'});
+    } else {
+      const btype = slotBlocks[selectedSlot] || 2;
+      socket.emit('edit_block', {x: tx, y: ty, action: 'place', type: btype});
+    }
+  }
+});
+
+// --- SOCKET EVENTS ---
+socket.on('init', d => {
+  worldW = d.w; worldH = d.h; T = d.tile; myId = d.you_id;
+  d.blocks.forEach(b => blocks.set(k(b.x, b.y), b.type));
+  d.mobs.forEach(m => mobs.set(m.id, m));
+  d.players.forEach(p => players.set(p.id, p));
+  d.chat.forEach(addChatMsg);
+});
+
+socket.on('state', d => {
+  worldTime = d.time;
+  mobs.clear();
+  d.mobs.forEach(m => mobs.set(m.id, m));
+  d.players.forEach(p => players.set(p.id, p));
+
+  const me = players.get(myId);
+  if(me){
+    document.getElementById('p-name').textContent = me.name;
+    document.getElementById('hp-fill').style.width = (me.hp / me.max_hp * 100) + '%';
+  }
+  document.getElementById('online-cnt').textContent = 'Онлайн: ' + players.size;
+});
+
+socket.on('world_patch', b => {
+  if(b.type) blocks.set(k(b.x, b.y), b.type);
+  else blocks.delete(k(b.x, b.y));
+});
+
+socket.on('vampire_dash', d => {
+  playSfx('vampire_dash');
+  damageTexts.push({x: d.x, y: d.y - 20, text: '⚡ РЫВОК ВАМПИРА!', color: '#ff1744', life: 1.0});
+});
+
+socket.on('effect', e => {
+  if(e.type === 'damage'){
+    damageTexts.push({x: e.x, y: e.y, text: e.val, color: '#ff5252', life: 0.8});
+  }
+});
+
+socket.on('chat', addChatMsg);
+socket.on('notice', i => addChatMsg({name: 'Мир', text: i.text, color: i.color || '#ffd166'}));
+
+function addChatMsg(m){
+  const box = document.getElementById('chat-logs');
+  const el = document.createElement('div');
+  el.className = 'chat-msg';
+  el.innerHTML = `<b style="color:${m.color||'#fff'}">${escapeHtml(m.name)}:</b> ${escapeHtml(m.text)}`;
+  box.appendChild(el);
+  while(box.children.length > 8) box.firstChild.remove();
+  box.scrollTop = box.scrollHeight;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// --- ОТРИСОВКА И РЕНДЕРИНГ ИГРЫ ---
+function draw(){
+  const w = innerWidth, h = innerHeight;
+  ctx.clearRect(0, 0, w, h);
+
+  // Камера следит за игроком
+  const me = players.get(myId);
+  if(me){
+    camera.x += (me.x + me.w / 2 - w / 2 - camera.x) * 0.1;
+    camera.y += (me.y + me.h / 2 - h / 2 - camera.y) * 0.1;
+    camera.x = Math.max(0, Math.min(worldW * T - w, camera.x));
+    camera.y = Math.max(0, Math.min(worldH * T - h, camera.y));
+  }
+
+  // Небо Геншин Импакт (Динамическая смена дня и ночи)
+  let skyGrad = ctx.createLinearGradient(0, 0, 0, h);
+  if(worldTime >= 0.2 && worldTime <= 0.75){ // День
+    skyGrad.addColorStop(0, '#4fc3f7');
+    skyGrad.addColorStop(1, '#e1f5fe');
+  } else { // Ночь
+    skyGrad.addColorStop(0, '#0a0e1a');
+    skyGrad.addColorStop(1, '#1a233a');
+  }
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  // Отрисовка блоков мира
+  const x0 = Math.floor(camera.x / T) - 1;
+  const x1 = Math.ceil((camera.x + w) / T) + 1;
+  const y0 = Math.floor(camera.y / T) - 1;
+  const y1 = Math.ceil((camera.y + h) / T) + 1;
+
+  for(let y = y0; y <= y1; y++){
+    for(let x = x0; x <= x1; x++){
+      const b = blocks.get(k(x, y));
+      if(!b) continue;
+
+      const px = x * T - camera.x;
+      const py = y * T - camera.y;
+
+      ctx.fillStyle = blockColors[b] || '#777';
+      ctx.fillRect(px, py, T, T);
+
+      // Красивые контуры блоков
+      ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+      ctx.strokeRect(px, py, T, T);
+
+      // Шапка травы
+      if(b === 1){
+        ctx.fillStyle = '#81c784';
+        ctx.fillRect(px, py, T, 5);
+      }
+    }
+  }
+
+  // Отрисовка Мобцов и Босса
+  mobs.forEach(m => {
+    const px = m.x - camera.x;
+    const py = m.y - camera.y;
+
+    if(m.type === 'vampire'){
+      // ВАМПИР-ЛОРД (СУПЕР БОСС)
+      ctx.fillStyle = m.dash_active > 0 ? '#ff1744' : '#800020';
+      ctx.fillRect(px, py, m.w, m.h);
+      // Плащ
+      ctx.fillStyle = '#111';
+      ctx.fillRect(px - (m.facing === 1 ? 6 : -2), py + 8, 8, m.h - 8);
+      // Светящиеся красные глаза
+      ctx.fillStyle = '#ff1744';
+      ctx.fillRect(px + (m.facing === 1 ? 16 : 4), py + 8, 5, 4);
+
+      // Аура рывка
+      if(m.dash_active > 0){
+        ctx.strokeStyle = '#ff1744';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(px - 6, py - 6, m.w + 12, m.h + 12);
+      }
+    } else if(m.type === 'zombie'){
+      ctx.fillStyle = '#388e3c';
+      ctx.fillRect(px, py, m.w, m.h);
+      ctx.fillStyle = '#1b5e20';
+      ctx.fillRect(px + (m.facing === 1 ? 14 : 2), py + 6, 4, 4);
+    } else if(m.type === 'slime'){
+      ctx.fillStyle = '#00e676';
+      ctx.fillRect(px, py, m.w, m.h);
+    } else if(m.type === 'bunny'){
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(px, py, m.w, m.h);
+      // Ушки
+      ctx.fillRect(px + 2, py - 6, 4, 6);
+      ctx.fillRect(px + m.w - 6, py - 6, 4, 6);
+    }
+
+    // Полоска HP Моба
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(px, py - 10, m.w, 5);
+    ctx.fillStyle = m.type === 'vampire' ? '#ff1744' : '#4caf50';
+    ctx.fillRect(px, py - 10, (m.hp / m.max_hp) * m.w, 5);
+
+    // Имя Моба
+    ctx.font = 'bold 10px sans-serif';
+    ctx.fillStyle = m.type === 'vampire' ? '#ff1744' : '#fff';
+    ctx.textAlign = 'center';
+    ctx.fillText(m.name, px + m.w / 2, py - 14);
+  });
+
+  // Отрисовка Игроков
+  players.forEach(p => {
+    if(p.hp <= 0) return;
+    const px = p.x - camera.x;
+    const py = p.y - camera.y;
+
+    // Тело
+    ctx.fillStyle = p.color;
+    ctx.fillRect(px, py, p.w, p.h);
+
+    // Голова
+    ctx.fillStyle = '#ffcc80';
+    ctx.fillRect(px + 3, py + 4, p.w - 6, 12);
+
+    // Глаза
+    ctx.fillStyle = '#111';
+    const eyeX = p.facing === 1 ? px + p.w - 7 : px + 3;
+    ctx.fillRect(eyeX, py + 8, 3, 3);
+
+    // Оружие в руках
+    if(p.holding === 1){ // Меч
+      ctx.fillStyle = '#e0e0e0';
+      const swordX = p.facing === 1 ? px + p.w : px - 12;
+      ctx.fillRect(swordX, py + 16, 12, 4);
+    }
+
+    // Имя игрока
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#000';
+    ctx.shadowBlur = 4;
+    ctx.fillText(p.name, px + p.w / 2, py - 8);
+    ctx.shadowBlur = 0;
+  });
+
+  // Всплывающий текст урона
+  for(let i = damageTexts.length - 1; i >= 0; i--){
+    let dt = damageTexts[i];
+    dt.life -= 0.03;
+    dt.y -= 0.8;
+    ctx.font = '900 16px sans-serif';
+    ctx.fillStyle = dt.color;
+    ctx.textAlign = 'center';
+    ctx.fillText(dt.text, dt.x - camera.x, dt.y - camera.y);
+    if(dt.life <= 0) damageTexts.splice(i, 1);
+  }
+
+  requestAnimationFrame(draw);
+}
+
+draw();
+</script>
+</body>
+</html>
+'''
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8080))
+    socketio.run(app, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True)
