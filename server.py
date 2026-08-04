@@ -166,7 +166,7 @@ def extract_doc_attachment(save_result):
     return None
 
 SW_JS = """
-const CACHE_NAME = 'vk-meow-v9-cache';
+const CACHE_NAME = 'vk-meow-v10-cache';
 const STATIC_ASSETS = ['/', '/sw.js'];
 
 self.addEventListener('install', (evt) => {
@@ -258,7 +258,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 .header-subtitle{font-size:12px;color:#8e8e93;display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .header-actions{display:flex;gap:6px;align-items:center}
-.header-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;color:#aaa;background:rgba(255,255,255,0.05)}
+.header-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;color:#aaa;background:rgba(255,255,255,0.05);border:none;outline:none}
 .header-btn:active{background:rgba(255,255,255,0.15);color:#fff}
 .header-btn.active{color:#fff;background:rgba(255,255,255,0.15)}
 
@@ -268,7 +268,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 /* Search Bar */
 .search-bar-container{padding:8px 12px;background:#0d0d0d;border-bottom:1px solid #1a1a1a}
-.search-input-wrap{display:flex;align-items:center;background:#1c1c1e;border-radius:12px;padding:0 10px;border:1px solid #2a2a2c}
+.search-input-wrap{display:flex;align-items:center;background:#1c1c1e;border-radius:12px;padding:0 12px;border:1px solid #2a2a2c;width:100%}
 .search-input-wrap svg{color:#8e8e93;flex-shrink:0;margin-right:8px}
 .search-input{flex:1;background:transparent;border:none;padding:10px 0;color:#fff;font-size:14px;outline:none;font-family:inherit}
 .search-input::placeholder{color:#666}
@@ -494,7 +494,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 .upload-toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(28,28,30,0.95);border:1px solid #3a3a3c;color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;z-index:900;display:flex;align-items:center;gap:10px;box-shadow:0 4px 16px rgba(0,0,0,0.5)}
 
 /* Bottom Nav */
-.bottom-nav{height:50px;background:#0d0d0d;border-top:1px solid #1a1a1a;display:flex;justify-space-around;align-items:center;flex-shrink:0}
+.bottom-nav{height:50px;background:#0d0d0d;border-top:1px solid #1a1a1a;display:flex;justify-content:space-around;align-items:center;flex-shrink:0}
 .nav-item{flex:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;color:#666}
 .nav-item.active{color:#fff}
 .nav-item span{font-size:10px}
@@ -826,16 +826,16 @@ Kate Mobile API • Cloud Realtime E2EE
 <div class="header-subtitle" id="dialogsHeaderSubtitle">Защищено Cloud E2EE</div>
 </div>
 <div class="header-actions">
-<div class="header-btn active" id="encryptBtn" onclick="openEncryptModal()" title="Шифрование E2EE">
+<button class="header-btn active" id="encryptBtn" onclick="openEncryptModal()" title="Шифрование E2EE">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-</div>
+</button>
 </div>
 </div>
 
 <!-- Search Input Bar -->
 <div class="search-bar-container">
 <div class="search-input-wrap">
-<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
 <input class="search-input" id="dialogSearchInput" placeholder="Поиск по диалогам и ВКонтакте..." oninput="handleSearchInput()">
 </div>
 </div>
@@ -877,9 +877,9 @@ Kate Mobile API • Cloud Realtime E2EE
 <div class="header-subtitle" id="chatEncryptStatus">в сети • <span id="msgCount">0</span> сообщений</div>
 </div>
 <div class="header-actions">
-<!-- SVG Magnifying Glass Icon as requested (analogous to Telegram search style) -->
-<button class="header-btn" id="searchChatBtn" onclick="toggleChatSearch()" title="Поиск по сообщениям в чате">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+<!-- SVG Magnifying Glass Icon — clean, no gray box background -->
+<button class="header-btn" id="searchChatBtn" onclick="toggleChatSearch()" title="Поиск по сообщениям в чате" style="background:transparent;border:none">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
 </button>
 <button class="mark-read-btn hidden" id="manualMarkReadBtn" onclick="manualMarkChatAsRead()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align:middle;margin-right:4px"><polyline points="20 6 9 17 4 12"/></svg>Прочитать</button>
 </div>
@@ -887,13 +887,13 @@ Kate Mobile API • Cloud Realtime E2EE
 
 <div class="search-chat-bar hidden" id="searchChatBar" style="padding:8px 12px;background:#141416;border-bottom:1px solid #222;display:flex;align-items:center;gap:8px;z-index:10">
 <div class="search-input-wrap" style="flex:1">
-<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
 <input type="text" id="chatSearchInput" placeholder="Поиск по сообщениям..." style="flex:1;background:transparent;border:none;padding:8px 0;color:#fff;font-size:14px;outline:none" oninput="searchInChat()">
 </div>
 <div id="searchCounter" style="font-size:12px;color:#888;white-space:nowrap">0/0</div>
-<button class="header-btn" onclick="prevSearchResult()" style="width:32px;height:32px">↑</button>
-<button class="header-btn" onclick="nextSearchResult()" style="width:32px;height:32px">↓</button>
-<button class="header-btn" onclick="toggleChatSearch()" style="width:32px;height:32px">✕</button>
+<button class="header-btn" onclick="prevSearchResult()" style="width:32px;height:32px;background:rgba(255,255,255,0.08);border-radius:50%">↑</button>
+<button class="header-btn" onclick="nextSearchResult()" style="width:32px;height:32px;background:rgba(255,255,255,0.08);border-radius:50%">↓</button>
+<button class="header-btn" onclick="toggleChatSearch()" style="width:32px;height:32px;background:rgba(255,255,255,0.08);border-radius:50%">✕</button>
 </div>
 
 <div class="pinned-msg-bar hidden" id="pinnedMsgBar">
@@ -1037,7 +1037,7 @@ Kate Mobile API • Cloud Realtime E2EE
 </div>
 </div>
 <div class="profile-view-info" id="profileViewInfo"></div>
-<div class="profile-view-posts" id="profileViewPosts">
+<div class="profile-view-posts">
 <div class="profile-view-post-title">Записи на стене</div>
 <div id="profilePostsList"></div>
 </div>
@@ -2187,6 +2187,35 @@ async function loadMessages(initialScroll = false) {
     } catch(e){}
 }
 
+// Function to handle on-demand real-time decryption safely inside current chat
+async function tryDecryptMessageRealTime(msgId, encryptedText) {
+    try {
+        if (!localKeyPair) await initClientCrypto();
+        if (!localKeyPair) return;
+        const encObj = JSON.parse(encryptedText.substring(ENCRYPT_PREFIX.length));
+        const decBuf = await clientDecryptData(encObj);
+        if (decBuf) {
+            const plainText = new TextDecoder().decode(decBuf);
+            decryptedCache[msgId] = plainText;
+            const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
+            if (textElem) {
+                textElem.innerHTML = escapeHtml(plainText);
+            }
+        } else {
+            const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
+            if (textElem) {
+                textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
+            }
+        }
+    } catch(e) {
+        console.error('Real-time decrypt error:', e);
+        const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
+        if (textElem) {
+            textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
+        }
+    }
+}
+
 function renderMessageItem(containerOrFragment, msg) {
     const container = containerOrFragment.nodeType === 11 ? document.getElementById('messages') : containerOrFragment;
     const containerDiv = document.createElement('div');
@@ -2245,27 +2274,9 @@ function renderMessageItem(containerOrFragment, msg) {
             html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
         } else {
             html += `<div class="msg-text"><span class="decrypting-shimmer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Расшифровка...</span></div>`;
-            setTimeout(async () => {
-                try {
-                    if (!localKeyPair) await initClientCrypto();
-                    if (!localKeyPair) return;
-                    const encObj = JSON.parse(msg.text.substring(ENCRYPT_PREFIX.length));
-                    const decBuf = await clientDecryptData(encObj);
-                    if (decBuf) {
-                        const plainText = new TextDecoder().decode(decBuf);
-                        decryptedCache[msg.id] = plainText;
-                        const textElem = document.getElementById('msg-' + msg.id)?.querySelector('.msg-text');
-                        if (textElem) textElem.innerHTML = escapeHtml(plainText);
-                    } else {
-                        const textElem = document.getElementById('msg-' + msg.id)?.querySelector('.msg-text');
-                        if (textElem) textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Не удалось расшифровать';
-                    }
-                } catch(e) {
-                    console.error('Decrypt error:', e);
-                    const textElem = document.getElementById('msg-' + msg.id)?.querySelector('.msg-text');
-                    if (textElem) textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Не удалось расшифровать';
-                }
-            }, 100);
+            setTimeout(() => {
+                tryDecryptMessageRealTime(msg.id, msg.text);
+            }, 50);
         }
     } else {
         if (displayText) html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
@@ -3357,21 +3368,12 @@ async function pollEvents() {
                             renderMessageItem(container, newMsg);
                             container.scrollTop = container.scrollHeight;
                         }
+                        
+                        // FIX: Instant decryption for incoming messages inside the active chat screen
                         if (text && text.startsWith(ENCRYPT_PREFIX)) {
-                            setTimeout(async () => {
-                                try {
-                                    if (!localKeyPair) await initClientCrypto();
-                                    if (!localKeyPair) return;
-                                    const encObj = JSON.parse(text.substring(ENCRYPT_PREFIX.length));
-                                    const decBuf = await clientDecryptData(encObj);
-                                    if (decBuf) {
-                                        const plainText = new TextDecoder().decode(decBuf);
-                                        decryptedCache[msgId] = plainText;
-                                        const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
-                                        if (textElem) textElem.innerHTML = escapeHtml(plainText);
-                                    }
-                                } catch(e) { console.error('Poll decrypt error:', e); }
-                            }, 200);
+                            setTimeout(() => {
+                                tryDecryptMessageRealTime(msgId, text);
+                            }, 50);
                         }
                     }
                 } else if (eventCode === 3) {
@@ -4418,7 +4420,7 @@ def longpoll_listen():
 @app.route('/api/proxy_file')
 def proxy_file():
     url = request.args.get('url')
-    if not url:
+    if (!url):
         return jsonify({'error': 'No URL'}), 400
     try:
         resp = get_session().get(url, timeout=15)
