@@ -1,3 +1,4 @@
+
 import os
 import re
 import json
@@ -317,7 +318,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .tg-channel-btn:active{color:#fff}
 .tg-channel-btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2}
 
-/* Comments & Likes Modal */
+/* Comments &amp; Likes Modal */
 .comments-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:750;display:flex;flex-direction:column;transform:translateY(100%);transition:transform 0.25s cubic-bezier(0.1,0.9,0.2,1)}
 .comments-modal.active{transform:translateY(0)}
 .comments-header{height:56px;background:#0d0d0d;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #1c1c1c;flex-shrink:0}
@@ -427,8 +428,8 @@ input:checked + .slider:before{transform:translateX(20px)}
 .msg-in{align-self:flex-start;background:#1c1c1e;border-bottom-left-radius:4px;color:#fff}
 .msg-out{align-self:flex-end;background:#2c2c2e;border-bottom-right-radius:4px;color:#fff}
 
-.msg-sticker{background:transparent !important;padding:0 !important;box-shadow:none !important;max-width:160px !important;border-radius:0 !important}
-.msg-sticker img{width:140px;height:140px;object-fit:contain;display:block;-webkit-user-drag:none}
+.msg-sticker{background:transparent !important;padding:0 !important;box-shadow:none !important;max-width:160px !important}
+.msg-sticker img{width:140px;height:140px;object-fit:contain;display:block}
 
 .msg-circle-mode{background:transparent !important;padding:0 !important;border-radius:0 !important;box-shadow:none !important;max-width:200px !important}
 .msg-circle-mode .msg-time{position:absolute;bottom:6px;right:10px;background:rgba(0,0,0,0.55);padding:2px 6px;border-radius:10px;backdrop-filter:blur(4px);z-index:5}
@@ -459,10 +460,9 @@ input:checked + .slider:before{transform:translateX(20px)}
 
 .msg-photo{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;object-fit:cover;cursor:pointer;background:#111;border:none!important;outline:none!important;box-shadow:none!important}
 .msg-video{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;background:#000;border:none!important;outline:none!important;box-shadow:none!important}
-.msg-status{display:inline-flex;align-items:center;justify-content:center;margin-left:2px}
 .msg-file{background:rgba(255,255,255,.05);padding:10px;border-radius:12px;margin-top:6px;display:flex;align-items:center;gap:10px;cursor:pointer;color:#aaa}
 
-/* Input Bar & Actions */
+/* Input Bar &amp; Actions */
 .input-area-wrapper{background:#0d0d0d;border-top:1px solid #1a1a1a;display:flex;flex-direction:column;flex-shrink:0;z-index:15}
 .reply-preview-bar{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#141416;border-bottom:1px solid #222}
 .reply-preview-info{flex:1;min-width:0;border-left:2px solid #8e8e93;padding-left:8px}
@@ -630,7 +630,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 </div>
 </div>
 
-<!-- Encryption & Keys Modal -->
+<!-- Encryption &amp; Keys Modal -->
 <div class="modal hidden" id="encryptModal">
 <div class="encrypt-modal-content">
 <div class="modal-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Облачное E2EE шифрование</div>
@@ -703,6 +703,7 @@ input:checked + .slider:before{transform:translateX(20px)}
     }, { passive: true });
 
     modal.addEventListener('touchmove', (e) => {
+        if (!isDragging) return; /* Added this check */
         if (e.touches.length === 2) {
             e.preventDefault();
             const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -773,7 +774,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 </div>
 </div>
 
-<!-- Comments & Likes View Modal -->
+<!-- Comments &amp; Likes View Modal -->
 <div class="comments-modal" id="commentsModal">
 <div class="comments-header">
 <div class="header-back" onclick="closeCommentsModal()" style="margin-right:10px">
@@ -880,7 +881,7 @@ Kate Mobile API • Cloud Realtime E2EE
 </div>
 <div class="header-actions">
 <button class="header-btn" id="searchChatBtn" onclick="toggleChatSearch()" title="Поиск по сообщениям">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.85"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
 </button>
 <button class="mark-read-btn hidden" id="manualMarkReadBtn" onclick="manualMarkChatAsRead()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align:middle;margin-right:4px"><polyline points="20 6 9 17 4 12"/></svg>Прочитать</button>
 </div>
@@ -892,9 +893,9 @@ Kate Mobile API • Cloud Realtime E2EE
 <input type="text" id="chatSearchInput" placeholder="Поиск по сообщениям..." style="flex:1;background:transparent;border:none;padding:8px 0;color:#fff;font-size:14px;outline:none" oninput="searchInChat()">
 </div>
 <div id="searchCounter" style="font-size:12px;color:#888;white-space:nowrap">0/0</div>
-<button class="header-btn" onclick="prevSearchResult()" style="width:32px;height:32px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg></button>
-<button class="header-btn" onclick="nextSearchResult()" style="width:32px;height:32px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button>
-<button class="header-btn" onclick="toggleChatSearch()" style="width:32px;height:32px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+<button class="header-btn" onclick="prevSearchResult()" style="width:32px;height:32px">↑</button>
+<button class="header-btn" onclick="nextSearchResult()" style="width:32px;height:32px">↓</button>
+<button class="header-btn" onclick="toggleChatSearch()" style="width:32px;height:32px">✕</button>
 </div>
 
 <div class="pinned-msg-bar hidden" id="pinnedMsgBar">
@@ -1064,6 +1065,8 @@ if ('serviceWorker' in navigator) {
 const SVG_LIKE = `<svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
 const SVG_COMMENT = `<svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>`;
 const SVG_SHARE = `<svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>`;
+const SVG_ATTACH = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-right:8px"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>`;
+
 
 const ENCRYPT_PREFIX = "ENC2:";
 let token = localStorage.getItem('vk_token');
@@ -1087,6 +1090,7 @@ let myVkId = null;
 
 let localKeyPair = null;
 let peerKeysCache = {};
+let decryptedCache = {}; /* Moved here for broader visibility */
 
 let renderedMsgIds = new Set();
 
@@ -1416,7 +1420,10 @@ async function getPeerPubKey(peerId) {
 
 async function clientEncryptData(peerKey, plainBuf) {
     if (!localKeyPair) {
+        /* This should not happen if initClientCrypto() was successful at login. */
+        console.error("localKeyPair is null during encryption. Re-initializing.");
         await initClientCrypto();
+        if (!localKeyPair) throw new Error("Failed to initialize client crypto for encryption.");
     }
     const sessionKey = await window.crypto.subtle.generateKey(
         { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]
@@ -1437,9 +1444,10 @@ async function clientEncryptData(peerKey, plainBuf) {
 
 async function clientDecryptData(encObj) {
     if (!localKeyPair) {
-        await initClientCrypto();
+        /* This should not happen if initClientCrypto() was successful at login. */
+        console.error("localKeyPair is null during decryption. Skipping decryption.");
+        return null; // Don't try to re-initialize here, it indicates a deeper problem or wrong password.
     }
-    if (!localKeyPair) return null;
     let rawSession = null;
 
     try {
@@ -1448,6 +1456,7 @@ async function clientDecryptData(encObj) {
         try {
             rawSession = await window.crypto.subtle.decrypt({ name: "RSA-OAEP" }, localKeyPair.privateKey, b64ToBuf(encObj.k2));
         } catch(e2) {
+            console.error("Failed to decrypt session key with either K1 or K2:", e2);
             return null;
         }
     }
@@ -1459,7 +1468,7 @@ async function clientDecryptData(encObj) {
     return await decryptAESGCM(sessionKey, b64ToBuf(encObj.payload));
 }
 
-const AUTH_URL = 'https://oauth.vk.com/authorize?client_id=3682744&scope=messages,audio,photos,video,docs,notes,pages,status,wall,groups,email,stats,notifications,offline&redirect_uri=https://oauth.vk.com/blank.html&response_type=token';
+const AUTH_URL = 'https://oauth.vk.com/authorize?client_id=3682744&amp;scope=messages,audio,photos,video,docs,notes,pages,status,wall,groups,email,stats,notifications,offline&amp;redirect_uri=https://oauth.vk.com/blank.html&amp;response_type=token';
 
 function getToken() { window.open(AUTH_URL, '_blank'); }
 
@@ -1492,6 +1501,9 @@ async function login() {
             loadFolders();
             startLongPolling();
             updateDrawerProfile();
+        } else {
+             // If initClientCrypto fails, show login screen again.
+            document.getElementById('loginScreen').classList.remove('hidden');
         }
     } finally {
         hideUploadProgress();
@@ -1703,12 +1715,14 @@ function buildDialogPreviewHTML(d) {
 }
 
 async function fastDecryptDialogPreviews(dialogs) {
+    if (!localKeyPair) {
+        console.warn("localKeyPair not available for fastDecryptDialogPreviews. Skipping.");
+        return;
+    }
     for (const d of dialogs) {
         if (d.last_message && d.last_message.startsWith(ENCRYPT_PREFIX)) {
             setTimeout(async () => {
                 try {
-                    if (!localKeyPair) await initClientCrypto();
-                    if (!localKeyPair) return;
                     const encObj = JSON.parse(d.last_message.substring(ENCRYPT_PREFIX.length));
                     const decBuf = await clientDecryptData(encObj);
                     if (decBuf) {
@@ -1716,7 +1730,9 @@ async function fastDecryptDialogPreviews(dialogs) {
                         const elem = document.getElementById(`dialog-dec-${d.id}`);
                         if (elem) elem.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>${escapeHtml(plainText)}`;
                     }
-                } catch(e){}
+                } catch(e){
+                    console.error("Error decrypting dialog preview for ID " + d.id + ":", e);
+                }
             }, 5);
         }
     }
@@ -2167,7 +2183,7 @@ async function loadMessages(initialScroll = false) {
         const res = await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, peer_id: currentPeer }) });
         const data = await res.json();
         const container = document.getElementById('messages');
-
+        
         if (data.messages) {
             const msgs = data.messages.reverse();
             const wasAtBottom = (container.scrollHeight - container.scrollTop - container.clientHeight) < 80;
@@ -2178,26 +2194,6 @@ async function loadMessages(initialScroll = false) {
                     renderedMsgIds.add(m.id);
                     renderMessageItem(container, m);
                     hasNew = true;
-                    // Decrypt encrypted messages immediately after rendering
-                    if (m.text && m.text.startsWith(ENCRYPT_PREFIX)) {
-                        setTimeout(async () => {
-                            try {
-                                if (!localKeyPair) await initClientCrypto();
-                                if (!localKeyPair) return;
-                                const encObj = JSON.parse(m.text.substring(ENCRYPT_PREFIX.length));
-                                const decBuf = await clientDecryptData(encObj);
-                                if (decBuf) {
-                                    const plainText = new TextDecoder().decode(decBuf);
-                                    decryptedCache[m.id] = plainText;
-                                    const msgElem = document.getElementById('msg-' + m.id);
-                                    if (msgElem) {
-                                        const textElem = msgElem.querySelector('.msg-text');
-                                        if (textElem) textElem.innerHTML = escapeHtml(plainText);
-                                    }
-                                }
-                            } catch(e) { console.error('Load decrypt error:', e); }
-                        }, 50);
-                    }
                 }
             }
 
@@ -2205,8 +2201,9 @@ async function loadMessages(initialScroll = false) {
                 container.scrollTop = container.scrollHeight;
             }
         }
-    } catch(e){ console.error('loadMessages error:', e); }
+    } catch(e){}
 }
+
 function renderMessageItem(containerOrFragment, msg) {
     const container = containerOrFragment.nodeType === 11 ? document.getElementById('messages') : containerOrFragment;
     const containerDiv = document.createElement('div');
@@ -2256,10 +2253,6 @@ function renderMessageItem(containerOrFragment, msg) {
                 const t = (a.doc?.title || '').toLowerCase();
                 const e = (a.doc?.ext || '').toLowerCase();
                 if (e === 'mst' || t.endsWith('.mst')) isSticker = true;
-            } else if (a.type === 'photo') {
-                // VK sends stickers as photos sometimes, check if it's from sticker pack
-                const photo = a.photo || {};
-                if (photo.access_key && photo.access_key.includes('sticker')) isSticker = true;
             }
         }
     }
@@ -2272,8 +2265,12 @@ function renderMessageItem(containerOrFragment, msg) {
             html += `<div class="msg-text"><span class="decrypting-shimmer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Расшифровка...</span></div>`;
             setTimeout(async () => {
                 try {
-                    if (!localKeyPair) await initClientCrypto();
-                    if (!localKeyPair) return;
+                    // Removed if (!localKeyPair) await initClientCrypto(); - assumes localKeyPair is initialized at startup.
+                    if (!localKeyPair) {
+                        const textElem = document.getElementById('msg-' + msg.id)?.querySelector('.msg-text');
+                        if (textElem) textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Не удалось расшифровать (ключи недоступны)';
+                        return;
+                    }
                     const encObj = JSON.parse(msg.text.substring(ENCRYPT_PREFIX.length));
                     const decBuf = await clientDecryptData(encObj);
                     if (decBuf) {
@@ -2387,7 +2384,7 @@ function renderMessageItem(containerOrFragment, msg) {
 
                     setTimeout(() => processEncryptedAttachment(docId, doc.url, ext || title), 10);
                 } else {
-                    html += `<div class="msg-file" onclick="window.open('${doc.url}', '_blank')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-right:8px"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><div class="msg-file-info"><div class="msg-file-name">${escapeHtml(doc.title || 'Файл')}</div><div class="msg-file-size">${(doc.size / 1024).toFixed(1)} KB</div></div></div>`;
+                    html += `<div class="msg-file" onclick="window.open('${doc.url}', '_blank')">${SVG_ATTACH}<div class="msg-file-info"><div class="msg-file-name">${escapeHtml(doc.title || 'Файл')}</div><div class="msg-file-size">${(doc.size / 1024).toFixed(1)} KB</div></div></div>`;
                 }
             }
         }
@@ -2395,11 +2392,6 @@ function renderMessageItem(containerOrFragment, msg) {
 
     if (isSticker) {
         div.classList.add('msg-sticker');
-        div.style.background = 'transparent';
-        div.style.padding = '0';
-        div.style.borderRadius = '0';
-        div.style.boxShadow = 'none';
-        div.style.maxWidth = '160px';
     }
 
     if (isPureCircle) {
@@ -2407,7 +2399,7 @@ function renderMessageItem(containerOrFragment, msg) {
     }
 
     const msgTime = msg.date ? new Date(msg.date * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : '';
-    html += `<div class="msg-time">${msgTime} ${msg.out ? '<span class="msg-status"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align:middle"><polyline points="20 6 9 17 4 12"/></svg></span>' : ''}</div>`;
+    html += `<div class="msg-time">${msgTime} ${msg.out ? '<span class="msg-status">✓</span>' : ''}</div>`;
     
     div.innerHTML = html;
     containerDiv.appendChild(div);
@@ -2642,6 +2634,12 @@ async function processEncryptedAttachment(elemId, url, extInfo) {
         return;
     }
 
+    // Assume localKeyPair is already initialized. If not, decryption should fail.
+    if (!localKeyPair) {
+        if (elem.querySelector('.msg-file-size')) elem.querySelector('.msg-file-size').textContent = 'Ключи недоступны';
+        return;
+    }
+
     try {
         const resp = await fetch(`/api/proxy_file?url=${encodeURIComponent(url)}`);
         const encArrayBuf = await resp.arrayBuffer();
@@ -2657,11 +2655,9 @@ async function processEncryptedAttachment(elemId, url, extInfo) {
 
                     if (header.k1 && header.k2) {
                         const encPayload = encArrayBuf.slice(4 + headerLen);
-                        const decPayloadBuf = await clientDecryptData({
-                            k1: header.k1,
-                            k2: header.k2,
-                            payload: bufToB64(encPayload)
-                        });
+                        const decPayloadBuf = await clientDecryptData(
+                            { k1: header.k1, k2: header.k2, payload: bufToB64(encPayload) }
+                        );
 
                         if (decPayloadBuf) {
                             const blob = new Blob([decPayloadBuf], { type: header.mime || 'application/octet-stream' });
@@ -2804,7 +2800,7 @@ function renderDecryptedMedia(elem, data) {
         vid.src = data.blobUrl;
         vid.controls = true;
         elem.replaceWith(vid);
-    } else if ((data.name && data.name.endsWith('.mst')) || (data.extInfo && data.extInfo.includes('mst'))) {
+    } else if ((data.name && data.name.endsWith('.mst')) || (data.extInfo && data.extInfo.includes('mst')) || data.mime === 'image/png') {
         // Sticker
         const img = document.createElement('img');
         img.style.width = '140px';
@@ -2812,15 +2808,14 @@ function renderDecryptedMedia(elem, data) {
         img.style.objectFit = 'contain';
         img.style.display = 'block';
         img.src = data.blobUrl;
-        img.draggable = false;
 
         const parentMsg = elem.closest('.msg');
         if (parentMsg) {
             parentMsg.classList.add('msg-sticker');
-            parentMsg.style.background = 'transparent !important';
-            parentMsg.style.padding = '0 !important';
-            parentMsg.style.borderRadius = '0 !important';
-            parentMsg.style.boxShadow = 'none !important';
+            parentMsg.style.background = 'transparent';
+            parentMsg.style.padding = '0';
+            parentMsg.style.borderRadius = '0';
+            parentMsg.style.boxShadow = 'none';
             parentMsg.style.maxWidth = '160px';
         }
         elem.replaceWith(img);
@@ -3215,7 +3210,7 @@ async function uploadEncryptedMedia(blob, filename, mimeType) {
     else if (filename.endsWith('.mgs') || mimeType.includes('mgs')) ext = 'mgs';
     else if (filename.endsWith('.meow') || mimeType.startsWith('image/')) ext = 'meow';
     else if (filename.endsWith('.mer') || mimeType.startsWith('video/')) ext = 'mer';
-    else if (filename.endsWith('.mst') || mimeType === 'image/png') ext = 'mst';
+    else if (filename.endsWith('.mst') || mimeType === 'image/png') ext = 'mst'; /* Ensure .mst also uses image/png for mime type handling */
     else if (filename.endsWith('.mmu') || mimeType.startsWith('audio/')) ext = 'mmu';
 
     const formData = new FormData();
@@ -3236,16 +3231,16 @@ async function handleFile(e) {
     try {
         let name = file.name;
         let mime = file.type || 'application/octet-stream';
-        const lowerName = name.toLowerCase();
-        if (lowerName.endsWith('.mst')) {
-            name = `sticker_${Date.now()}.mst`;
-            mime = 'image/png';
-        } else if (file.type.startsWith('image/')) {
+
+        if (file.type.startsWith('image/')) {
             name = `photo_${Date.now()}.meow`;
         } else if (file.type.startsWith('video/')) {
             name = `video_${Date.now()}.mer`;
         } else if (file.type.startsWith('audio/')) {
             name = `music_${Date.now()}.mmu`;
+        } else if (file.name.endsWith('.mst')) {
+            // No change for .mst filename, but ensure mime is image/png if it's a sticker
+            mime = 'image/png';
         }
         await sendMediaBlob(file, name, mime);
     } finally {
@@ -3286,7 +3281,7 @@ async function createStickerFromPhoto() {
                 img.onerror = reject;
                 img.src = URL.createObjectURL(file);
             });
-
+            // Changed mime type here to 'image/png'
             await sendMediaBlob(blob, `sticker_${Date.now()}.mst`, 'image/png');
         } catch(err) {
             alert('Ошибка создания стикера: ' + err.message);
@@ -3348,8 +3343,7 @@ async function pollEvents() {
             let hasNewMsg = false;
             let needsDialogUpdate = false;
             for (const u of data.updates) {
-                try {
-                    const eventCode = u[0];
+                const eventCode = u[0];
                 if (eventCode === 4) {
                     // New message
                     hasNewMsg = true;
@@ -3397,25 +3391,24 @@ async function pollEvents() {
                         }
                         // Force decrypt if encrypted
                         if (text && text.startsWith(ENCRYPT_PREFIX)) {
-                            (async () => {
+                            setTimeout(async () => {
                                 try {
-                                    if (!localKeyPair) await initClientCrypto();
-                                    if (!localKeyPair) return;
-                                    // Wait for DOM to render the message
-                                    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+                                    // Removed if (!localKeyPair) await initClientCrypto();
+                                    if (!localKeyPair) {
+                                        const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
+                                        if (textElem) textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Не удалось расшифровать (ключи недоступны)';
+                                        return;
+                                    }
                                     const encObj = JSON.parse(text.substring(ENCRYPT_PREFIX.length));
                                     const decBuf = await clientDecryptData(encObj);
                                     if (decBuf) {
                                         const plainText = new TextDecoder().decode(decBuf);
                                         decryptedCache[msgId] = plainText;
-                                        const msgElem = document.getElementById('msg-' + msgId);
-                                        if (msgElem) {
-                                            const textElem = msgElem.querySelector('.msg-text');
-                                            if (textElem) textElem.innerHTML = escapeHtml(plainText);
-                                        }
+                                        const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
+                                        if (textElem) textElem.innerHTML = escapeHtml(plainText);
                                     }
                                 } catch(e) { console.error('Poll decrypt error:', e); }
-                            })();
+                            }, 200);
                         }
                     }
                 } else if (eventCode === 3) {
@@ -3437,8 +3430,6 @@ async function pollEvents() {
             }
             if (hasNewMsg) {
                 playNotificationSound();
-            }
-            } catch (loopErr) { console.error('Poll event error:', loopErr); }
             }
         }
     } catch(e) {
@@ -3777,6 +3768,7 @@ async function saveNewFolder() {
                 loadFolders();
                 startLongPolling();
             } else {
+                // If initClientCrypto fails during startup, show login screen.
                 document.getElementById('loginScreen').classList.remove('hidden');
             }
         } catch(e) {
@@ -3787,717 +3779,3 @@ async function saveNewFolder() {
 </script>
 </body>
 </html>
-"""
-
-
-@app.route('/')
-def index():
-    return render_template_string(HTML)
-
-
-@app.route('/sw.js')
-def service_worker():
-    return Response(SW_JS, mimetype='application/javascript')
-
-
-@app.route('/api/auth', methods=['POST'])
-def auth():
-    url = request.json.get('url', '')
-    token_match = re.search(r'access_token=([^&]+)', url)
-    if not token_match:
-        return jsonify({'error': 'Токен не найден в ссылке'}), 400
-    token = token_match.group(1)
-    user_info = vk_request('users.get', token, fields='photo_100,online,last_seen,sex,status')
-    if isinstance(user_info, dict) and 'error' in user_info:
-        return jsonify({'error': 'Неверный или просроченный токен'}), 400
-    user = user_info[0] if isinstance(user_info, list) else user_info
-    
-    online_text = format_last_seen(user)
-    
-    return jsonify({
-        'token': token,
-        'user': {
-            'id': user.get('id'),
-            'name': user.get('first_name', '') + ' ' + user.get('last_name', ''),
-            'photo': user.get('photo_100', ''),
-            'online': user.get('online', 0),
-            'online_text': online_text,
-            'status': user.get('status', '')
-        }
-    })
-
-
-@app.route('/api/my_status', methods=['POST'])
-def my_status():
-    token = request.json.get('token')
-    u_info = vk_request('users.get', token, fields='online,last_seen,sex')
-    if isinstance(u_info, list) and len(u_info) > 0:
-        u = u_info[0]
-        return jsonify({
-            'online': u.get('online', 0),
-            'online_text': format_last_seen(u)
-        })
-    return jsonify({'online': 0, 'online_text': 'неизвестно'})
-
-
-@app.route('/api/mark_read', methods=['POST'])
-def mark_read():
-    token = request.json.get('token')
-    peer_id = request.json.get('peer_id')
-    if token and peer_id:
-        vk_request('messages.markAsRead', token, peer_id=peer_id)
-    return jsonify({'ok': True})
-
-
-@app.route('/api/user_groups', methods=['POST'])
-def user_groups():
-    token = request.json.get('token')
-    res = vk_request('groups.get', token, extended=1, fields='photo_100,photo_200,description,status,activity', count=100)
-
-    if isinstance(res, dict) and 'error' in res:
-        return jsonify(res), 400
-    
-    items = res.get('items', [])
-    for g in items:
-        if 'photo_200' in g and g['photo_200']:
-            g['photo'] = g['photo_200']
-        elif 'photo_100' in g and g['photo_100']:
-            g['photo'] = g['photo_100']
-
-    return jsonify({'groups': items})
-
-
-@app.route('/api/search_global', methods=['POST'])
-def search_global():
-    token = request.json.get('token')
-    query = request.json.get('query', '').strip()
-    if not query:
-        return jsonify({'results': []})
-
-    results = []
-    users_res = vk_request('users.search', token, q=query, count=10, fields='photo_100')
-    if isinstance(users_res, dict) and 'items' in users_res:
-        for u in users_res.get('items', []):
-            results.append({
-                'id': u.get('id'),
-                'type': 'user',
-                'name': f"{u.get('first_name', '')} {u.get('last_name', '')}".strip(),
-                'photo': u.get('photo_100', '')
-            })
-
-    groups_res = vk_request('groups.search', token, q=query, count=10)
-    if isinstance(groups_res, dict) and 'items' in groups_res:
-        for g in groups_res.get('items', []):
-            results.append({
-                'id': -g.get('id'),
-                'type': 'group',
-                'name': g.get('name', ''),
-                'photo': g.get('photo_100', '')
-            })
-
-    return jsonify({'results': results})
-
-
-@app.route('/api/keys/<vk_id>', methods=['GET'])
-def get_key(vk_id):
-    stored = get_stored_pub_key(vk_id)
-    if stored:
-        return jsonify(stored)
-    return jsonify({'error': 'Not found'}), 404
-
-
-@app.route('/api/keys/private/<vk_id>', methods=['GET'])
-def get_private_key_local(vk_id):
-    stored_priv = get_stored_priv_key(vk_id)
-    stored_pub = get_stored_pub_key(vk_id)
-
-    if stored_priv and stored_pub:
-        return jsonify({
-            'public_key': stored_pub.get('public_key'),
-            'private_key_enc': stored_priv.get('private_key_enc')
-        })
-    return jsonify({'error': 'Not found'}), 404
-
-
-@app.route('/api/keys/<vk_id>', methods=['POST'])
-def save_key(vk_id):
-    data = request.json
-    now_iso = datetime.now().isoformat()
-    if 'public_key' in data:
-        store_pub_key(vk_id, {'public_key': data['public_key'], 'created_at': now_iso})
-    if 'private_key_enc' in data:
-        store_priv_key(vk_id, {'private_key_enc': data['private_key_enc'], 'created_at': now_iso})
-    return jsonify({'ok': True})
-
-
-@app.route('/api/dialogs', methods=['POST'])
-def get_dialogs():
-    token = request.json.get('token')
-    result = vk_request('messages.getConversations', token, count=100, offset=0, extended=1)
-
-    if isinstance(result, dict) and 'error' in result:
-        return jsonify(result), 400
-    dialogs = []
-    profiles = {p['id']: p for p in result.get('profiles', [])}
-    groups = {g['id']: g for g in result.get('groups', [])}
-    for item in result.get('items', []):
-        conv = item.get('conversation', {})
-        msg = item.get('last_message', {})
-        peer = conv.get('peer', {})
-        peer_id = peer.get('id')
-        peer_type = peer.get('type')
-        name = "Unknown"
-        photo = ""
-        if peer_type == 'user':
-            profile = profiles.get(peer_id, {})
-            name = profile.get('first_name', '') + ' ' + profile.get('last_name', '')
-            photo = profile.get('photo_100', '')
-        elif peer_type == 'group':
-            group = groups.get(-peer_id, {})
-            name = group.get('name', 'Group')
-            photo = group.get('photo_100', '')
-        elif peer_type == 'chat':
-            chat_settings = conv.get('chat_settings', {})
-            name = chat_settings.get('title', 'Chat')
-            photo = chat_settings.get('photo', {}).get('photo_100', '')
-        dialogs.append({
-            'id': peer_id,
-            'type': peer_type,
-            'name': name.strip(),
-            'photo': photo,
-            'unread': conv.get('unread_count', 0),
-            'last_message': msg.get('text', ''),
-            'last_attachments': msg.get('attachments', []),
-            'date': msg.get('date', 0),
-            'online': profile.get('online', 0) if peer_type == 'user' else 0
-        })
-    return jsonify({'dialogs': dialogs})
-
-
-@app.route('/api/messages', methods=['POST'])
-def get_messages():
-    token = request.json.get('token')
-    peer_id = request.json.get('peer_id')
-    offset = request.json.get('offset', 0)
-    result = vk_request('messages.getHistory', token, peer_id=peer_id, count=200, offset=offset, extended=1)
-
-    if isinstance(result, dict) and 'error' in result:
-        return jsonify(result), 400
-    messages = []
-    profiles = {p['id']: p for p in result.get('profiles', [])}
-    for msg in result.get('items', []):
-        from_id = msg.get('from_id', 0)
-        profile = profiles.get(from_id, {})
-        messages.append({
-            'id': msg.get('id'),
-            'text': msg.get('text', ''),
-            'date': msg.get('date', 0),
-            'from_id': from_id,
-            'out': msg.get('out', 0),
-            'name': profile.get('first_name', '') + ' ' + profile.get('last_name', ''),
-            'photo': profile.get('photo_50', ''),
-            'attachments': msg.get('attachments', []),
-            'reply_message': msg.get('reply_message')
-        })
-    return jsonify({'messages': messages})
-
-
-@app.route('/api/peer_status', methods=['POST'])
-def peer_status():
-    token = request.json.get('token')
-    peer_id = request.json.get('peer_id')
-    
-    if not peer_id or int(peer_id) < 0:
-        return jsonify({'status_text': 'сообщество'})
-
-    user_info = vk_request('users.get', token, user_ids=peer_id, fields='online,last_seen,sex')
-
-    if isinstance(user_info, list) and len(user_info) > 0:
-        u = user_info[0]
-        status_str = format_last_seen(u)
-        return jsonify({'status_text': status_str, 'online': u.get('online', 0) == 1})
-
-    return jsonify({'status_text': 'офлайн', 'online': False})
-
-
-@app.route('/api/typing', methods=['POST'])
-def set_typing():
-    token = request.json.get('token')
-    peer_id = request.json.get('peer_id')
-    if token and peer_id:
-        vk_request('messages.setActivity', token, peer_id=peer_id, type='typing')
-    return jsonify({'ok': True})
-
-
-@app.route('/api/profile/update', methods=['POST'])
-def update_profile():
-    token = request.json.get('token')
-    first_name = request.json.get('first_name', '').strip()
-    last_name = request.json.get('last_name', '').strip()
-    status_text = request.json.get('status', '').strip()
-
-    status_res = vk_request('status.set', token, text=status_text)
-    profile_res = None
-    if first_name and last_name:
-        profile_res = vk_request('account.saveProfileInfo', token, first_name=first_name, last_name=last_name)
-    
-    return jsonify({'ok': True, 'status_res': status_res, 'profile_res': profile_res})
-
-
-@app.route('/api/profile/upload_avatar', methods=['POST'])
-def upload_avatar():
-    token = request.form.get('token')
-    photo_file = request.files.get('photo')
-
-    if not photo_file:
-        return jsonify({'error': 'Файл не выбран'}), 400
-
-    upload_server = vk_request('photos.getOwnerPhotoUploadServer', token)
-    if isinstance(upload_server, dict) and 'error' in upload_server:
-        return jsonify(upload_server), 400
-
-    upload_url = upload_server.get('upload_url')
-    files = {'photo': (photo_file.filename, photo_file.read(), photo_file.content_type or 'image/jpeg')}
-    upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
-
-    save_result = vk_request('photos.saveOwnerPhoto', token,
-        server=upload_resp.get('server'),
-        photo=upload_resp.get('photo'),
-        hash=upload_resp.get('hash')
-    )
-
-    if isinstance(save_result, dict) and 'photo_hash' in save_result:
-        u_info = vk_request('users.get', token, fields='photo_100')
-        if isinstance(u_info, list) and len(u_info) > 0:
-            return jsonify({'ok': True, 'photo_url': u_info[0].get('photo_100')})
-
-    return jsonify({'ok': True})
-
-
-@app.route('/api/send', methods=['POST'])
-def send_message():
-    token = request.json.get('token')
-    peer_id = request.json.get('peer_id')
-    text = request.json.get('text', '')
-    reply_to = request.json.get('reply_to')
-    
-    params = {'peer_id': peer_id, 'message': text, 'random_id': random.randint(1, 2147483647)}
-    if reply_to:
-        params['reply_to'] = reply_to
-
-    result = vk_request('messages.send', token, **params)
-    return jsonify({'result': result})
-
-
-@app.route('/api/edit', methods=['POST'])
-def edit_message():
-    token = request.json.get('token')
-    peer_id = request.json.get('peer_id')
-    message_id = request.json.get('message_id')
-    text = request.json.get('text', '')
-
-    result = vk_request('messages.edit', token, peer_id=peer_id, message_id=message_id, message=text)
-    return jsonify({'result': result})
-
-
-@app.route('/api/delete', methods=['POST'])
-def delete_message():
-    token = request.json.get('token')
-    message_ids = request.json.get('message_ids')
-    delete_for_all = request.json.get('delete_for_all', 1)
-
-    result = vk_request('messages.delete', token, message_ids=str(message_ids), delete_for_all=delete_for_all)
-    return jsonify({'result': result})
-
-
-@app.route('/api/upload_encrypted_doc', methods=['POST'])
-def upload_encrypted_doc():
-    token = request.form.get('token')
-    peer_id = request.form.get('peer_id')
-    file = request.files.get('file')
-
-    if not file:
-        return jsonify({'error': 'No file'}), 400
-
-    upload_server = vk_request('docs.getMessagesUploadServer', token, type='doc', peer_id=peer_id)
-    if isinstance(upload_server, dict) and 'error' in upload_server:
-        return jsonify(upload_server), 400
-
-    upload_url = upload_server.get('upload_url')
-    files = {'file': (file.filename, file.read(), 'application/octet-stream')}
-    upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
-
-    save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=file.filename)
-    attachment = extract_doc_attachment(save_result)
-
-    if attachment:
-        vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
-        return jsonify({'ok': True})
-
-    return jsonify({'error': 'Upload failed'}), 400
-
-
-@app.route('/api/upload_normal', methods=['POST'])
-def upload_normal():
-    token = request.form.get('token')
-    peer_id = request.form.get('peer_id')
-    file = request.files.get('file')
-
-    if not file:
-        return jsonify({'error': 'No file'}), 400
-
-    filename = file.filename.lower()
-    file_bytes = file.read()
-
-    # Sticker (.mst) - upload as PNG photo for best compatibility
-    if filename.endswith('.mst'):
-        upload_server = vk_request('photos.getMessagesUploadServer', token, peer_id=peer_id)
-        if isinstance(upload_server, dict) and 'error' in upload_server:
-            return jsonify(upload_server), 400
-
-        upload_url = upload_server.get('upload_url')
-        files = {'photo': (filename, BytesIO(file_bytes), 'image/png')}
-        upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
-
-        save_result = vk_request('photos.saveMessagesPhoto', token,
-            photo=upload_resp.get('photo'),
-            server=upload_resp.get('server'),
-            hash=upload_resp.get('hash')
-        )
-
-        if isinstance(save_result, list) and len(save_result) > 0:
-            photo = save_result[0]
-            attachment = f"photo{photo['owner_id']}_{photo['id']}"
-            vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
-            return jsonify({'ok': True})
-
-    if filename.endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp', '.meow')):
-        upload_server = vk_request('photos.getMessagesUploadServer', token, peer_id=peer_id)
-        if isinstance(upload_server, dict) and 'error' in upload_server:
-            return jsonify(upload_server), 400
-
-        upload_url = upload_server.get('upload_url')
-        files = {'photo': (filename, BytesIO(file_bytes), file.content_type or 'image/jpeg')}
-        upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
-
-        save_result = vk_request('photos.saveMessagesPhoto', token,
-            photo=upload_resp.get('photo'),
-            server=upload_resp.get('server'),
-            hash=upload_resp.get('hash')
-        )
-
-        if isinstance(save_result, list) and len(save_result) > 0:
-            photo = save_result[0]
-            attachment = f"photo{photo['owner_id']}_{photo['id']}"
-            vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
-            return jsonify({'ok': True})
-
-    upload_server = vk_request('docs.getMessagesUploadServer', token, type='doc', peer_id=peer_id)
-    if isinstance(upload_server, dict) and 'error' in upload_server:
-        return jsonify(upload_server), 400
-
-    upload_url = upload_server.get('upload_url')
-    files = {'file': (filename, BytesIO(file_bytes), file.content_type or 'application/octet-stream')}
-    upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
-
-    save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=filename)
-    attachment = extract_doc_attachment(save_result)
-
-    if attachment:
-        vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
-        return jsonify({'ok': True})
-
-    return jsonify({'error': 'Upload failed'}), 400
-
-
-@app.route('/api/folders/<vk_id>', methods=['GET'])
-def get_folders(vk_id):
-    stored = get_stored_pub_key(f"folders_{vk_id}")
-    if stored and 'folders' in stored:
-        return jsonify({'folders': stored['folders']})
-    return jsonify({'folders': []})
-
-
-@app.route('/api/folders/<vk_id>', methods=['POST'])
-def save_folders(vk_id):
-    data = request.json
-    existing = get_stored_pub_key(f"folders_{vk_id}") or {'folders': []}
-    folder_id = 'folder_' + str(random.randint(1000, 9999))
-    existing['folders'] = existing.get('folders', []) + [{
-        'id': folder_id,
-        'name': data.get('name', 'Папка'),
-        'peers': data.get('peers', [])
-    }]
-    store_pub_key(f"folders_{vk_id}", existing)
-    return jsonify({'ok': True})
-
-
-def extract_media_from_attachments(attachments):
-    photo = None
-    video = None
-    for a in attachments:
-        a_type = a.get('type')
-        if a_type == 'photo' and not photo:
-            sizes = a.get('photo', {}).get('sizes', [])
-            if sizes:
-                photo = sizes[-1].get('url', '')
-        elif a_type == 'video' and not video:
-            v = a.get('video', {})
-            player_url = v.get('player', '')
-            image_url = ''
-            if v.get('first_frame'):
-                image_url = v.get('first_frame', [{}])[-1].get('url', '')
-            elif v.get('image'):
-                image_url = v.get('image', [{}])[-1].get('url', '')
-            video = {
-                'player': player_url,
-                'image': image_url,
-                'title': v.get('title', '')
-            }
-    return photo, video
-
-
-@app.route('/api/news', methods=['POST'])
-def get_news():
-    token = request.json.get('token')
-    result = vk_request('newsfeed.get', token, filters='post', count=100, fields='photo_50,photo_100')
-
-    if isinstance(result, dict) and 'error' in result:
-        return jsonify(result), 400
-    items = []
-    profiles = {p['id']: p for p in result.get('profiles', [])}
-    groups = {g['id']: g for g in result.get('groups', [])}
-    for item in result.get('items', []):
-        source_id = item.get('source_id', 0)
-        if source_id > 0:
-            author = profiles.get(source_id, {})
-            author_name = author.get('first_name', '') + ' ' + author.get('last_name', '')
-            author_photo = author.get('photo_100') or author.get('photo_50', '')
-        else:
-            author = groups.get(-source_id, {})
-            author_name = author.get('name', 'Group')
-            author_photo = author.get('photo_100') or author.get('photo_50', '')
-
-        photo, video = extract_media_from_attachments(item.get('attachments', []))
-
-        items.append({
-            'owner_id': source_id,
-            'post_id': item.get('post_id', 0),
-            'author_name': author_name.strip(),
-            'author_photo': author_photo,
-            'text': item.get('text', ''),
-            'photo': photo,
-            'video': video,
-            'time': datetime.fromtimestamp(item.get('date', 0)).strftime('%H:%M') if item.get('date') else '',
-            'likes': item.get('likes', {}).get('count', 0),
-            'comments': item.get('comments', {}).get('count', 0),
-            'reposts': item.get('reposts', {}).get('count', 0)
-        })
-    return jsonify({'items': items})
-
-
-@app.route('/api/post_likes', methods=['POST'])
-def post_likes():
-    token = request.json.get('token')
-    owner_id = request.json.get('owner_id')
-    item_id = request.json.get('item_id')
-
-    res = vk_request('likes.getList', token, type='post', owner_id=owner_id, item_id=item_id, extended=1, count=100, fields='photo_100')
-
-    if isinstance(res, dict) and 'error' in res:
-        return jsonify({'users': []})
-
-    users = []
-    for u in res.get('items', []):
-        name = f"{u.get('first_name', '')} {u.get('last_name', '')}".strip() or u.get('name', '')
-        users.append({
-            'id': u.get('id'),
-            'name': name,
-            'photo': u.get('photo_100', '')
-        })
-
-    return jsonify({'users': users})
-
-
-@app.route('/api/wall_comments', methods=['POST'])
-def wall_comments():
-    token = request.json.get('token')
-    owner_id = request.json.get('owner_id')
-    post_id = request.json.get('post_id')
-
-    res = vk_request('wall.getComments', token, owner_id=owner_id, post_id=post_id, extended=1, count=50, fields='photo_50')
-
-    if isinstance(res, dict) and 'error' in res:
-        return jsonify({'comments': []})
-
-    profiles = {p['id']: p for p in res.get('profiles', [])}
-    groups = {g['id']: g for g in res.get('groups', [])}
-
-    comments = []
-    for item in res.get('items', []):
-        from_id = item.get('from_id', 0)
-        name = "Пользователь"
-        photo = ""
-        if from_id > 0:
-            p = profiles.get(from_id, {})
-            name = f"{p.get('first_name', '')} {p.get('last_name', '')}".strip()
-            photo = p.get('photo_50', '')
-        elif from_id < 0:
-            g = groups.get(-from_id, {})
-            name = g.get('name', '')
-            photo = g.get('photo_50', '')
-
-        comments.append({
-            'id': item.get('id'),
-            'name': name,
-            'photo': photo,
-            'text': item.get('text', ''),
-            'time': datetime.fromtimestamp(item.get('date', 0)).strftime('%d.%m %H:%M') if item.get('date') else ''
-        })
-
-    return jsonify({'comments': comments})
-
-
-@app.route('/api/profile_view', methods=['POST'])
-def profile_view():
-    token = request.json.get('token')
-    peer_id = request.json.get('peer_id')
-    is_group = request.json.get('is_group', False)
-
-    try:
-        peer_id_int = int(peer_id)
-    except (ValueError, TypeError):
-        peer_id_int = 0
-
-    if is_group or peer_id_int < 0:
-        group_id = abs(peer_id_int)
-        group_info = vk_request('groups.getById', token, group_id=group_id, fields='description,status,photo_200,photo_100,cover')
-
-        name = ""
-        photo = ""
-        status = ""
-        cover_photo = None
-
-        g_list = []
-        if isinstance(group_info, list):
-            g_list = group_info
-        elif isinstance(group_info, dict) and 'groups' in group_info:
-            g_list = group_info['groups']
-
-        if len(g_list) > 0:
-            g = g_list[0]
-            name = g.get('name', '')
-            photo = g.get('photo_200') or g.get('photo_100', '')
-            status = g.get('status') or g.get('description', '')
-
-            cover_data = g.get('cover', {})
-            if cover_data.get('enabled') == 1:
-                images = cover_data.get('images', [])
-                if images:
-                    cover_photo = images[-1].get('url')
-
-        wall = vk_request('wall.get', token, owner_id=-group_id, count=50, extended=1)
-
-        posts = []
-        if isinstance(wall, dict) and 'items' in wall:
-            items = wall.get('items', [])
-            for p in items:
-                p_photo, p_video = extract_media_from_attachments(p.get('attachments', []))
-                posts.append({
-                    'id': p.get('id'),
-                    'owner_id': -group_id,
-                    'text': p.get('text', ''),
-                    'photo': p_photo,
-                    'video': p_video,
-                    'likes': p.get('likes', {}).get('count', 0),
-                    'comments': p.get('comments', {}).get('count', 0),
-                    'reposts': p.get('reposts', {}).get('count', 0)
-                })
-
-        return jsonify({
-            'name': name,
-            'photo': photo,
-            'status': status,
-            'cover_photo': cover_photo,
-            'posts': posts
-        })
-    else:
-        user_info = vk_request('users.get', token, user_ids=peer_id, fields='photo_200,photo_100,status,city,bdate,site,sex')
-
-        if isinstance(user_info, list) and len(user_info) > 0:
-            u = user_info[0]
-            wall = vk_request('wall.get', token, owner_id=peer_id, count=50, extended=1, filter='owner')
-
-            posts = []
-            if isinstance(wall, dict) and 'items' in wall:
-                for p in wall.get('items', []):
-                    p_photo, p_video = extract_media_from_attachments(p.get('attachments', []))
-                    posts.append({
-                        'id': p.get('id'),
-                        'owner_id': peer_id,
-                        'text': p.get('text', ''),
-                        'photo': p_photo,
-                        'video': p_video,
-                        'likes': p.get('likes', {}).get('count', 0),
-                        'comments': p.get('comments', {}).get('count', 0),
-                        'reposts': p.get('reposts', {}).get('count', 0)
-                    })
-            return jsonify({
-                'name': u.get('first_name', '') + ' ' + u.get('last_name', ''),
-                'photo': u.get('photo_200') or u.get('photo_100', ''),
-                'status': u.get('status', ''),
-                'city': u.get('city', {}).get('title', ''),
-                'bdate': u.get('bdate', ''),
-                'site': u.get('site', ''),
-                'posts': posts
-            })
-
-    return jsonify({'error': 'Not found'}), 404
-
-
-@app.route('/api/longpoll/init', methods=['POST'])
-def longpoll_init():
-    token = request.json.get('token')
-    lp = vk_request('messages.getLongPollServer', token, need_pts=1, lp_version=3)
-
-    if isinstance(lp, dict) and 'error' in lp:
-        return jsonify(lp), 400
-    return jsonify({
-        'server': lp.get('server'),
-        'key': lp.get('key'),
-        'ts': lp.get('ts')
-    })
-
-
-@app.route('/api/longpoll/listen', methods=['POST'])
-def longpoll_listen():
-    data = request.json
-    server = data.get('server')
-    key = data.get('key')
-    ts = data.get('ts')
-    if not server or not key or not ts:
-        return jsonify({'error': 'Missing params'}), 400
-    
-    url = f"https://{server}?act=a_check&key={key}&ts={ts}&wait=25&mode=2&version=3"
-    try:
-        resp = requests.get(url, timeout=30)
-        json_data = resp.json()
-        return jsonify(json_data)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/proxy_file')
-def proxy_file():
-    url = request.args.get('url')
-    if not url:
-        return jsonify({'error': 'No URL'}), 400
-    try:
-        resp = get_session().get(url, timeout=15)
-        return Response(resp.content, mimetype='application/octet-stream')
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
