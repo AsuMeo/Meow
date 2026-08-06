@@ -2197,21 +2197,30 @@ async function tryDecryptMessageRealTime(msgId, encryptedText) {
         if (decBuf) {
             const plainText = new TextDecoder().decode(decBuf);
             decryptedCache[msgId] = plainText;
-            const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
-            if (textElem) {
-                textElem.innerHTML = escapeHtml(plainText);
+            const msgContainer = document.getElementById('msg-' + msgId);
+            if (msgContainer) {
+                const textElem = msgContainer.querySelector('.msg-text');
+                if (textElem) {
+                    textElem.innerHTML = escapeHtml(plainText);
+                }
             }
         } else {
-            const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
-            if (textElem) {
-                textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
+            const msgContainer = document.getElementById('msg-' + msgId);
+            if (msgContainer) {
+                const textElem = msgContainer.querySelector('.msg-text');
+                if (textElem) {
+                    textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
+                }
             }
         }
     } catch(e) {
         console.error('Real-time decrypt error:', e);
-        const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
-        if (textElem) {
-            textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
+        const msgContainer = document.getElementById('msg-' + msgId);
+        if (msgContainer) {
+            const textElem = msgContainer.querySelector('.msg-text');
+            if (textElem) {
+                textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
+            }
         }
     }
 }
@@ -2274,9 +2283,24 @@ function renderMessageItem(containerOrFragment, msg) {
             html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
         } else {
             html += `<div class="msg-text"><span class="decrypting-shimmer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Расшифровка...</span></div>`;
-            setTimeout(() => {
-                tryDecryptMessageRealTime(msg.id, msg.text);
-            }, 50);
+            // Мгновенная расшифровка для мобильных - без setTimeout
+            (async () => {
+                try {
+                    if (!localKeyPair) await initClientCrypto();
+                    if (!localKeyPair) return;
+                    const encObj = JSON.parse(msg.text.substring(ENCRYPT_PREFIX.length));
+                    const decBuf = await clientDecryptData(encObj);
+                    if (decBuf) {
+                        const plainText = new TextDecoder().decode(decBuf);
+                        decryptedCache[msg.id] = plainText;
+                        const msgEl = document.getElementById('msg-' + msg.id);
+                        if (msgEl) {
+                            const textEl = msgEl.querySelector('.msg-text');
+                            if (textEl) textEl.innerHTML = escapeHtml(plainText);
+                        }
+                    }
+                } catch(e) { console.error('Inline decrypt error:', e); }
+            })();
         }
     } else {
         if (displayText) html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
@@ -3371,9 +3395,23 @@ async function pollEvents() {
                         
                         // FIX: Instant decryption for incoming messages inside the active chat screen
                         if (text && text.startsWith(ENCRYPT_PREFIX)) {
-                            setTimeout(() => {
-                                tryDecryptMessageRealTime(msgId, text);
-                            }, 50);
+                            (async () => {
+                                try {
+                                    if (!localKeyPair) await initClientCrypto();
+                                    if (!localKeyPair) return;
+                                    const encObj = JSON.parse(text.substring(ENCRYPT_PREFIX.length));
+                                    const decBuf = await clientDecryptData(encObj);
+                                    if (decBuf) {
+                                        const plainText = new TextDecoder().decode(decBuf);
+                                        decryptedCache[msgId] = plainText;
+                                        const msgEl = document.getElementById('msg-' + msgId);
+                                        if (msgEl) {
+                                            const textEl = msgEl.querySelector('.msg-text');
+                                            if (textEl) textEl.innerHTML = escapeHtml(plainText);
+                                        }
+                                    }
+                                } catch(e) { console.error('Poll decrypt error:', e); }
+                            })();
                         }
                     }
                 } else if (eventCode === 3) {
