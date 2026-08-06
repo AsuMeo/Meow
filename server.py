@@ -1090,6 +1090,7 @@ let myVkId = null;
 let localKeyPair = null;
 let peerKeysCache = {};
 let decryptedCache = {};
+let sentEncryptedCache = {};
 
 let renderedMsgIds = new Set();
 
@@ -2190,6 +2191,12 @@ async function loadMessages(initialScroll = false) {
 // Function to handle on-demand real-time decryption safely inside current chat
 async function tryDecryptMessageRealTime(msgId, encryptedText) {
     try {
+        if (sentEncryptedCache[encryptedText]) {
+            decryptedCache[msgId] = sentEncryptedCache[encryptedText];
+            const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
+            if (textElem) textElem.innerHTML = escapeHtml(sentEncryptedCache[encryptedText]);
+            return;
+        }
         if (!localKeyPair) await initClientCrypto();
         if (!localKeyPair) return;
         const encObj = JSON.parse(encryptedText.substring(ENCRYPT_PREFIX.length));
@@ -2271,6 +2278,10 @@ function renderMessageItem(containerOrFragment, msg) {
     if (isEncrypted) {
         if (decryptedCache[msg.id]) {
             displayText = decryptedCache[msg.id];
+            html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
+        } else if (sentEncryptedCache[msg.text]) {
+            decryptedCache[msg.id] = sentEncryptedCache[msg.text];
+            displayText = sentEncryptedCache[msg.text];
             html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
         } else {
             html += `<div class="msg-text"><span class="decrypting-shimmer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Расшифровка...</span></div>`;
@@ -2917,6 +2928,7 @@ async function sendMessage() {
                 const plainBuf = new TextEncoder().encode(text).buffer;
                 const encObj = await clientEncryptData(peerKey, plainBuf);
                 sendText = ENCRYPT_PREFIX + JSON.stringify(encObj);
+                sentEncryptedCache[sendText] = text;
             }
         } catch(eEnc) {
             console.error("E2EE encryption error, fallback to plain text:", eEnc);
