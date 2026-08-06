@@ -2199,7 +2199,11 @@ async function tryDecryptMessageRealTime(msgId, encryptedText, retryCount = 0) {
         }
         if (!localKeyPair) await initClientCrypto();
         if (!localKeyPair) {
-            setTimeout(() => tryDecryptMessageRealTime(msgId, encryptedText, retryCount + 1), 2000);
+            if (retryCount < 3) {
+                setTimeout(() => tryDecryptMessageRealTime(msgId, encryptedText, retryCount + 1), 1500);
+            } else {
+                emulateSingleMessageReenter(msgId);
+            }
             return;
         }
         const encObj = JSON.parse(encryptedText.substring(ENCRYPT_PREFIX.length));
@@ -2212,12 +2216,32 @@ async function tryDecryptMessageRealTime(msgId, encryptedText, retryCount = 0) {
                 textElem.innerHTML = escapeHtml(plainText);
             }
         } else {
-            setTimeout(() => tryDecryptMessageRealTime(msgId, encryptedText, retryCount + 1), 2000 + retryCount * 500);
+            if (retryCount < 3) {
+                setTimeout(() => tryDecryptMessageRealTime(msgId, encryptedText, retryCount + 1), 1500 + retryCount * 400);
+            } else {
+                emulateSingleMessageReenter(msgId);
+            }
         }
     } catch(e) {
         console.error('Real-time decrypt error:', e);
-        setTimeout(() => tryDecryptMessageRealTime(msgId, encryptedText, retryCount + 1), 2000 + retryCount * 500);
+        if (retryCount < 3) {
+            setTimeout(() => tryDecryptMessageRealTime(msgId, encryptedText, retryCount + 1), 1500 + retryCount * 400);
+        } else {
+            emulateSingleMessageReenter(msgId);
+        }
     }
+}
+
+// Seamless single-message re-enter: remove only this message from renderedMsgIds and DOM,
+// then re-fetch messages from server. Only the missing message will be re-rendered.
+async function emulateSingleMessageReenter(msgId) {
+    const msgElem = document.getElementById('msg-' + msgId);
+    if (msgElem) {
+        const container = msgElem.closest('.msg-container');
+        if (container) container.remove();
+    }
+    renderedMsgIds.delete(msgId);
+    await loadMessages(true);
 }
 
 function renderMessageItem(containerOrFragment, msg) {
