@@ -1090,7 +1090,6 @@ let myVkId = null;
 let localKeyPair = null;
 let peerKeysCache = {};
 let decryptedCache = {};
-let sentEncryptedCache = {};
 
 let renderedMsgIds = new Set();
 
@@ -2189,23 +2188,10 @@ async function loadMessages(initialScroll = false) {
 }
 
 // Function to handle on-demand real-time decryption safely inside current chat
-async function tryDecryptMessageRealTime(msgId, encryptedText, retryCount = 0) {
+async function tryDecryptMessageRealTime(msgId, encryptedText) {
     try {
-        if (sentEncryptedCache[encryptedText]) {
-            decryptedCache[msgId] = sentEncryptedCache[encryptedText];
-            const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
-            if (textElem) textElem.innerHTML = escapeHtml(sentEncryptedCache[encryptedText]);
-            return;
-        }
         if (!localKeyPair) await initClientCrypto();
-        if (!localKeyPair) {
-            if (retryCount < 3) {
-                setTimeout(() => tryDecryptMessageRealTime(msgId, encryptedText, retryCount + 1), 1500);
-            } else {
-                emulateSingleMessageReenter(msgId);
-            }
-            return;
-        }
+        if (!localKeyPair) return;
         const encObj = JSON.parse(encryptedText.substring(ENCRYPT_PREFIX.length));
         const decBuf = await clientDecryptData(encObj);
         if (decBuf) {
@@ -2216,32 +2202,18 @@ async function tryDecryptMessageRealTime(msgId, encryptedText, retryCount = 0) {
                 textElem.innerHTML = escapeHtml(plainText);
             }
         } else {
-            if (retryCount < 3) {
-                setTimeout(() => tryDecryptMessageRealTime(msgId, encryptedText, retryCount + 1), 1500 + retryCount * 400);
-            } else {
-                emulateSingleMessageReenter(msgId);
+            const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
+            if (textElem) {
+                textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
             }
         }
     } catch(e) {
         console.error('Real-time decrypt error:', e);
-        if (retryCount < 3) {
-            setTimeout(() => tryDecryptMessageRealTime(msgId, encryptedText, retryCount + 1), 1500 + retryCount * 400);
-        } else {
-            emulateSingleMessageReenter(msgId);
+        const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
+        if (textElem) {
+            textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
         }
     }
-}
-
-// Seamless single-message re-enter: remove only this message from renderedMsgIds and DOM,
-// then re-fetch messages from server. Only the missing message will be re-rendered.
-async function emulateSingleMessageReenter(msgId) {
-    const msgElem = document.getElementById('msg-' + msgId);
-    if (msgElem) {
-        const container = msgElem.closest('.msg-container');
-        if (container) container.remove();
-    }
-    renderedMsgIds.delete(msgId);
-    await loadMessages(true);
 }
 
 function renderMessageItem(containerOrFragment, msg) {
@@ -2300,15 +2272,11 @@ function renderMessageItem(containerOrFragment, msg) {
         if (decryptedCache[msg.id]) {
             displayText = decryptedCache[msg.id];
             html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
-        } else if (sentEncryptedCache[msg.text]) {
-            decryptedCache[msg.id] = sentEncryptedCache[msg.text];
-            displayText = sentEncryptedCache[msg.text];
-            html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
         } else {
             html += `<div class="msg-text"><span class="decrypting-shimmer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Расшифровка...</span></div>`;
             setTimeout(() => {
-                tryDecryptMessageRealTime(msg.id, msg.text, 0);
-            }, 800);
+                tryDecryptMessageRealTime(msg.id, msg.text);
+            }, 50);
         }
     } else {
         if (displayText) html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
@@ -2949,7 +2917,6 @@ async function sendMessage() {
                 const plainBuf = new TextEncoder().encode(text).buffer;
                 const encObj = await clientEncryptData(peerKey, plainBuf);
                 sendText = ENCRYPT_PREFIX + JSON.stringify(encObj);
-                sentEncryptedCache[sendText] = text;
             }
         } catch(eEnc) {
             console.error("E2EE encryption error, fallback to plain text:", eEnc);
@@ -3405,8 +3372,8 @@ async function pollEvents() {
                         // FIX: Instant decryption for incoming messages inside the active chat screen
                         if (text && text.startsWith(ENCRYPT_PREFIX)) {
                             setTimeout(() => {
-                                tryDecryptMessageRealTime(msgId, text, 0);
-                            }, 800);
+                                tryDecryptMessageRealTime(msgId, text);
+                            }, 50);
                         }
                     }
                 } else if (eventCode === 3) {
