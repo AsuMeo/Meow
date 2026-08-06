@@ -4420,7 +4420,7 @@ def longpoll_listen():
 @app.route('/api/proxy_file')
 def proxy_file():
     url = request.args.get('url')
-    if (!url):
+    if not url:
         return jsonify({'error': 'No URL'}), 400
     try:
         resp = get_session().get(url, timeout=15)
