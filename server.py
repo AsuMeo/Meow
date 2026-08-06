@@ -2189,7 +2189,7 @@ async function loadMessages(initialScroll = false) {
 }
 
 // Function to handle on-demand real-time decryption safely inside current chat
-async function tryDecryptMessageRealTime(msgId, encryptedText) {
+async function tryDecryptMessageRealTime(msgId, encryptedText, retryCount = 0) {
     try {
         if (sentEncryptedCache[encryptedText]) {
             decryptedCache[msgId] = sentEncryptedCache[encryptedText];
@@ -2198,7 +2198,12 @@ async function tryDecryptMessageRealTime(msgId, encryptedText) {
             return;
         }
         if (!localKeyPair) await initClientCrypto();
-        if (!localKeyPair) return;
+        if (!localKeyPair) {
+            if (retryCount < 5) {
+                setTimeout(() => tryDecryptMessageRealTime(msgId, encryptedText, retryCount + 1), 800);
+            }
+            return;
+        }
         const encObj = JSON.parse(encryptedText.substring(ENCRYPT_PREFIX.length));
         const decBuf = await clientDecryptData(encObj);
         if (decBuf) {
@@ -2209,18 +2214,33 @@ async function tryDecryptMessageRealTime(msgId, encryptedText) {
                 textElem.innerHTML = escapeHtml(plainText);
             }
         } else {
-            const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
-            if (textElem) {
-                textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
+            if (retryCount < 5) {
+                const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
+                if (textElem) {
+                    textElem.innerHTML = '<span class="decrypting-shimmer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Повторная расшифровка...</span>';
+                }
+                setTimeout(() => tryDecryptMessageRealTime(msgId, encryptedText, retryCount + 1), 1000 + retryCount * 500);
+            } else {
+                emulateChatReenterForDecryption();
             }
         }
     } catch(e) {
         console.error('Real-time decrypt error:', e);
-        const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
-        if (textElem) {
-            textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
+        if (retryCount < 5) {
+            setTimeout(() => tryDecryptMessageRealTime(msgId, encryptedText, retryCount + 1), 1000 + retryCount * 500);
+        } else {
+            emulateChatReenterForDecryption();
         }
     }
+}
+
+// EMULATION OF RE-ENTER: force re-fetch and re-render all messages to decrypt
+async function emulateChatReenterForDecryption() {
+    if (!currentPeer) return;
+    renderedMsgIds.clear();
+    const container = document.getElementById('messages');
+    container.innerHTML = '';
+    await loadMessages(true);
 }
 
 function renderMessageItem(containerOrFragment, msg) {
@@ -2286,8 +2306,8 @@ function renderMessageItem(containerOrFragment, msg) {
         } else {
             html += `<div class="msg-text"><span class="decrypting-shimmer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Расшифровка...</span></div>`;
             setTimeout(() => {
-                tryDecryptMessageRealTime(msg.id, msg.text);
-            }, 50);
+                tryDecryptMessageRealTime(msg.id, msg.text, 0);
+            }, 300);
         }
     } else {
         if (displayText) html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
@@ -2959,6 +2979,9 @@ async function sendMessage() {
     } finally {
         hideUploadProgress();
         loadMessages(true);
+        setTimeout(() => {
+            emulateChatReenterForDecryption();
+        }, 1500);
     }
 }
 
@@ -3384,8 +3407,8 @@ async function pollEvents() {
                         // FIX: Instant decryption for incoming messages inside the active chat screen
                         if (text && text.startsWith(ENCRYPT_PREFIX)) {
                             setTimeout(() => {
-                                tryDecryptMessageRealTime(msgId, text);
-                            }, 50);
+                                tryDecryptMessageRealTime(msgId, text, 0);
+                            }, 300);
                         }
                     }
                 } else if (eventCode === 3) {
