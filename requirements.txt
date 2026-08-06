@@ -1,8 +1,5 @@
 flask==3.0.3
-numpy==1.26.4
-cython==3.0.10
 librosa==0.10.1
 soundfile==0.12.1
-pyworld==0.3.4
 pedalboard==0.9.6
 pydub==0.25.1
