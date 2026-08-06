@@ -166,7 +166,7 @@ def extract_doc_attachment(save_result):
     return None
 
 SW_JS = """
-const CACHE_NAME = 'vk-meow-v8-cache';
+const CACHE_NAME = 'vk-meow-v10-cache';
 const STATIC_ASSETS = ['/', '/sw.js'];
 
 self.addEventListener('install', (evt) => {
@@ -258,7 +258,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 .header-subtitle{font-size:12px;color:#8e8e93;display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .header-actions{display:flex;gap:6px;align-items:center}
-.header-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;color:#aaa;background:rgba(255,255,255,0.05)}
+.header-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;color:#aaa;background:rgba(255,255,255,0.05);border:none;outline:none}
 .header-btn:active{background:rgba(255,255,255,0.15);color:#fff}
 .header-btn.active{color:#fff;background:rgba(255,255,255,0.15)}
 
@@ -268,12 +268,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 /* Search Bar */
 .search-bar-container{padding:8px 12px;background:#0d0d0d;border-bottom:1px solid #1a1a1a}
-.search-input-wrap{display:flex;align-items:center;background:#1c1c1e;border-radius:12px;padding:0 10px;border:1px solid #2a2a2c}
+.search-input-wrap{display:flex;align-items:center;background:#1c1c1e;border-radius:12px;padding:0 12px;border:1px solid #2a2a2c;width:100%}
 .search-input-wrap svg{color:#8e8e93;flex-shrink:0;margin-right:8px}
 .search-input{flex:1;background:transparent;border:none;padding:10px 0;color:#fff;font-size:14px;outline:none;font-family:inherit}
 .search-input::placeholder{color:#666}
 
-/* Global Search Section Header - WHITE PLEASANT COLOR */
+/* Global Search Section Header */
 .search-section-header{padding:12px 14px 6px;font-size:12px;font-weight:700;color:#ffffff;text-transform:uppercase;letter-spacing:0.8px;opacity:0.9}
 
 /* Dialogs Screen */
@@ -459,7 +459,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 
 .msg-photo{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;object-fit:cover;cursor:pointer;background:#111;border:none!important;outline:none!important;box-shadow:none!important}
 .msg-video{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;background:#000;border:none!important;outline:none!important;box-shadow:none!important}
-.msg-file{background:rgba(255,255,255,.05);padding:10px;border-radius:12px;margin-top:6px;display:flex;align-items:center;gap:10px;cursor:pointer}
+.msg-file{background:rgba(255,255,255,.05);padding:10px;border-radius:12px;margin-top:6px;display:flex;align-items:center;gap:10px;cursor:pointer;color:#aaa}
 
 /* Input Bar & Actions */
 .input-area-wrapper{background:#0d0d0d;border-top:1px solid #1a1a1a;display:flex;flex-direction:column;flex-shrink:0;z-index:15}
@@ -494,7 +494,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 .upload-toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(28,28,30,0.95);border:1px solid #3a3a3c;color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;z-index:900;display:flex;align-items:center;gap:10px;box-shadow:0 4px 16px rgba(0,0,0,0.5)}
 
 /* Bottom Nav */
-.bottom-nav{height:50px;background:#0d0d0d;border-top:1px solid #1a1a1a;display:flex;justify-space-around;align-items:center;flex-shrink:0}
+.bottom-nav{height:50px;background:#0d0d0d;border-top:1px solid #1a1a1a;display:flex;justify-content:space-around;align-items:center;flex-shrink:0}
 .nav-item{flex:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;color:#666}
 .nav-item.active{color:#fff}
 .nav-item span{font-size:10px}
@@ -520,6 +520,10 @@ input:checked + .slider:before{transform:translateX(20px)}
 
 .file-input{display:none}
 .hidden{display:none!important}
+.folder-create-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #222}
+.folder-create-item img{width:36px;height:36px;border-radius:50%;object-fit:cover}
+.folder-create-item input[type="checkbox"]{width:20px;height:20px}
+.msg-search-highlight{background:#ffeb3b;color:#000;padding:1px 2px;border-radius:2px}
 .loader{border:2px solid #333;border-top:2px solid #fff;border-radius:50%;width:14px;height:14px;animation:spin 0.6s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
 @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
@@ -559,7 +563,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 
 <div class="drawer-item" onclick="toggleStealthRead()">
 <div class="drawer-item-left">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
 <span>Режим «Не читать»</span>
 </div>
 <label class="switch" onclick="event.stopPropagation()">
@@ -570,7 +574,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 
 <div class="drawer-item" onclick="toggleSoundNotifications()">
 <div class="drawer-item-left">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
 <span>Звук уведомлений</span>
 </div>
 <label class="switch" onclick="event.stopPropagation()">
@@ -581,7 +585,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 
 <div class="drawer-item" onclick="toggleEncryptionMode()">
 <div class="drawer-item-left">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
 <span>Шифрование E2EE</span>
 </div>
 <label class="switch" onclick="event.stopPropagation()">
@@ -592,7 +596,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 
 <div class="drawer-item" onclick="clearAppCache()">
 <div class="drawer-item-left">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
 <span id="cacheSizeText">Очистить кэш (0.0 MB)</span>
 </div>
 </div>
@@ -611,7 +615,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 </div>
 <div class="drawer-item" onclick="openEncryptModal(); closeDrawer();">
 <div class="drawer-item-left">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
 <span>Облачное E2EE Шифрование</span>
 </div>
 </div>
@@ -628,9 +632,9 @@ input:checked + .slider:before{transform:translateX(20px)}
 <!-- Encryption & Keys Modal -->
 <div class="modal hidden" id="encryptModal">
 <div class="encrypt-modal-content">
-<div class="modal-title">🔐 Облачное E2EE шифрование</div>
+<div class="modal-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Облачное E2EE шифрование</div>
 <div class="warning-box">
-☁️ Ваши зашифрованные ключи надежно сохранены в <b>Firebase Realtime Database</b> и защищены вашим мастер-паролем. Вход с любого устройства восстановит доступ к вашим чатам!
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>Ваши зашифрованные ключи надежно сохранены в <b>Firebase Realtime Database</b> и защищены вашим мастер-паролем. Вход с любого устройства восстановит доступ к вашим чатам!
 </div>
 <div class="modal-text" style="margin-bottom:10px">Отпечаток устройства (Delfan Fingerprint):</div>
 <div class="delfan-box" id="delfanFingerprint">Вычисление отпечатка...</div>
@@ -671,8 +675,91 @@ input:checked + .slider:before{transform:translateX(20px)}
 <!-- Photo Viewer Modal -->
 <div class="photo-viewer-modal" id="photoViewerModal" onclick="closePhotoViewer()">
 <span class="photo-viewer-close" onclick="closePhotoViewer()">&times;</span>
-<img class="photo-viewer-img" id="photoViewerImg" src="" onclick="event.stopPropagation()">
+<img class="photo-viewer-img" id="photoViewerImg" src="" onclick="event.stopPropagation()" style="transition:transform 0.1s ease-out;transform-origin:center center">
 </div>
+
+<script>
+// Pinch-to-zoom for photo viewer
+(function() {
+    const img = document.getElementById('photoViewerImg');
+    const modal = document.getElementById('photoViewerModal');
+    let scale = 1;
+    let lastScale = 1;
+    let startX = 0, startY = 0;
+    let translateX = 0, translateY = 0;
+    let isDragging = false;
+
+    modal.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) {
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            lastScale = Math.sqrt(dx*dx + dy*dy);
+        } else if (e.touches.length === 1 && scale > 1) {
+            isDragging = true;
+            startX = e.touches[0].clientX - translateX;
+            startY = e.touches[0].clientY - translateY;
+        }
+    }, { passive: true });
+
+    modal.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2) {
+            e.preventDefault();
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            scale = Math.min(Math.max(1, (dist / lastScale) * scale), 5);
+            lastScale = dist;
+            updateTransform();
+        } else if (isDragging && scale > 1) {
+            e.preventDefault();
+            translateX = e.touches[0].clientX - startX;
+            translateY = e.touches[0].clientY - startY;
+            updateTransform();
+        }
+    }, { passive: false });
+
+    modal.addEventListener('touchend', () => {
+        isDragging = false;
+        if (scale < 1) {
+            scale = 1;
+            translateX = 0;
+            translateY = 0;
+            updateTransform();
+        }
+    });
+
+    modal.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        scale = Math.min(Math.max(1, scale * delta), 5);
+        if (scale === 1) {
+            translateX = 0;
+            translateY = 0;
+        }
+        updateTransform();
+    }, { passive: false });
+
+    function updateTransform() {
+        img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+    }
+
+    let lastTap = 0;
+    modal.addEventListener('touchend', (e) => {
+        const now = Date.now();
+        if (now - lastTap < 300) {
+            if (scale > 1) {
+                scale = 1;
+                translateX = 0;
+                translateY = 0;
+            } else {
+                scale = 2.5;
+            }
+            updateTransform();
+        }
+        lastTap = now;
+    });
+})();
+</script>
 
 <!-- Forward Message Modal -->
 <div class="modal hidden" id="forwardModal">
@@ -736,19 +823,19 @@ Kate Mobile API • Cloud Realtime E2EE
 </div>
 <div class="header-info" onclick="openDrawer()">
 <div class="header-title-main" id="dialogsHeaderTitle">VK Meow</div>
-<div class="header-subtitle" id="dialogsHeaderSubtitle">Личные чаты</div>
+<div class="header-subtitle" id="dialogsHeaderSubtitle">Защищено Cloud E2EE</div>
 </div>
 <div class="header-actions">
-<div class="header-btn active" id="encryptBtn" onclick="openEncryptModal()" title="Шифрование E2EE">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-</div>
+<button class="header-btn active" id="encryptBtn" onclick="openEncryptModal()" title="Шифрование E2EE">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+</button>
 </div>
 </div>
 
 <!-- Search Input Bar -->
 <div class="search-bar-container">
 <div class="search-input-wrap">
-<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
 <input class="search-input" id="dialogSearchInput" placeholder="Поиск по диалогам и ВКонтакте..." oninput="handleSearchInput()">
 </div>
 </div>
@@ -787,16 +874,31 @@ Kate Mobile API • Cloud Realtime E2EE
 <img class="header-avatar" id="chatAvatar" src="" alt="" onclick="openProfileView(currentPeer, currentPeer < 0)" style="cursor:pointer">
 <div class="header-info" onclick="backToDialogs()">
 <div class="header-title" id="chatTitle">...</div>
-<div class="header-subtitle" id="chatEncryptStatus">в сети</div>
+<div class="header-subtitle" id="chatEncryptStatus">в сети • <span id="msgCount">0</span> сообщений</div>
 </div>
 <div class="header-actions">
-<button class="mark-read-btn hidden" id="manualMarkReadBtn" onclick="manualMarkChatAsRead()">✓✓ Прочитать</button>
+<!-- SVG Magnifying Glass Icon — clean, no gray box background -->
+<button class="header-btn" id="searchChatBtn" onclick="toggleChatSearch()" title="Поиск по сообщениям в чате" style="background:transparent;border:none">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+</button>
+<button class="mark-read-btn hidden" id="manualMarkReadBtn" onclick="manualMarkChatAsRead()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align:middle;margin-right:4px"><polyline points="20 6 9 17 4 12"/></svg>Прочитать</button>
 </div>
+</div>
+
+<div class="search-chat-bar hidden" id="searchChatBar" style="padding:8px 12px;background:#141416;border-bottom:1px solid #222;display:flex;align-items:center;gap:8px;z-index:10">
+<div class="search-input-wrap" style="flex:1">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+<input type="text" id="chatSearchInput" placeholder="Поиск по сообщениям..." style="flex:1;background:transparent;border:none;padding:8px 0;color:#fff;font-size:14px;outline:none" oninput="searchInChat()">
+</div>
+<div id="searchCounter" style="font-size:12px;color:#888;white-space:nowrap">0/0</div>
+<button class="header-btn" onclick="prevSearchResult()" style="width:32px;height:32px;background:rgba(255,255,255,0.08);border-radius:50%">↑</button>
+<button class="header-btn" onclick="nextSearchResult()" style="width:32px;height:32px;background:rgba(255,255,255,0.08);border-radius:50%">↓</button>
+<button class="header-btn" onclick="toggleChatSearch()" style="width:32px;height:32px;background:rgba(255,255,255,0.08);border-radius:50%">✕</button>
 </div>
 
 <div class="pinned-msg-bar hidden" id="pinnedMsgBar">
 <div class="pinned-msg-info" onclick="scrollToPinnedMsg()">
-<div class="pinned-msg-title">📌 Закрепленное сообщение</div>
+<div class="pinned-msg-title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14l-1.5-7h-11z"/><path d="M9 10V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6"/></svg>Закрепленное сообщение</div>
 <div class="pinned-msg-text" id="pinnedMsgText">...</div>
 </div>
 <div class="pinned-msg-close" onclick="unpinCurrentMessage()">
@@ -827,12 +929,19 @@ Kate Mobile API • Cloud Realtime E2EE
 
 <textarea class="message-input" id="msgInput" placeholder="Сообщение..." rows="1" oninput="handleInputTyping()"></textarea>
 
+<!-- SVG ICON FOR VOICE -->
 <button class="media-rec-btn" id="voiceRecBtn" onclick="startVoiceRecording()" title="Голосовое сообщение (.mgs)">
 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
 </button>
 
+<!-- SVG ICON FOR CIRCLE VIDEO -->
 <button class="media-rec-btn" id="circleRecBtn" onclick="startCircleRecording()" title="Кружочек (.mkru)">
 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+</button>
+
+<!-- SVG ICON FOR STICKER FROM GALLERY -->
+<button class="media-rec-btn" id="stickerBtn" onclick="createStickerFromPhoto()" title="Стикер из галереи (.mst)">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
 </button>
 
 <button class="send-btn hidden" id="sendBtn" onclick="sendMessage()">
@@ -928,7 +1037,7 @@ Kate Mobile API • Cloud Realtime E2EE
 </div>
 </div>
 <div class="profile-view-info" id="profileViewInfo"></div>
-<div class="profile-view-posts" id="profileViewPosts">
+<div class="profile-view-posts">
 <div class="profile-view-post-title">Записи на стене</div>
 <div id="profilePostsList"></div>
 </div>
@@ -981,45 +1090,8 @@ let myVkId = null;
 let localKeyPair = null;
 let peerKeysCache = {};
 let decryptedCache = {};
+
 let renderedMsgIds = new Set();
-
-// VK_MEOW_REALTIME_DECRYPT_FIX_V2
-const realtimeDecryptJobs = new Map();
-
-function setRealtimeDecryptState(msgId, html) {
-    const root = document.getElementById('msg-' + msgId);
-    const textElem = root ? root.querySelector('.msg-text') : null;
-    if (textElem) textElem.innerHTML = html;
-}
-
-function realtimeDecryptWait(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function getCanonicalEncryptedMessage(msgId, peerId) {
-    if (!peerId || String(currentPeer) !== String(peerId)) return null;
-
-    try {
-        const res = await fetch('/api/messages', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({token, peer_id: peerId})
-        });
-        if (!res.ok) return null;
-
-        const data = await res.json();
-        const message = (data.messages || []).find(item => String(item.id) === String(msgId));
-        if (!message || typeof message.text !== 'string') return null;
-        return message.text;
-    } catch (e) {
-        console.warn('Canonical message fetch failed:', e);
-        return null;
-    }
-}
-
-function decryptErrorHtml() {
-    return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
-}
 
 let replyToMsg = null;
 let editMsg = null;
@@ -1216,7 +1288,7 @@ async function importKeysFile(e) {
 }
 
 async function regenerateKeysPrompt() {
-    if (confirm('⚠️ Вы уверены, что хотите обновить пароль и пересоздать ключи E2EE?')) {
+    if (confirm('ВНИМАНИЕ: Вы уверены, что хотите обновить пароль и пересоздать ключи E2EE?')) {
         localStorage.removeItem('vk_pass');
         const newPass = prompt('Введите новый мастер-пароль для шифрования:');
         if (!newPass) return;
@@ -1390,77 +1462,6 @@ async function clientDecryptData(encObj) {
     return await decryptAESGCM(sessionKey, b64ToBuf(encObj.payload));
 }
 
-// Переопределяем старую функцию. При событии Long Poll текст может прийти раньше,
-// чем VK вернёт его каноническую версию через getHistory. Поэтому повторяем
-// попытку и при необходимости берём точный текст сообщения из истории.
-tryDecryptMessageRealTime = async function(msgId, encryptedText) {
-    const jobKey = String(msgId);
-    if (decryptedCache[msgId]) {
-        setRealtimeDecryptState(msgId, escapeHtml(decryptedCache[msgId]));
-        return decryptedCache[msgId];
-    }
-    if (realtimeDecryptJobs.has(jobKey)) return realtimeDecryptJobs.get(jobKey);
-
-    const peerAtStart = currentPeer;
-    const job = (async () => {
-        let candidate = encryptedText;
-        const delays = [0, 120, 250, 500, 900, 1500, 2500, 4000];
-        let lastError = null;
-
-        for (let attempt = 0; attempt < delays.length; attempt++) {
-            if (String(currentPeer) !== String(peerAtStart)) return null;
-            if (delays[attempt]) await realtimeDecryptWait(delays[attempt]);
-
-            // После первой попытки всегда запрашиваем точную версию из истории VK.
-            if (attempt > 0) {
-                const canonical = await getCanonicalEncryptedMessage(msgId, peerAtStart);
-                if (canonical && canonical.startsWith(ENCRYPT_PREFIX)) candidate = canonical;
-            }
-
-            try {
-                if (!candidate || !candidate.startsWith(ENCRYPT_PREFIX)) {
-                    throw new Error('Encrypted payload is not ready');
-                }
-
-                if (!localKeyPair) await initClientCrypto();
-                if (!localKeyPair) throw new Error('E2EE key is not ready');
-
-                const encObj = JSON.parse(candidate.substring(ENCRYPT_PREFIX.length));
-                if (!encObj || !encObj.k1 || !encObj.k2 || !encObj.payload) {
-                    throw new Error('Incomplete encrypted payload');
-                }
-
-                const decBuf = await clientDecryptData(encObj);
-                if (!decBuf) throw new Error('The session key cannot be decrypted yet');
-
-                const plainText = new TextDecoder().decode(decBuf);
-                decryptedCache[msgId] = plainText;
-                setRealtimeDecryptState(msgId, escapeHtml(plainText));
-                return plainText;
-            } catch (e) {
-                lastError = e;
-                if (attempt < delays.length - 1) {
-                    setRealtimeDecryptState(
-                        msgId,
-                        '<span class="decrypting-shimmer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Расшифровка...</span>'
-                    );
-                }
-            }
-        }
-
-        console.error('Real-time decrypt failed after retries:', lastError);
-        setRealtimeDecryptState(msgId, decryptErrorHtml());
-        return null;
-    })();
-
-    realtimeDecryptJobs.set(jobKey, job);
-    try {
-        return await job;
-    } finally {
-        realtimeDecryptJobs.delete(jobKey);
-    }
-};
-
 const AUTH_URL = 'https://oauth.vk.com/authorize?client_id=3682744&scope=messages,audio,photos,video,docs,notes,pages,status,wall,groups,email,stats,notifications,offline&redirect_uri=https://oauth.vk.com/blank.html&response_type=token';
 
 function getToken() { window.open(AUTH_URL, '_blank'); }
@@ -1504,7 +1505,7 @@ function showDialogsScreen() {
     document.getElementById('dialogsScreen').classList.remove('hidden');
     if (currentUser) {
         document.getElementById('dialogsHeaderTitle').textContent = 'VK Meow';
-        document.getElementById('dialogsHeaderSubtitle').textContent = 'Личные чаты';
+        document.getElementById('dialogsHeaderSubtitle').textContent = 'Защищено Cloud E2EE';
         updateDrawerProfile();
     }
 }
@@ -1678,21 +1679,27 @@ function buildDialogPreviewHTML(d) {
             if (ext === 'mkru' || ext === 'mec' || title.endsWith('.mkru')) isCircle = true;
             else if (ext === 'mgs' || ext === 'meg' || title.endsWith('.mgs')) isVoice = true;
             else if (ext === 'meow' || title.endsWith('.meow')) photoUrl = a.doc?.url;
+            else if (ext === 'mst' || title.endsWith('.mst')) { photoUrl = a.doc?.url; }
+            else if (ext === 'mmu' || title.endsWith('.mmu')) isVoice = true;
         }
     }
 
     if (rawText.startsWith(ENCRYPT_PREFIX)) {
-        return `<span class="dialog-preview-wrap" id="dialog-dec-${d.id}">🔒 Зашифрованное сообщение</span>`;
+        return `<span class="dialog-preview-wrap" id="dialog-dec-${d.id}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Зашифрованное сообщение</span>`;
     }
 
     if (isCircle) {
-        return `<span class="dialog-preview-wrap">🎥 Кружочек</span>`;
+        return `<span class="dialog-preview-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" style="vertical-align:middle;margin-right:4px;flex-shrink:0"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>Кружочек</span>`;
     } else if (isVoice) {
-        return `<span class="dialog-preview-wrap">🎤 Голосовое сообщение</span>`;
+        return `<span class="dialog-preview-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" style="vertical-align:middle;margin-right:4px;flex-shrink:0"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>Голосовое</span>`;
     } else if (photoUrl) {
-        return `<span class="dialog-preview-wrap"><img class="dialog-preview-thumb" src="${photoUrl}" onerror="this.style.display='none'">📷 Фото ${escapeHtml(rawText)}</span>`;
+        return `<span class="dialog-preview-wrap"><img class="dialog-preview-thumb" src="${photoUrl}" onerror="this.style.display='none'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" style="vertical-align:middle;margin-right:4px;flex-shrink:0"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Фото ${escapeHtml(rawText)}</span>`;
     } else if (videoUrl) {
-        return `<span class="dialog-preview-wrap"><img class="dialog-preview-thumb" src="${videoUrl}" onerror="this.style.display='none'">📹 Видео ${escapeHtml(rawText)}</span>`;
+        return `<span class="dialog-preview-wrap"><img class="dialog-preview-thumb" src="${videoUrl}" onerror="this.style.display='none'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" style="vertical-align:middle;margin-right:4px;flex-shrink:0"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>Видео ${escapeHtml(rawText)}</span>`;
+    } else if (atts.find(a => a.type === 'doc' && ((a.doc?.ext || '').toLowerCase() === 'mst' || (a.doc?.title || '').toLowerCase().endsWith('.mst')))) {
+        return `<span class="dialog-preview-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" style="vertical-align:middle;margin-right:4px;flex-shrink:0"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Стикер</span>`;
+    } else if (atts.find(a => a.type === 'doc' && ((a.doc?.ext || '').toLowerCase() === 'mmu' || (a.doc?.title || '').toLowerCase().endsWith('.mmu')))) {
+        return `<span class="dialog-preview-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" style="vertical-align:middle;margin-right:4px;flex-shrink:0"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Музыка</span>`;
     }
 
     return `<span class="dialog-preview-wrap">${escapeHtml(rawText || 'Сообщение')}</span>`;
@@ -1703,12 +1710,14 @@ async function fastDecryptDialogPreviews(dialogs) {
         if (d.last_message && d.last_message.startsWith(ENCRYPT_PREFIX)) {
             setTimeout(async () => {
                 try {
+                    if (!localKeyPair) await initClientCrypto();
+                    if (!localKeyPair) return;
                     const encObj = JSON.parse(d.last_message.substring(ENCRYPT_PREFIX.length));
                     const decBuf = await clientDecryptData(encObj);
                     if (decBuf) {
                         const plainText = new TextDecoder().decode(decBuf);
                         const elem = document.getElementById(`dialog-dec-${d.id}`);
-                        if (elem) elem.innerHTML = `🔒 ${escapeHtml(plainText)}`;
+                        if (elem) elem.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>${escapeHtml(plainText)}`;
                     }
                 } catch(e){}
             }, 5);
@@ -1793,7 +1802,7 @@ function renderDialogsListFiltered() {
         div.className = 'dialog';
         div.onclick = () => openChatByObject(d);
 
-        attachDialogSwipeArchive(div, d);
+        attachDialogSwipe(div, d);
 
         const time = d.date ? new Date(d.date * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : '';
         const previewHTML = buildDialogPreviewHTML(d);
@@ -1814,7 +1823,7 @@ function renderDialogsListFiltered() {
                     ${d.unread > 0 ? `<div class="dialog-unread-blue">${d.unread}</div>` : ''}
                 </div>
             </div>
-            ${isPinned ? '<div class="dialog-pin-icon">📌</div>' : ''}
+            ${isPinned ? '<div class="dialog-pin-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14l-1.5-7h-11z"/><path d="M9 10V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6"/></svg></div>' : ''}
         `;
         list.appendChild(div);
     }
@@ -1848,7 +1857,7 @@ function renderDialogsListFiltered() {
     }
 }
 
-function attachDialogSwipeArchive(elem, d) {
+function attachDialogSwipe(elem, d) {
     let startX = 0;
     let currentX = 0;
     let isDragging = false;
@@ -1863,14 +1872,22 @@ function attachDialogSwipeArchive(elem, d) {
         currentX = e.touches[0].clientX - startX;
         if (currentX > 0 && currentX < 120) {
             elem.style.transform = `translateX(${currentX}px)`;
+            elem.style.background = `rgba(255,59,48,${currentX/200})`;
+        } else if (currentX < 0 && currentX > -120) {
+            elem.style.transform = `translateX(${currentX}px)`;
+            elem.style.background = `rgba(10,132,255,${Math.abs(currentX)/200})`;
         }
     }, { passive: true });
 
     elem.addEventListener('touchend', () => {
         if (!isDragging) return;
         isDragging = false;
+        elem.style.background = '';
         if (currentX > 60) {
             toggleArchivePeer(String(d.id));
+        } else if (currentX < -60) {
+            togglePinPeer(String(d.id));
+            if (navigator.vibrate) navigator.vibrate(20);
         }
         elem.style.transform = 'translateX(0px)';
         currentX = 0;
@@ -1980,6 +1997,8 @@ function openChatByObject(d) {
 
     renderedMsgIds.clear();
     document.getElementById('messages').innerHTML = '';
+    messagesOffset = 0;
+    allMessagesLoaded = false;
 
     const markBtn = document.getElementById('manualMarkReadBtn');
     if (stealthRead && d.unread > 0) {
@@ -2042,11 +2061,73 @@ async function manualMarkChatAsRead() {
     renderDialogsListFiltered();
 }
 
+let chatSearchResults = [];
+let currentSearchIndex = -1;
+
+function toggleChatSearch() {
+    const bar = document.getElementById('searchChatBar');
+    bar.classList.toggle('hidden');
+    if (!bar.classList.contains('hidden')) {
+        document.getElementById('chatSearchInput').focus();
+    }
+}
+
+function searchInChat() {
+    const query = document.getElementById('chatSearchInput').value.toLowerCase().trim();
+    chatSearchResults = [];
+    currentSearchIndex = -1;
+
+    document.querySelectorAll('.msg-search-highlight').forEach(el => {
+        el.outerHTML = el.innerHTML;
+    });
+
+    if (!query) {
+        document.getElementById('searchCounter').textContent = '0/0';
+        return;
+    }
+
+    const msgs = document.querySelectorAll('.msg-text');
+    msgs.forEach((el, idx) => {
+        const text = el.textContent.toLowerCase();
+        if (text.includes(query)) {
+            chatSearchResults.push(el.closest('.msg'));
+            const html = el.innerHTML;
+            const regex = new RegExp(`(${escapeHtml(query)})`, 'gi');
+            el.innerHTML = html.replace(regex, '<mark class="msg-search-highlight" style="background:#ffeb3b;color:#000;padding:1px 2px;border-radius:2px">$1</mark>');
+        }
+    });
+
+    document.getElementById('searchCounter').textContent = `${chatSearchResults.length > 0 ? 1 : 0}/${chatSearchResults.length}`;
+    if (chatSearchResults.length > 0) {
+        currentSearchIndex = 0;
+        chatSearchResults[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+
+function nextSearchResult() {
+    if (chatSearchResults.length === 0) return;
+    currentSearchIndex = (currentSearchIndex + 1) % chatSearchResults.length;
+    chatSearchResults[currentSearchIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById('searchCounter').textContent = `${currentSearchIndex + 1}/${chatSearchResults.length}`;
+}
+
+function prevSearchResult() {
+    if (chatSearchResults.length === 0) return;
+    currentSearchIndex = (currentSearchIndex - 1 + chatSearchResults.length) % chatSearchResults.length;
+    chatSearchResults[currentSearchIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById('searchCounter').textContent = `${currentSearchIndex + 1}/${chatSearchResults.length}`;
+}
+
 function backToDialogs() {
     document.getElementById('chatScreen').classList.remove('active');
     currentPeer = null;
     renderedMsgIds.clear();
+    messagesOffset = 0;
+    allMessagesLoaded = false;
     cancelReplyOrEdit();
+    chatSearchResults = [];
+    currentSearchIndex = -1;
+    document.getElementById('searchChatBar').classList.add('hidden');
     loadDialogs();
 }
 
@@ -2106,7 +2187,37 @@ async function loadMessages(initialScroll = false) {
     } catch(e){}
 }
 
-function renderMessageItem(container, msg) {
+// Function to handle on-demand real-time decryption safely inside current chat
+async function tryDecryptMessageRealTime(msgId, encryptedText) {
+    try {
+        if (!localKeyPair) await initClientCrypto();
+        if (!localKeyPair) return;
+        const encObj = JSON.parse(encryptedText.substring(ENCRYPT_PREFIX.length));
+        const decBuf = await clientDecryptData(encObj);
+        if (decBuf) {
+            const plainText = new TextDecoder().decode(decBuf);
+            decryptedCache[msgId] = plainText;
+            const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
+            if (textElem) {
+                textElem.innerHTML = escapeHtml(plainText);
+            }
+        } else {
+            const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
+            if (textElem) {
+                textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
+            }
+        }
+    } catch(e) {
+        console.error('Real-time decrypt error:', e);
+        const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
+        if (textElem) {
+            textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
+        }
+    }
+}
+
+function renderMessageItem(containerOrFragment, msg) {
+    const container = containerOrFragment.nodeType === 11 ? document.getElementById('messages') : containerOrFragment;
     const containerDiv = document.createElement('div');
     containerDiv.className = 'msg-container';
     containerDiv.style.justifyContent = msg.out ? 'flex-end' : 'flex-start';
@@ -2134,7 +2245,7 @@ function renderMessageItem(container, msg) {
         const rMsg = msg.reply_message;
         const rAuthor = rMsg.name || (rMsg.from_id === myVkId ? 'Вы' : 'Собеседник');
         let rText = rMsg.text || 'Вложение';
-        if (rText.startsWith(ENCRYPT_PREFIX)) rText = '🔒 Зашифрованное сообщение';
+        if (rText.startsWith(ENCRYPT_PREFIX)) rText = '[Зашифрованное]';
         html += `<div class="msg-reply-quote" onclick="scrollToMsg('${rMsg.id}')">
             <div class="msg-reply-name">${escapeHtml(rAuthor)}</div>
             <div class="msg-reply-text">${escapeHtml(rText)}</div>
@@ -2146,13 +2257,23 @@ function renderMessageItem(container, msg) {
     let displayText = msg.text || '';
     let isPureCircle = false;
     let isSticker = false;
-    
+
+    if (msg.attachments) {
+        for (const a of msg.attachments) {
+            if (a.type === 'doc') {
+                const t = (a.doc?.title || '').toLowerCase();
+                const e = (a.doc?.ext || '').toLowerCase();
+                if (e === 'mst' || t.endsWith('.mst')) isSticker = true;
+            }
+        }
+    }
+
     if (isEncrypted) {
         if (decryptedCache[msg.id]) {
             displayText = decryptedCache[msg.id];
             html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
         } else {
-            html += `<div class="msg-text"><span class="decrypting-shimmer">🔐 Расшифровка...</span></div>`;
+            html += `<div class="msg-text"><span class="decrypting-shimmer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Расшифровка...</span></div>`;
             setTimeout(() => {
                 tryDecryptMessageRealTime(msg.id, msg.text);
             }, 50);
@@ -2204,7 +2325,7 @@ function renderMessageItem(container, msg) {
                             <div class="tg-voice-bar active" style="height:100%"></div>
                             <div class="tg-voice-bar" style="height:60%"></div>
                         </div>
-                        <div class="tg-voice-info"><span>🎤 Голосовое</span></div>
+                        <div class="tg-voice-info"><span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>Голосовое</span></div>
                     </div>
                 </div>`;
 
@@ -2215,9 +2336,9 @@ function renderMessageItem(container, msg) {
 
                 const isCustomEnc = title.startsWith('enc_') || 
                     ext === 'meow' || ext === 'mer' || ext === 'mkru' || ext === 'mgs' ||
-                    ext === 'enc' || ext === 'mec' || ext === 'meg' || ext === 'mur' ||
+                    ext === 'enc' || ext === 'mec' || ext === 'meg' || ext === 'mur' || ext === 'mst' || ext === 'mmu' ||
                     title.endsWith('.meow') || title.endsWith('.mer') || title.endsWith('.mkru') || title.endsWith('.mgs') ||
-                    title.endsWith('.mec') || title.endsWith('.meg');
+                    title.endsWith('.mec') || title.endsWith('.meg') || title.endsWith('.mst') || title.endsWith('.mmu');
 
                 if (isCustomEnc) {
                     const docId = `doc_${doc.owner_id}_${doc.id}`;
@@ -2232,11 +2353,22 @@ function renderMessageItem(container, msg) {
                             <div class="tg-voice-play-btn"><span class="loader"></span></div>
                             <div class="tg-voice-wave-wrap">
                                 <div class="tg-voice-waveform"><div class="tg-voice-bar active" style="height:50%"></div></div>
-                                <div class="tg-voice-info"><span>🎤 Голосовое...</span></div>
+                                <div class="tg-voice-info"><span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>Голосовое...</span></div>
+                            </div>
+                        </div>`;
+                    } else if (ext === 'mst' || title.endsWith('.mst')) {
+                        html += `<div id="${docId}" style="width:140px;height:140px;display:flex;align-items:center;justify-content:center"><span class="loader"></span></div>`;
+                        isSticker = true;
+                    } else if (ext === 'mmu' || title.endsWith('.mmu')) {
+                        html += `<div class="tg-voice-container" id="${docId}">
+                            <div class="tg-voice-play-btn"><span class="loader"></span></div>
+                            <div class="tg-voice-wave-wrap">
+                                <div class="tg-voice-waveform"><div class="tg-voice-bar active" style="height:50%"></div></div>
+                                <div class="tg-voice-info"><span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Музыка...</span></div>
                             </div>
                         </div>`;
                     } else {
-                        html += `<div class="msg-file" id="${docId}"><span class="msg-file-icon">🔒</span><div class="msg-file-info"><div class="msg-file-name">Зашифрованный файл</div><div class="msg-file-size">Загрузка...</div></div></div>`;
+                        html += `<div class="msg-file" id="${docId}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-right:8px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><div class="msg-file-info"><div class="msg-file-name">Зашифрованный файл</div><div class="msg-file-size">Загрузка...</div></div></div>`;
                     }
 
                     setTimeout(() => processEncryptedAttachment(docId, doc.url, ext || title), 10);
@@ -2261,7 +2393,11 @@ function renderMessageItem(container, msg) {
     div.innerHTML = html;
     containerDiv.appendChild(div);
     containerDiv.appendChild(swipeBgRight);
-    container.appendChild(containerDiv);
+    if (containerOrFragment.nodeType === 11) {
+        containerOrFragment.appendChild(containerDiv);
+    } else {
+        container.appendChild(containerDiv);
+    }
 }
 
 const audioPlayersCache = {};
@@ -2441,7 +2577,7 @@ function setReplyToMessage(msg) {
     
     title.textContent = `Ответ на сообщение (${author})`;
     let previewText = msg.text || 'Вложение';
-    if (previewText.startsWith(ENCRYPT_PREFIX)) previewText = '🔒 Зашифрованное сообщение';
+    if (previewText.startsWith(ENCRYPT_PREFIX)) previewText = '[Зашифрованное]';
     text.textContent = previewText;
     
     document.getElementById('replyPreviewBar').classList.remove('hidden');
@@ -2600,7 +2736,7 @@ function renderDecryptedMedia(elem, data) {
                 </div>
                 <div class="tg-voice-info">
                     <span class="v-time">0:00</span>
-                    <span>🎤 Голосовое</span>
+                    <span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>Голосовое</span>
                 </div>
             </div>
         `;
@@ -2649,6 +2785,82 @@ function renderDecryptedMedia(elem, data) {
         vid.src = data.blobUrl;
         vid.controls = true;
         elem.replaceWith(vid);
+    } else if ((data.name && data.name.endsWith('.mst')) || (data.extInfo && data.extInfo.includes('mst')) || data.mime === 'image/png') {
+        const img = document.createElement('img');
+        img.style.width = '140px';
+        img.style.height = '140px';
+        img.style.objectFit = 'contain';
+        img.style.display = 'block';
+        img.src = data.blobUrl;
+
+        const parentMsg = elem.closest('.msg');
+        if (parentMsg) {
+            parentMsg.classList.add('msg-sticker');
+            parentMsg.style.background = 'transparent';
+            parentMsg.style.padding = '0';
+            parentMsg.style.borderRadius = '0';
+            parentMsg.style.boxShadow = 'none';
+            parentMsg.style.maxWidth = '160px';
+        }
+        elem.replaceWith(img);
+    } else if ((data.name && data.name.endsWith('.mmu')) || (data.extInfo && data.extInfo.includes('mmu'))) {
+        const container = document.createElement('div');
+        container.className = 'tg-voice-container';
+        container.style.width = '280px';
+        const audio = new Audio(data.blobUrl);
+
+        container.innerHTML = `
+            <div class="tg-voice-play-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </div>
+            <div class="tg-voice-wave-wrap">
+                <div class="tg-voice-waveform">
+                    <div class="tg-voice-bar active" style="height:30%"></div>
+                    <div class="tg-voice-bar active" style="height:60%"></div>
+                    <div class="tg-voice-bar active" style="height:90%"></div>
+                    <div class="tg-voice-bar active" style="height:50%"></div>
+                    <div class="tg-voice-bar active" style="height:80%"></div>
+                    <div class="tg-voice-bar" style="height:40%"></div>
+                    <div class="tg-voice-bar" style="height:70%"></div>
+                </div>
+                <div class="tg-voice-info">
+                    <span class="v-time">0:00</span>
+                    <span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Музыка</span>
+                </div>
+            </div>
+        `;
+
+        const playBtn = container.querySelector('.tg-voice-play-btn');
+        const timeStr = container.querySelector('.v-time');
+
+        audio.onloadedmetadata = () => {
+            const m = Math.floor(audio.duration / 60);
+            const s = Math.floor(audio.duration % 60).toString().padStart(2, '0');
+            timeStr.textContent = `${m}:${s}`;
+        };
+
+        audio.ontimeupdate = () => {
+            const cur = Math.floor(audio.currentTime);
+            const m = Math.floor(cur / 60);
+            const s = Math.floor(cur % 60).toString().padStart(2, '0');
+            timeStr.textContent = `${m}:${s}`;
+        };
+
+        audio.onended = () => {
+            playBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+        };
+
+        playBtn.onclick = () => {
+            if (audio.paused) {
+                audio.play();
+                playBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+            } else {
+                audio.pause();
+                playBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+            }
+        };
+
+        elem.replaceWith(container);
     } else {
         if (elem.querySelector('.msg-file-size')) {
             elem.querySelector('.msg-file-size').textContent = 'Расшифровано (нажмите для скачивания)';
@@ -2669,6 +2881,7 @@ function handleInputTyping() {
     const sendBtn = document.getElementById('sendBtn');
     const voiceBtn = document.getElementById('voiceRecBtn');
     const circleBtn = document.getElementById('circleRecBtn');
+    const stickerBtn = document.getElementById('stickerBtn');
 
     if (val.length > 0) {
         triggerTypingSignal();
@@ -2678,10 +2891,12 @@ function handleInputTyping() {
         sendBtn.classList.remove('hidden');
         voiceBtn.classList.add('hidden');
         circleBtn.classList.add('hidden');
+        stickerBtn.classList.add('hidden');
     } else {
         sendBtn.classList.add('hidden');
         voiceBtn.classList.remove('hidden');
         circleBtn.classList.remove('hidden');
+        stickerBtn.classList.remove('hidden');
     }
 }
 
@@ -2724,7 +2939,7 @@ async function sendMessage() {
             await fetch('/api/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ payload })
+                body: JSON.stringify(payload)
             });
         }
     } catch(errSend) {
@@ -2981,6 +3196,8 @@ async function uploadEncryptedMedia(blob, filename, mimeType) {
     else if (filename.endsWith('.mgs') || mimeType.includes('mgs')) ext = 'mgs';
     else if (filename.endsWith('.meow') || mimeType.startsWith('image/')) ext = 'meow';
     else if (filename.endsWith('.mer') || mimeType.startsWith('video/')) ext = 'mer';
+    else if (filename.endsWith('.mst') || mimeType === 'image/png') ext = 'mst';
+    else if (filename.endsWith('.mmu') || mimeType.startsWith('audio/')) ext = 'mmu';
 
     const formData = new FormData();
     formData.append('token', token);
@@ -3003,11 +3220,58 @@ async function handleFile(e) {
             name = `photo_${Date.now()}.meow`;
         } else if (file.type.startsWith('video/')) {
             name = `video_${Date.now()}.mer`;
+        } else if (file.type.startsWith('audio/')) {
+            name = `music_${Date.now()}.mmu`;
+        } else if (file.name.endsWith('.mst')) {
+            name = file.name;
         }
         await sendMediaBlob(file, name, file.type || 'application/octet-stream');
     } finally {
         e.target.value = '';
     }
+}
+
+// Sticker creator from gallery photo with 512x512 square crop and PNG formatting
+async function createStickerFromPhoto() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file || !currentPeer) return;
+
+        showUploadProgress('Создание стикера...');
+        try {
+            const blob = await new Promise((resolve, reject) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                img.onload = () => {
+                    const size = 512;
+                    canvas.width = size;
+                    canvas.height = size;
+
+                    const minDim = Math.min(img.width, img.height);
+                    const sx = (img.width - minDim) / 2;
+                    const sy = (img.height - minDim) / 2;
+                    ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size);
+
+                    canvas.toBlob((b) => {
+                        if (b) resolve(b);
+                        else reject(new Error('Canvas toBlob failed'));
+                    }, 'image/png');
+                };
+                img.onerror = reject;
+                img.src = URL.createObjectURL(file);
+            });
+
+            await sendMediaBlob(blob, `sticker_${Date.now()}.mst`, 'image/png');
+        } catch(err) {
+            alert('Ошибка создания стикера: ' + err.message);
+            hideUploadProgress();
+        }
+    };
+    input.click();
 }
 
 function playNotificationSound() {
@@ -3054,31 +3318,86 @@ async function pollEvents() {
         if (data.ts) {
             longPollTs = data.ts;
         }
+        if (data.failed) {
+            startLongPolling();
+            return;
+        }
         if (data.updates && data.updates.length > 0) {
             let hasNewMsg = false;
+            let needsDialogUpdate = false;
             for (const u of data.updates) {
-                if (u[0] === 4) {
+                const eventCode = u[0];
+                if (eventCode === 4) {
                     hasNewMsg = true;
+                    needsDialogUpdate = true;
                     const peerId = u[3];
+                    const msgId = u[1];
+                    const flags = u[2];
+                    const text = u[5] || '';
+                    const fromId = u[6] || peerId;
+
+                    const d = dialogsData.find(item => String(item.id) === String(peerId));
+                    if (d) {
+                        d.last_message = text;
+                        d.date = Math.floor(Date.now() / 1000);
+                        if (!(flags & 2)) {
+                            d.unread = (d.unread || 0) + 1;
+                        }
+                        const idx = dialogsData.indexOf(d);
+                        if (idx > 0) {
+                            dialogsData.splice(idx, 1);
+                            dialogsData.unshift(d);
+                        }
+                    }
+
                     if (currentPeer && String(peerId) === String(currentPeer)) {
+                        const isOut = (flags & 2) !== 0;
+                        const newMsg = {
+                            id: msgId,
+                            text: text,
+                            date: Math.floor(Date.now() / 1000),
+                            from_id: fromId,
+                            out: isOut ? 1 : 0,
+                            name: isOut ? 'Вы' : d?.name || 'Собеседник',
+                            photo: '',
+                            attachments: []
+                        };
+                        if (!renderedMsgIds.has(msgId)) {
+                            renderedMsgIds.add(msgId);
+                            const container = document.getElementById('messages');
+                            renderMessageItem(container, newMsg);
+                            container.scrollTop = container.scrollHeight;
+                        }
+                        
+                        // FIX: Instant decryption for incoming messages inside the active chat screen
                         if (text && text.startsWith(ENCRYPT_PREFIX)) {
                             setTimeout(() => {
                                 tryDecryptMessageRealTime(msgId, text);
-                            }, 100);
+                            }, 50);
                         }
-                        loadMessages(false);
                     }
+                } else if (eventCode === 3) {
+                    const msgId = u[1];
+                    const elem = document.getElementById('msg-' + msgId);
+                    if (elem) elem.closest('.msg-container').remove();
+                } else if (eventCode === 5) {
+                    needsDialogUpdate = true;
+                } else if (eventCode === 6 || eventCode === 7 || eventCode === 80) {
+                    needsDialogUpdate = true;
                 }
+            }
+
+            if (needsDialogUpdate) {
+                renderDialogsListFiltered();
             }
             if (hasNewMsg) {
                 playNotificationSound();
-                loadDialogs();
             }
         }
     } catch(e) {
         await new Promise(r => setTimeout(r, 1000));
     }
-    setTimeout(pollEvents, 200);
+    setTimeout(pollEvents, 100);
 }
 
 function logout() {
@@ -3122,7 +3441,6 @@ function renderFolderTabs() {
         tabs.appendChild(tab);
     };
 
-    /* EXACT FOLDER ORDER REQUESTED BY USER */
     createTab('all', 'Личные');
     createTab('groups', 'Группы');
     createTab('channels', 'Каналы');
@@ -3238,7 +3556,7 @@ async function openLikesModal(ownerId, postId) {
                 list.appendChild(item);
             }
         } else {
-            list.innerHTML = '<div style="color:#666;text-align:center;padding:40px">Пока никто не оценил</div>';
+            list.innerHTML = '<div style="color:#666;text-align:center;padding:40px"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1.5" style="display:block;margin:0 auto 8px"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>Пока никто не оценил</div>';
         }
         document.getElementById('commentsModal').classList.add('active');
     } catch(e){}
@@ -3273,7 +3591,7 @@ async function openCommentsModal(ownerId, postId) {
                 list.appendChild(item);
             }
         } else {
-            list.innerHTML = '<div style="color:#666;text-align:center;padding:40px">Комментариев пока нет</div>';
+            list.innerHTML = '<div style="color:#666;text-align:center;padding:40px"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1.5" style="display:block;margin:0 auto 8px"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>Комментариев пока нет</div>';
         }
         document.getElementById('commentsModal').classList.add('active');
     } catch(e){}
@@ -3309,9 +3627,9 @@ async function openProfileView(peerId, isGroup) {
 
         const infoDiv = document.getElementById('profileViewInfo');
         infoDiv.innerHTML = '';
-        if (data.city) infoDiv.innerHTML += `<div class="profile-view-info-item">📍 ${escapeHtml(data.city)}</div>`;
-        if (data.bdate) infoDiv.innerHTML += `<div class="profile-view-info-item">🎂 ${escapeHtml(data.bdate)}</div>`;
-        if (data.site) infoDiv.innerHTML += `<div class="profile-view-info-item">🔗 ${escapeHtml(data.site)}</div>`;
+        if (data.city) infoDiv.innerHTML += `<div class="profile-view-info-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;flex-shrink:0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${escapeHtml(data.city)}</div>`;
+        if (data.bdate) infoDiv.innerHTML += `<div class="profile-view-info-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;flex-shrink:0"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>${escapeHtml(data.bdate)}</div>`;
+        if (data.site) infoDiv.innerHTML += `<div class="profile-view-info-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;flex-shrink:0"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>${escapeHtml(data.site)}</div>`;
 
         const postsList = document.getElementById('profilePostsList');
         postsList.innerHTML = '';
@@ -3341,7 +3659,7 @@ async function openProfileView(peerId, isGroup) {
                 postsList.appendChild(div);
             }
         } else {
-            postsList.innerHTML = '<div class="profile-view-empty">Нет постов для отображения</div>';
+            postsList.innerHTML = '<div class="profile-view-empty"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1.5" style="display:block;margin:0 auto 8px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>Нет постов для отображения</div>';
         }
 
         document.getElementById('profileViewModal').classList.add('active');
@@ -3418,6 +3736,208 @@ async function saveNewFolder() {
         }
     }
 })();
+
+
+// VK_MEOW_REALTIME_DECRYPT_FIX_V2
+// Надёжная расшифровка сообщений Long Poll без повторного входа в чат.
+const realtimeDecryptJobs = new Map();
+
+function setRealtimeDecryptState(msgId, html) {
+    const root = document.getElementById('msg-' + msgId);
+    const textElem = root ? root.querySelector('.msg-text') : null;
+    if (textElem) textElem.innerHTML = html;
+}
+
+function realtimeDecryptWait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function getCanonicalEncryptedMessage(msgId, peerId) {
+    if (!peerId || String(currentPeer) !== String(peerId)) return null;
+
+    try {
+        const res = await fetch('/api/messages', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({token, peer_id: peerId})
+        });
+        if (!res.ok) return null;
+
+        const data = await res.json();
+        const message = (data.messages || []).find(item => String(item.id) === String(msgId));
+        if (!message || typeof message.text !== 'string') return null;
+        return message.text;
+    } catch (e) {
+        console.warn('Canonical message fetch failed:', e);
+        return null;
+    }
+}
+
+function decryptErrorHtml() {
+    return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
+}
+
+// Переопределяем старую функцию. При событии Long Poll текст может прийти раньше,
+// чем VK вернёт его каноническую версию через getHistory. Поэтому повторяем
+// попытку и при необходимости берём точный текст сообщения из истории.
+tryDecryptMessageRealTime = async function(msgId, encryptedText) {
+    const jobKey = String(msgId);
+    if (decryptedCache[msgId]) {
+        setRealtimeDecryptState(msgId, escapeHtml(decryptedCache[msgId]));
+        return decryptedCache[msgId];
+    }
+    if (realtimeDecryptJobs.has(jobKey)) return realtimeDecryptJobs.get(jobKey);
+
+    const peerAtStart = currentPeer;
+    const job = (async () => {
+        let candidate = encryptedText;
+        const delays = [0, 120, 250, 500, 900, 1500, 2500, 4000];
+        let lastError = null;
+
+        for (let attempt = 0; attempt < delays.length; attempt++) {
+            if (String(currentPeer) !== String(peerAtStart)) return null;
+            if (delays[attempt]) await realtimeDecryptWait(delays[attempt]);
+
+            // После первой попытки всегда запрашиваем точную версию из истории VK.
+            if (attempt > 0) {
+                const canonical = await getCanonicalEncryptedMessage(msgId, peerAtStart);
+                if (canonical && canonical.startsWith(ENCRYPT_PREFIX)) candidate = canonical;
+            }
+
+            try {
+                if (!candidate || !candidate.startsWith(ENCRYPT_PREFIX)) {
+                    throw new Error('Encrypted payload is not ready');
+                }
+
+                if (!localKeyPair) await initClientCrypto();
+                if (!localKeyPair) throw new Error('E2EE key is not ready');
+
+                const encObj = JSON.parse(candidate.substring(ENCRYPT_PREFIX.length));
+                if (!encObj || !encObj.k1 || !encObj.k2 || !encObj.payload) {
+                    throw new Error('Incomplete encrypted payload');
+                }
+
+                const decBuf = await clientDecryptData(encObj);
+                if (!decBuf) throw new Error('The session key cannot be decrypted yet');
+
+                const plainText = new TextDecoder().decode(decBuf);
+                decryptedCache[msgId] = plainText;
+                setRealtimeDecryptState(msgId, escapeHtml(plainText));
+                return plainText;
+            } catch (e) {
+                lastError = e;
+                if (attempt < delays.length - 1) {
+                    setRealtimeDecryptState(
+                        msgId,
+                        '<span class="decrypting-shimmer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Расшифровка...</span>'
+                    );
+                }
+            }
+        }
+
+        console.error('Real-time decrypt failed after retries:', lastError);
+        setRealtimeDecryptState(msgId, decryptErrorHtml());
+        return null;
+    })();
+
+    realtimeDecryptJobs.set(jobKey, job);
+    try {
+        return await job;
+    } finally {
+        realtimeDecryptJobs.delete(jobKey);
+    }
+};
+
+function getSentMessageId(responseData) {
+    const result = responseData ? responseData.result : null;
+    if (typeof result === 'number' || typeof result === 'string') return result;
+    if (result && (typeof result.message_id === 'number' || typeof result.message_id === 'string')) {
+        return result.message_id;
+    }
+    if (result && (typeof result.id === 'number' || typeof result.id === 'string')) {
+        return result.id;
+    }
+    return null;
+}
+
+// Сохраняем открытый текст исходящего сообщения сразу по ID, возвращённому VK.
+// Это убирает гонку между messages.send, Long Poll и messages.getHistory.
+sendMessage = async function() {
+    const input = document.getElementById('msgInput');
+    const text = input.value.trim();
+    if (!text || !currentPeer) return;
+
+    const peerAtSend = currentPeer;
+    const replyAtSend = replyToMsg;
+    const editAtSend = editMsg;
+
+    showUploadProgress(editAtSend ? 'Сохранение...' : 'Отправка...');
+    input.value = '';
+    handleInputTyping();
+
+    let sendText = text;
+    if (encryptionEnabled) {
+        try {
+            const peerKey = await getPeerPubKey(peerAtSend);
+            if (peerKey) {
+                const plainBuf = new TextEncoder().encode(text).buffer;
+                const encObj = await clientEncryptData(peerKey, plainBuf);
+                sendText = ENCRYPT_PREFIX + JSON.stringify(encObj);
+            }
+        } catch (eEnc) {
+            console.error('E2EE encryption error, fallback to plain text:', eEnc);
+        }
+    }
+
+    const payload = {token, peer_id: peerAtSend, text: sendText};
+    if (replyAtSend) payload.reply_to = replyAtSend.id;
+    cancelReplyOrEdit();
+
+    try {
+        if (editAtSend) {
+            const res = await fetch('/api/edit', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    token,
+                    peer_id: peerAtSend,
+                    message_id: editAtSend.id,
+                    text: sendText
+                })
+            });
+            if (!res.ok) throw new Error('VK edit request failed');
+
+            // ID при редактировании уже известен.
+            if (sendText.startsWith(ENCRYPT_PREFIX)) {
+                decryptedCache[editAtSend.id] = text;
+                setRealtimeDecryptState(editAtSend.id, escapeHtml(text));
+            }
+        } else {
+            const res = await fetch('/api/send', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'VK send request failed');
+
+            const sentId = getSentMessageId(data);
+            if (sentId !== null && sendText.startsWith(ENCRYPT_PREFIX)) {
+                decryptedCache[sentId] = text;
+                setRealtimeDecryptState(sentId, escapeHtml(text));
+            }
+        }
+    } catch (errSend) {
+        console.error('Send error:', errSend);
+        input.value = text;
+        handleInputTyping();
+        alert('Ошибка сети при отправке!');
+    } finally {
+        hideUploadProgress();
+        if (String(currentPeer) === String(peerAtSend)) loadMessages(true);
+    }
+};
+
 </script>
 </body>
 </html>
@@ -3612,7 +4132,8 @@ def get_dialogs():
 def get_messages():
     token = request.json.get('token')
     peer_id = request.json.get('peer_id')
-    result = vk_request('messages.getHistory', token, peer_id=peer_id, count=200, offset=0, extended=1)
+    offset = request.json.get('offset', 0)
+    result = vk_request('messages.getHistory', token, peer_id=peer_id, count=200, offset=offset, extended=1)
 
     if isinstance(result, dict) and 'error' in result:
         return jsonify(result), 400
@@ -3936,7 +4457,7 @@ def wall_comments():
     owner_id = request.json.get('owner_id')
     post_id = request.json.get('post_id')
 
-    res = vk_request('wall.getComments', token, owner_id=owner_id, post_id=post_id, extended=1, count=50)
+    res = vk_request('wall.getComments', token, owner_id=owner_id, post_id=post_id, extended=1, count=50, fields='photo_50')
 
     if isinstance(res, dict) and 'error' in res:
         return jsonify({'comments': []})
