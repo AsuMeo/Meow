@@ -2197,30 +2197,21 @@ async function tryDecryptMessageRealTime(msgId, encryptedText) {
         if (decBuf) {
             const plainText = new TextDecoder().decode(decBuf);
             decryptedCache[msgId] = plainText;
-            const msgContainer = document.getElementById('msg-' + msgId);
-            if (msgContainer) {
-                const textElem = msgContainer.querySelector('.msg-text');
-                if (textElem) {
-                    textElem.innerHTML = escapeHtml(plainText);
-                }
+            const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
+            if (textElem) {
+                textElem.innerHTML = escapeHtml(plainText);
             }
         } else {
-            const msgContainer = document.getElementById('msg-' + msgId);
-            if (msgContainer) {
-                const textElem = msgContainer.querySelector('.msg-text');
-                if (textElem) {
-                    textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
-                }
+            const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
+            if (textElem) {
+                textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
             }
         }
     } catch(e) {
         console.error('Real-time decrypt error:', e);
-        const msgContainer = document.getElementById('msg-' + msgId);
-        if (msgContainer) {
-            const textElem = msgContainer.querySelector('.msg-text');
-            if (textElem) {
-                textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
-            }
+        const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
+        if (textElem) {
+            textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
         }
     }
 }
@@ -2280,30 +2271,12 @@ function renderMessageItem(containerOrFragment, msg) {
     if (isEncrypted) {
         if (decryptedCache[msg.id]) {
             displayText = decryptedCache[msg.id];
-            html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
+            html += '<div class="msg-text">' + escapeHtml(displayText) + '</div>';
         } else {
-            html += `<div class="msg-text"><span class="decrypting-shimmer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Расшифровка...</span></div>`;
-            // Мгновенная расшифровка для мобильных - без setTimeout
-            (async () => {
-                try {
-                    if (!localKeyPair) await initClientCrypto();
-                    if (!localKeyPair) return;
-                    const encObj = JSON.parse(msg.text.substring(ENCRYPT_PREFIX.length));
-                    const decBuf = await clientDecryptData(encObj);
-                    if (decBuf) {
-                        const plainText = new TextDecoder().decode(decBuf);
-                        decryptedCache[msg.id] = plainText;
-                        const msgEl = document.getElementById('msg-' + msg.id);
-                        if (msgEl) {
-                            const textEl = msgEl.querySelector('.msg-text');
-                            if (textEl) textEl.innerHTML = escapeHtml(plainText);
-                        }
-                    }
-                } catch(e) { console.error('Inline decrypt error:', e); }
-            })();
+            html += '<div class="msg-text" data-encrypted="' + msg.id + '"><span class="decrypting-shimmer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Расшифровка...</span></div>';
         }
     } else {
-        if (displayText) html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
+        if (displayText) html += '<div class="msg-text">' + escapeHtml(displayText) + '</div>';
     }
 
     if (msg.attachments) {
@@ -2421,6 +2394,10 @@ function renderMessageItem(containerOrFragment, msg) {
         containerOrFragment.appendChild(containerDiv);
     } else {
         container.appendChild(containerDiv);
+    }
+    // Запускаем расшифровку ПОСЛЕ вставки в DOM
+    if (isEncrypted && !decryptedCache[msg.id]) {
+        queueDecrypt(msg.id, msg.text);
     }
 }
 
@@ -3395,23 +3372,7 @@ async function pollEvents() {
                         
                         // FIX: Instant decryption for incoming messages inside the active chat screen
                         if (text && text.startsWith(ENCRYPT_PREFIX)) {
-                            (async () => {
-                                try {
-                                    if (!localKeyPair) await initClientCrypto();
-                                    if (!localKeyPair) return;
-                                    const encObj = JSON.parse(text.substring(ENCRYPT_PREFIX.length));
-                                    const decBuf = await clientDecryptData(encObj);
-                                    if (decBuf) {
-                                        const plainText = new TextDecoder().decode(decBuf);
-                                        decryptedCache[msgId] = plainText;
-                                        const msgEl = document.getElementById('msg-' + msgId);
-                                        if (msgEl) {
-                                            const textEl = msgEl.querySelector('.msg-text');
-                                            if (textEl) textEl.innerHTML = escapeHtml(plainText);
-                                        }
-                                    }
-                                } catch(e) { console.error('Poll decrypt error:', e); }
-                            })();
+                            queueDecrypt(msgId, text);
                         }
                     }
                 } else if (eventCode === 3) {
@@ -3454,6 +3415,39 @@ document.getElementById('msgInput').addEventListener('keypress', e => {
 
 let currentFolder = 'all';
 let customFolders = [];
+
+// ОЧЕРЕДЬ РАСШИФРОВКИ - для мобильных устройств
+let decryptQueue = [];
+let isDecrypting = false;
+
+async function processDecryptQueue() {
+    if (isDecrypting || decryptQueue.length === 0) return;
+    isDecrypting = true;
+    while (decryptQueue.length > 0) {
+        const task = decryptQueue.shift();
+        try {
+            if (!localKeyPair) await initClientCrypto();
+            if (!localKeyPair) continue;
+            const encObj = JSON.parse(task.text.substring(ENCRYPT_PREFIX.length));
+            const decBuf = await clientDecryptData(encObj);
+            if (decBuf) {
+                const plainText = new TextDecoder().decode(decBuf);
+                decryptedCache[task.msgId] = plainText;
+                const msgEl = document.getElementById('msg-' + task.msgId);
+                if (msgEl) {
+                    const textEl = msgEl.querySelector('.msg-text');
+                    if (textEl) textEl.innerHTML = escapeHtml(plainText);
+                }
+            }
+        } catch(e) { console.error('Queue decrypt error:', e); }
+    }
+    isDecrypting = false;
+}
+
+function queueDecrypt(msgId, text) {
+    decryptQueue.push({ msgId, text });
+    processDecryptQueue();
+}
 
 async function loadFolders() {
     try {
