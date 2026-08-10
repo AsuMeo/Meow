@@ -1712,9 +1712,7 @@ async function fastDecryptDialogPreviews(dialogs) {
                 try {
                     if (!localKeyPair) await initClientCrypto();
                     if (!localKeyPair) return;
-
-                    const cleanPayload = unescapeVkText(d.last_message.substring(ENCRYPT_PREFIX.length));
-                    const encObj = JSON.parse(cleanPayload);
+                    const encObj = JSON.parse(d.last_message.substring(ENCRYPT_PREFIX.length));
                     const decBuf = await clientDecryptData(encObj);
                     if (decBuf) {
                         const plainText = new TextDecoder().decode(decBuf);
@@ -2190,52 +2188,31 @@ async function loadMessages(initialScroll = false) {
 }
 
 // Function to handle on-demand real-time decryption safely inside current chat
-function unescapeVkText(str) {
-    if (!str) return '';
-    return str
-        .replace(/&quot;/g, '"')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&#39;/g, "'")
-        .replace(/&apos;/g, "'");
-}
-
 async function tryDecryptMessageRealTime(msgId, encryptedText) {
     try {
         if (!localKeyPair) await initClientCrypto();
         if (!localKeyPair) return;
-
-        const cleanPayload = unescapeVkText(encryptedText.substring(ENCRYPT_PREFIX.length));
-        const encObj = JSON.parse(cleanPayload);
+        const encObj = JSON.parse(encryptedText.substring(ENCRYPT_PREFIX.length));
         const decBuf = await clientDecryptData(encObj);
-
         if (decBuf) {
             const plainText = new TextDecoder().decode(decBuf);
             decryptedCache[msgId] = plainText;
-
-            setTimeout(() => {
-                const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
-                if (textElem) {
-                    textElem.innerHTML = escapeHtml(plainText);
-                }
-            }, 20);
+            const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
+            if (textElem) {
+                textElem.innerHTML = escapeHtml(plainText);
+            }
         } else {
-            setTimeout(() => {
-                const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
-                if (textElem) {
-                    textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
-                }
-            }, 20);
-        }
-    } catch(e) {
-        console.error('Real-time decrypt error:', e);
-        setTimeout(() => {
             const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
             if (textElem) {
                 textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
             }
-        }, 20);
+        }
+    } catch(e) {
+        console.error('Real-time decrypt error:', e);
+        const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
+        if (textElem) {
+            textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
+        }
     }
 }
 
@@ -2297,8 +2274,9 @@ function renderMessageItem(containerOrFragment, msg) {
             html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
         } else {
             html += `<div class="msg-text"><span class="decrypting-shimmer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Расшифровка...</span></div>`;
-            // Decrypt immediately without setTimeout delay
-            tryDecryptMessageRealTime(msg.id, msg.text);
+            setTimeout(() => {
+                tryDecryptMessageRealTime(msg.id, msg.text);
+            }, 50);
         }
     } else {
         if (displayText) html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
@@ -3324,7 +3302,7 @@ async function startLongPolling() {
     }
 }
 
-async async function pollEvents() {
+async function pollEvents() {
     if (!longPollServer || !longPollKey || !longPollTs) {
         setTimeout(startLongPolling, 2000);
         return;
@@ -3374,56 +3352,28 @@ async async function pollEvents() {
 
                     if (currentPeer && String(peerId) === String(currentPeer)) {
                         const isOut = (flags & 2) !== 0;
-                        const container = document.getElementById('messages');
-
-                        if (text && text.startsWith(ENCRYPT_PREFIX)) {
-                            // Encrypted msg — fetch full via API to ensure valid JSON + all fields
+                        const newMsg = {
+                            id: msgId,
+                            text: text,
+                            date: Math.floor(Date.now() / 1000),
+                            from_id: fromId,
+                            out: isOut ? 1 : 0,
+                            name: isOut ? 'Вы' : d?.name || 'Собеседник',
+                            photo: '',
+                            attachments: []
+                        };
+                        if (!renderedMsgIds.has(msgId)) {
                             renderedMsgIds.add(msgId);
-                            try {
-                                const res = await fetch('/api/message', {
-                                    method: 'POST',
-                                    headers: {'Content-Type': 'application/json'},
-                                    body: JSON.stringify({ token, message_id: msgId })
-                                });
-                                const fullMsg = await res.json();
-                                if (!fullMsg.error) {
-                                    // Remove placeholder if already rendered
-                                    const oldElem = document.getElementById('msg-' + msgId);
-                                    if (oldElem) oldElem.closest('.msg-container').remove();
-                                    renderedMsgIds.delete(msgId);
-                                    if (!renderedMsgIds.has(fullMsg.id)) {
-                                        renderedMsgIds.add(fullMsg.id);
-                                        renderMessageItem(container, fullMsg);
-                                        container.scrollTop = container.scrollHeight;
-                                    }
-                                }
-                            } catch(e) {
-                                console.error('Encrypted msg fetch failed:', e);
-                                // Fallback: render raw placeholder
-                                const newMsg = {
-                                    id: msgId, text, date: Math.floor(Date.now()/1000),
-                                    from_id: fromId, out: isOut?1:0,
-                                    name: isOut?'Вы':d?.name||'Собеседник', photo:'', attachments:[]
-                                };
-                                renderMessageItem(container, newMsg);
-                                container.scrollTop = container.scrollHeight;
-                            }
-                        } else {
-                            const newMsg = {
-                                id: msgId,
-                                text: text,
-                                date: Math.floor(Date.now() / 1000),
-                                from_id: fromId,
-                                out: isOut ? 1 : 0,
-                                name: isOut ? 'Вы' : d?.name || 'Собеседник',
-                                photo: '',
-                                attachments: []
-                            };
-                            if (!renderedMsgIds.has(msgId)) {
-                                renderedMsgIds.add(msgId);
-                                renderMessageItem(container, newMsg);
-                                container.scrollTop = container.scrollHeight;
-                            }
+                            const container = document.getElementById('messages');
+                            renderMessageItem(container, newMsg);
+                            container.scrollTop = container.scrollHeight;
+                        }
+                        
+                        // FIX: Instant decryption for incoming messages inside the active chat screen
+                        if (text && text.startsWith(ENCRYPT_PREFIX)) {
+                            setTimeout(() => {
+                                tryDecryptMessageRealTime(msgId, text);
+                            }, 50);
                         }
                     }
                 } else if (eventCode === 3) {
@@ -4002,38 +3952,6 @@ def get_messages():
             'reply_message': msg.get('reply_message')
         })
     return jsonify({'messages': messages})
-
-
-@app.route('/api/message', methods=['POST'])
-def get_message_by_id():
-    token = request.json.get('token')
-    message_id = request.json.get('message_id')
-
-    result = vk_request('messages.getById', token, message_ids=message_id, extended=1)
-
-    if isinstance(result, dict) and 'error' in result:
-        return jsonify(result), 400
-
-    items = result.get('items', [])
-    if not items:
-        return jsonify({'error': 'Message not found'}), 404
-
-    msg = items[0]
-    from_id = msg.get('from_id', 0)
-    profiles = {p['id']: p for p in result.get('profiles', [])}
-    profile = profiles.get(from_id, {})
-
-    return jsonify({
-        'id': msg.get('id'),
-        'text': msg.get('text', ''),
-        'date': msg.get('date', 0),
-        'from_id': from_id,
-        'out': msg.get('out', 0),
-        'name': profile.get('first_name', '') + ' ' + profile.get('last_name', ''),
-        'photo': profile.get('photo_50', ''),
-        'attachments': msg.get('attachments', []),
-        'reply_message': msg.get('reply_message')
-    })
 
 
 @app.route('/api/peer_status', methods=['POST'])
