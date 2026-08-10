@@ -1712,7 +1712,9 @@ async function fastDecryptDialogPreviews(dialogs) {
                 try {
                     if (!localKeyPair) await initClientCrypto();
                     if (!localKeyPair) return;
-                    const encObj = JSON.parse(d.last_message.substring(ENCRYPT_PREFIX.length));
+
+                    const cleanPayload = unescapeVkText(d.last_message.substring(ENCRYPT_PREFIX.length));
+                    const encObj = JSON.parse(cleanPayload);
                     const decBuf = await clientDecryptData(encObj);
                     if (decBuf) {
                         const plainText = new TextDecoder().decode(decBuf);
@@ -2188,31 +2190,52 @@ async function loadMessages(initialScroll = false) {
 }
 
 // Function to handle on-demand real-time decryption safely inside current chat
+function unescapeVkText(str) {
+    if (!str) return '';
+    return str
+        .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&#39;/g, "'")
+        .replace(/&apos;/g, "'");
+}
+
 async function tryDecryptMessageRealTime(msgId, encryptedText) {
     try {
         if (!localKeyPair) await initClientCrypto();
         if (!localKeyPair) return;
-        const encObj = JSON.parse(encryptedText.substring(ENCRYPT_PREFIX.length));
+
+        const cleanPayload = unescapeVkText(encryptedText.substring(ENCRYPT_PREFIX.length));
+        const encObj = JSON.parse(cleanPayload);
         const decBuf = await clientDecryptData(encObj);
+
         if (decBuf) {
             const plainText = new TextDecoder().decode(decBuf);
             decryptedCache[msgId] = plainText;
-            const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
-            if (textElem) {
-                textElem.innerHTML = escapeHtml(plainText);
-            }
+
+            setTimeout(() => {
+                const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
+                if (textElem) {
+                    textElem.innerHTML = escapeHtml(plainText);
+                }
+            }, 20);
         } else {
+            setTimeout(() => {
+                const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
+                if (textElem) {
+                    textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
+                }
+            }, 20);
+        }
+    } catch(e) {
+        console.error('Real-time decrypt error:', e);
+        setTimeout(() => {
             const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
             if (textElem) {
                 textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
             }
-        }
-    } catch(e) {
-        console.error('Real-time decrypt error:', e);
-        const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
-        if (textElem) {
-            textElem.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Ошибка расшифровки';
-        }
+        }, 20);
     }
 }
 
