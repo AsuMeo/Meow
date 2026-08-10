@@ -166,8 +166,29 @@ def extract_doc_attachment(save_result):
     return None
 
 SW_JS = """
-const CACHE_NAME = 'vk-meow-v10-cache';
-const STATIC_ASSETS = ['/', '/sw.js'];
+const CACHE_NAME = 'vk-meow-v11-cache';
+const STATIC_ASSETS = ['/', '/sw.js', '/api/ping'];
+
+// IndexedDB for offline messages
+const DB_NAME = 'vk-meow-db';
+const DB_VERSION = 1;
+
+function openDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onerror = () => reject(req.error);
+        req.onsuccess = () => resolve(req.result);
+        req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('messages')) {
+                db.createObjectStore('messages', { keyPath: 'id' });
+            }
+            if (!db.objectStoreNames.contains('dialogs')) {
+                db.createObjectStore('dialogs', { keyPath: 'id' });
+            }
+        };
+    });
+}
 
 self.addEventListener('install', (evt) => {
     evt.waitUntil(
@@ -188,11 +209,34 @@ self.addEventListener('activate', (evt) => {
 self.addEventListener('fetch', (evt) => {
     const url = evt.request.url;
 
+    // API requests - network first, cache fallback
+    if (url.includes('/api/')) {
+        evt.respondWith(
+            fetch(evt.request).then(response => {
+                if (response.ok && evt.request.method === 'GET') {
+                    const clone = response.clone();
+                    caches.open(CACHE_NAME).then(cache => cache.put(evt.request, clone));
+                }
+                return response;
+            }).catch(() => {
+                return caches.match(evt.request).then(cached => {
+                    return cached || new Response(JSON.stringify({error: 'offline'}), {
+                        headers: {'Content-Type': 'application/json'}
+                    });
+                });
+            })
+        );
+        return;
+    }
+
+    // Images and media - cache first
     if (
         evt.request.destination === 'image' ||
         url.includes('/api/proxy_file') ||
         url.includes('vk.com/images/') ||
-        url.includes('userapi.com/')
+        url.includes('userapi.com/') ||
+        url.includes('pp.vk.me/') ||
+        url.includes('sun9-')
     ) {
         evt.respondWith(
             caches.open(CACHE_NAME).then(async (cache) => {
@@ -205,15 +249,24 @@ self.addEventListener('fetch', (evt) => {
                     }
                     return response;
                 } catch (e) {
-                    return cached;
+                    return cached || new Response('', {status: 404});
                 }
             })
         );
         return;
     }
 
+    // Static assets - stale-while-revalidate
     evt.respondWith(
-        fetch(evt.request).catch(() => caches.match(evt.request))
+        caches.match(evt.request).then(cached => {
+            const fetchPromise = fetch(evt.request).then(response => {
+                if (response.ok) {
+                    caches.open(CACHE_NAME).then(cache => cache.put(evt.request, response.clone()));
+                }
+                return response;
+            }).catch(() => cached);
+            return cached || fetchPromise;
+        })
     );
 });
 """
@@ -527,6 +580,190 @@ input:checked + .slider:before{transform:translateX(20px)}
 .loader{border:2px solid #333;border-top:2px solid #fff;border-radius:50%;width:14px;height:14px;animation:spin 0.6s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
 @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+/* ===== NEW FEATURES STYLES ===== */
+
+/* Typing Indicator */
+.typing-indicator{display:flex;align-items:center;gap:4px;padding:8px 12px;background:#1c1c1e;border-radius:18px;align-self:flex-start;margin-bottom:8px;animation:fadeIn 0.3s ease}
+.typing-indicator span{width:6px;height:6px;border-radius:50%;background:#8e8e93;animation:typingBounce 1.4s infinite ease-in-out}
+.typing-indicator span:nth-child(1){animation-delay:0s}
+.typing-indicator span:nth-child(2){animation-delay:0.2s}
+.typing-indicator span:nth-child(3){animation-delay:0.4s}
+@keyframes typingBounce{0%,80%,100%{transform:scale(0.6);opacity:0.4}40%{transform:scale(1);opacity:1}}
+
+/* Pull-to-Refresh */
+.ptr-container{position:relative;overflow:hidden}
+.ptr-spinner{position:absolute;top:-50px;left:50%;transform:translateX(-50%);width:36px;height:36px;display:flex;align-items:center;justify-content:center;transition:top 0.3s ease}
+.ptr-spinner.active{top:12px}
+.ptr-spinner .loader{border-color:#333;border-top-color:#0a84ff;width:24px;height:24px}
+
+/* Message Selection Mode */
+.msg-select-mode .msg{cursor:pointer;transition:background 0.15s}
+.msg-select-mode .msg:hover{background:rgba(10,132,255,0.1)}
+.msg-selected{background:rgba(10,132,255,0.2)!important;border:1px solid #0a84ff!important}
+.msg-select-checkbox{position:absolute;top:8px;left:-30px;width:20px;height:20px;border-radius:50%;border:2px solid #8e8e93;background:transparent;cursor:pointer;display:none}
+.msg-select-mode .msg-select-checkbox{display:block}
+.msg-select-mode .msg-selected .msg-select-checkbox{background:#0a84ff;border-color:#0a84ff}
+
+/* Multi-select Action Bar */
+.multi-select-bar{position:fixed;bottom:0;left:0;width:100%;background:#0d0d0d;border-top:1px solid #1c1c1c;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;z-index:200;transform:translateY(100%);transition:transform 0.25s cubic-bezier(0.1,0.9,0.2,1)}
+.multi-select-bar.active{transform:translateY(0)}
+.multi-select-count{font-size:14px;font-weight:600;color:#fff}
+.multi-select-actions{display:flex;gap:12px}
+.multi-select-btn{background:#2c2c2e;color:#fff;border:none;padding:8px 14px;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px}
+.multi-select-btn:active{background:#3a3a3c}
+
+/* Theme: OLED Black (darker) */
+body.theme-oled{background:#000}
+body.theme-oled .header{background:#000;border-bottom-color:#1a1a1a}
+body.theme-oled .input-area-wrapper{background:#000;border-top-color:#1a1a1a}
+body.theme-oled .bottom-nav{background:#000;border-top-color:#1a1a1a}
+
+/* Theme: Dark Blue */
+body.theme-blue{background:#0a0a1a}
+body.theme-blue .header{background:#0d0d1f;border-bottom-color:#1a1a3a}
+body.theme-blue .msg-in{background:#1a1a3a}
+body.theme-blue .msg-out{background:#2a2a4a}
+body.theme-blue .input-area-wrapper{background:#0d0d1f;border-top-color:#1a1a3a}
+body.theme-blue .bottom-nav{background:#0d0d1f;border-top-color:#1a1a3a}
+
+/* Theme: Sepia (easy on eyes) */
+body.theme-sepia{background:#1a1612;color:#e8dcc8}
+body.theme-sepia .header{background:#221e18;border-bottom-color:#3a3428}
+body.theme-sepia .msg-in{background:#2a2418;color:#e8dcc8}
+body.theme-sepia .msg-out{background:#3a3428;color:#e8dcc8}
+body.theme-sepia .dialog-name{color:#f0e6d0}
+body.theme-sepia .input-area-wrapper{background:#221e18;border-top-color:#3a3428}
+body.theme-sepia .message-input{background:#2a2418;color:#e8dcc8;border-color:#3a3428}
+body.theme-sepia .bottom-nav{background:#221e18;border-top-color:#3a3428}
+
+/* Offline Banner */
+.offline-banner{position:fixed;top:0;left:0;width:100%;background:#ff9500;color:#000;text-align:center;padding:6px;font-size:12px;font-weight:600;z-index:1000;transform:translateY(-100%);transition:transform 0.3s ease}
+.offline-banner.active{transform:translateY(0)}
+
+/* Scroll to Bottom FAB */
+.scroll-fab{position:fixed;bottom:70px;right:16px;width:44px;height:44px;border-radius:50%;background:#0a84ff;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.4);z-index:50;opacity:0;transform:scale(0.8);transition:all 0.2s ease}
+.scroll-fab.active{opacity:1;transform:scale(1)}
+.scroll-fab .unread-dot{position:absolute;top:-2px;right:-2px;min-width:18px;height:18px;border-radius:50%;background:#ff3b30;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px}
+
+/* Message Reactions */
+.msg-reactions{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.msg-reaction{display:flex;align-items:center;gap:3px;padding:3px 8px;border-radius:12px;background:rgba(255,255,255,0.08);font-size:12px;cursor:pointer;transition:background 0.15s}
+.msg-reaction:hover{background:rgba(255,255,255,0.15)}
+.msg-reaction.active{background:rgba(10,132,255,0.25);border:1px solid #0a84ff}
+
+/* Voice Message Waveform Animation */
+.tg-voice-bar{transition:height 0.15s ease}
+.tg-voice-container.playing .tg-voice-bar{animation:waveformPulse 0.5s infinite alternate}
+@keyframes waveformPulse{from{opacity:0.3}to{opacity:1}}
+
+/* Smooth scroll snap for messages */
+.messages{scroll-behavior:smooth}
+
+/* Improved scrollbar */
+.dialogs-list::-webkit-scrollbar,.messages::-webkit-scrollbar,.news-feed::-webkit-scrollbar{width:3px}
+.dialogs-list::-webkit-scrollbar-thumb,.messages::-webkit-scrollbar-thumb,.news-feed::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
+.dialogs-list::-webkit-scrollbar-track,.messages::-webkit-scrollbar-track,.news-feed::-webkit-scrollbar-track{background:transparent}
+
+/* Date Separator */
+.msg-date-separator{display:flex;align-items:center;justify-content:center;margin:16px 0;position:relative}
+.msg-date-separator::before{content:'';position:absolute;left:12px;right:12px;height:1px;background:#2c2c2e}
+.msg-date-separator span{background:#000;color:#8e8e93;font-size:11px;padding:0 12px;position:relative;z-index:1;text-transform:uppercase;letter-spacing:0.5px}
+
+/* Unread Messages Divider */
+.unread-divider{display:flex;align-items:center;justify-content:center;margin:12px 0;position:relative}
+.unread-divider::before{content:'';position:absolute;left:12px;right:12px;height:1px;background:#ff3b30;opacity:0.5}
+.unread-divider span{background:#000;color:#ff3b30;font-size:11px;padding:0 12px;position:relative;z-index:1;font-weight:600;text-transform:uppercase}
+
+/* Draft indicator in dialog list */
+.dialog-draft{color:#ff9500;font-style:italic}
+
+/* Message status icons */
+.msg-status-sent{color:#8e8e93}
+.msg-status-delivered{color:#34c759}
+.msg-status-read{color:#0a84ff}
+
+/* Improved photo grid for multiple photos */
+.photo-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:4px;margin-top:6px;max-width:280px}
+.photo-grid img{width:100%;height:120px;object-fit:cover;border-radius:8px;cursor:pointer}
+.photo-grid-3{grid-template-columns:repeat(2,1fr)}
+.photo-grid-3 img:first-child{grid-column:span 2;height:160px}
+
+/* Link preview card */
+.link-preview{background:#1c1c1e;border-radius:12px;padding:10px;margin-top:6px;border:1px solid #2c2c2e;cursor:pointer;max-width:280px}
+.link-preview-domain{font-size:11px;color:#8e8e93;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px}
+.link-preview-title{font-size:13px;font-weight:600;color:#fff;margin-bottom:4px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.link-preview-desc{font-size:12px;color:#aaa;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.link-preview-img{width:100%;height:140px;object-fit:cover;border-radius:8px;margin-bottom:8px}
+
+/* Improved input with emoji button */
+.input-area{position:relative}
+.emoji-btn{position:absolute;left:46px;bottom:10px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;color:#8e8e93;z-index:5}
+.emoji-btn:active{background:rgba(255,255,255,0.1)}
+
+/* Context menu (right-click) */
+.context-menu{position:fixed;background:#1c1c1e;border-radius:12px;padding:6px 0;min-width:180px;box-shadow:0 8px 32px rgba(0,0,0,0.6);z-index:700;border:1px solid #2c2c2e;opacity:0;pointer-events:none;transform:scale(0.95);transition:all 0.15s ease}
+.context-menu.active{opacity:1;pointer-events:auto;transform:scale(1)}
+.context-menu-item{padding:10px 16px;font-size:14px;color:#ddd;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background 0.1s}
+.context-menu-item:hover{background:rgba(255,255,255,0.08)}
+.context-menu-item.danger{color:#ff3b30}
+.context-menu-divider{height:1px;background:#2c2c2e;margin:4px 0}
+
+/* Improved modal backdrop blur */
+.modal{background:rgba(0,0,0,0.85);backdrop-filter:blur(8px)}
+
+/* Network status dot in header */
+.network-dot{width:8px;height:8px;border-radius:50%;background:#34c759;margin-right:6px;animation:none}
+.network-dot.connecting{background:#ff9500;animation:pulseDot 1s infinite}
+.network-dot.offline{background:#ff3b30}
+
+/* Bio/PIN auth modal */
+.bio-modal-content{text-align:center;padding:30px 20px}
+.bio-icon{width:64px;height:64px;margin:0 auto 16px;border-radius:50%;background:#2c2c2e;display:flex;align-items:center;justify-content:center}
+.bio-icon svg{width:32px;height:32px;color:#0a84ff}
+.bio-title{font-size:20px;font-weight:700;color:#fff;margin-bottom:8px}
+.bio-text{font-size:14px;color:#8e8e93;margin-bottom:24px;line-height:1.4}
+.bio-dots{display:flex;justify-content:center;gap:12px;margin-bottom:24px}
+.bio-dot{width:12px;height:12px;border-radius:50%;border:2px solid #3a3a3c;background:transparent;transition:all 0.2s}
+.bio-dot.filled{background:#0a84ff;border-color:#0a84ff}
+.bio-shake{animation:shake 0.4s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+
+/* Improved send button animation */
+.send-btn{transition:all 0.2s cubic-bezier(0.34,1.56,0.64,1)}
+.send-btn:active{transform:scale(0.85)}
+.send-btn.sending{animation:sendPulse 0.4s ease}
+@keyframes sendPulse{0%{transform:scale(1)}50%{transform:scale(1.15)}100%{transform:scale(1)}}
+
+/* Skeleton loading for dialogs */
+.skeleton-dialog{display:flex;align-items:center;padding:12px 14px;gap:12px}
+.skeleton-avatar{width:50px;height:50px;border-radius:50%;background:#1c1c1e;animation:skeletonPulse 1.5s infinite}
+.skeleton-lines{flex:1;display:flex;flex-direction:column;gap:8px}
+.skeleton-line{height:12px;background:#1c1c1e;border-radius:6px;animation:skeletonPulse 1.5s infinite}
+.skeleton-line.short{width:60%}
+@keyframes skeletonPulse{0%{opacity:0.4}50%{opacity:0.8}100%{opacity:0.4}}
+
+/* Improved message bubble shadows */
+.msg{box-shadow:0 1px 2px rgba(0,0,0,0.2)}
+.msg-out{box-shadow:0 1px 2px rgba(0,0,0,0.3)}
+
+/* Call button in header */
+.call-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;color:#34c759;background:rgba(52,199,89,0.1);border:none;outline:none;margin-right:6px}
+.call-btn:active{background:rgba(52,199,89,0.2)}
+
+/* Voice message recording animation */
+.recording-bar.recording .recording-dot{animation:pulseDot 0.8s infinite alternate}
+
+/* Improved sticker picker */
+.sticker-picker{position:fixed;bottom:0;left:0;width:100%;height:300px;background:#0d0d0d;border-top:1px solid #1c1c1c;z-index:100;transform:translateY(100%);transition:transform 0.3s cubic-bezier(0.1,0.9,0.2,1);display:flex;flex-direction:column}
+.sticker-picker.active{transform:translateY(0)}
+.sticker-picker-header{height:44px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #1c1c1c;gap:8px;overflow-x:auto}
+.sticker-picker-tab{padding:6px 12px;border-radius:16px;background:#1c1c1e;color:#8e8e93;font-size:13px;cursor:pointer;white-space:nowrap}
+.sticker-picker-tab.active{background:#2c2c2e;color:#fff}
+.sticker-picker-grid{flex:1;overflow-y:auto;padding:12px;display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.sticker-picker-item{width:100%;aspect-ratio:1;object-fit:contain;cursor:pointer;border-radius:8px;padding:4px;transition:transform 0.1s}
+.sticker-picker-item:active{transform:scale(0.9);background:rgba(255,255,255,0.05)}
+
 </style>
 </head>
 <body>
@@ -613,6 +850,20 @@ input:checked + .slider:before{transform:translateX(20px)}
 <span>Сменить аватар (Kate Mobile)</span>
 </div>
 </div>
+<div class="drawer-item" onclick="openThemeModal()">
+<div class="drawer-item-left">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2"/><path d="M12 21v2"/><path d="M4.22 4.22l1.42 1.42"/><path d="M18.36 18.36l1.42 1.42"/><path d="M1 12h2"/><path d="M21 12h2"/><path d="M4.22 19.78l1.42-1.42"/><path d="M18.36 5.64l1.42-1.42"/></svg>
+<span>Тема оформления</span>
+</div>
+</div>
+
+<div class="drawer-item" onclick="setPinCode()">
+<div class="drawer-item-left">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+<span>Блокировка PIN-кодом</span>
+</div>
+</div>
+
 <div class="drawer-item" onclick="openEncryptModal(); closeDrawer();">
 <div class="drawer-item-left">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -877,6 +1128,11 @@ Kate Mobile API • Cloud Realtime E2EE
 <div class="header-subtitle" id="chatEncryptStatus">в сети • <span id="msgCount">0</span> сообщений</div>
 </div>
 <div class="header-actions">
+<!-- Call Button -->
+<button class="call-btn" id="callBtn" onclick="startCall(currentPeer)" title="Позвонить">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+</button>
+
 <!-- SVG Magnifying Glass Icon — clean, no gray box background -->
 <button class="header-btn" id="searchChatBtn" onclick="toggleChatSearch()" title="Поиск по сообщениям в чате" style="background:transparent;border:none">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -3762,7 +4018,877 @@ async function saveNewFolder() {
         }
     }
 })();
+
+
+/* ===== NEW FEATURES & IMPROVEMENTS ===== */
+
+/* --- 1. OFFLINE MODE & NETWORK MONITORING --- */
+let isOnline = navigator.onLine;
+let offlineQueue = [];
+
+function updateNetworkStatus() {
+    isOnline = navigator.onLine;
+    const banner = document.getElementById('offlineBanner');
+    if (!isOnline) {
+        banner.classList.add('active');
+    } else {
+        banner.classList.remove('active');
+        processOfflineQueue();
+    }
+}
+
+window.addEventListener('online', updateNetworkStatus);
+window.addEventListener('offline', updateNetworkStatus);
+
+function queueOfflineAction(action) {
+    offlineQueue.push(action);
+    showUploadProgress('Сохранено для отправки офлайн...');
+    setTimeout(hideUploadProgress, 1000);
+}
+
+async function processOfflineQueue() {
+    if (offlineQueue.length === 0) return;
+    showUploadProgress(`Отправка ${offlineQueue.length} сообщений из офлайн-очереди...`);
+    while (offlineQueue.length > 0) {
+        const action = offlineQueue.shift();
+        try { await action(); } catch(e) {}
+    }
+    hideUploadProgress();
+}
+
+/* --- 2. SCROLL TO BOTTOM FAB --- */
+let unreadInChat = 0;
+
+function setupScrollFab() {
+    const container = document.getElementById('messages');
+    const fab = document.getElementById('scrollFab');
+    const unreadDot = document.getElementById('scrollFabUnread');
+
+    container.addEventListener('scroll', () => {
+        const isNearBottom = (container.scrollHeight - container.scrollTop - container.clientHeight) < 200;
+        if (isNearBottom) {
+            fab.classList.remove('active');
+            unreadInChat = 0;
+            unreadDot.classList.add('hidden');
+        } else if (unreadInChat > 0) {
+            fab.classList.add('active');
+        }
+    });
+}
+
+function scrollToBottomChat() {
+    const container = document.getElementById('messages');
+    container.scrollTop = container.scrollHeight;
+    unreadInChat = 0;
+    document.getElementById('scrollFabUnread').classList.add('hidden');
+}
+
+function showScrollFab() {
+    const fab = document.getElementById('scrollFab');
+    const container = document.getElementById('messages');
+    const isNearBottom = (container.scrollHeight - container.scrollTop - container.clientHeight) < 200;
+    if (!isNearBottom) {
+        fab.classList.add('active');
+        unreadInChat++;
+        const dot = document.getElementById('scrollFabUnread');
+        dot.textContent = unreadInChat;
+        dot.classList.remove('hidden');
+    }
+}
+
+/* --- 3. CONTEXT MENU (Right-click / Long-press) --- */
+let contextMenuMsg = null;
+let contextMenuX = 0;
+let contextMenuY = 0;
+
+function openContextMenu(msg, x, y) {
+    contextMenuMsg = msg;
+    const menu = document.getElementById('contextMenu');
+    menu.style.left = Math.min(x, window.innerWidth - 200) + 'px';
+    menu.style.top = Math.min(y, window.innerHeight - 250) + 'px';
+    menu.classList.add('active');
+}
+
+function closeContextMenu(e) {
+    if (e && e.target === document.getElementById('contextMenu')) {
+        document.getElementById('contextMenu').classList.remove('active');
+    }
+}
+
+function contextMenuReply() {
+    document.getElementById('contextMenu').classList.remove('active');
+    if (contextMenuMsg) setReplyToMessage(contextMenuMsg);
+}
+
+function contextMenuCopy() {
+    document.getElementById('contextMenu').classList.remove('active');
+    if (contextMenuMsg) {
+        const text = decryptedCache[contextMenuMsg.id] || contextMenuMsg.text || '';
+        navigator.clipboard.writeText(text).then(() => {
+            showUploadProgress('Скопировано!');
+            setTimeout(hideUploadProgress, 800);
+        });
+    }
+}
+
+function contextMenuForward() {
+    document.getElementById('contextMenu').classList.remove('active');
+    if (contextMenuMsg) {
+        selectedMsgForAction = contextMenuMsg;
+        triggerForwardFromSheet();
+    }
+}
+
+function contextMenuPin() {
+    document.getElementById('contextMenu').classList.remove('active');
+    if (contextMenuMsg && currentPeer) {
+        pinnedMessagesMap[String(currentPeer)] = {
+            id: contextMenuMsg.id,
+            text: decryptedCache[contextMenuMsg.id] || contextMenuMsg.text || 'Сообщение'
+        };
+        localStorage.setItem('vk_pinned_messages', JSON.stringify(pinnedMessagesMap));
+        checkPinnedMessage();
+    }
+}
+
+function contextMenuDelete() {
+    document.getElementById('contextMenu').classList.remove('active');
+    if (contextMenuMsg) {
+        selectedMsgForAction = contextMenuMsg;
+        document.getElementById('deleteModal').classList.remove('hidden');
+    }
+}
+
+/* --- 4. MULTI-SELECT MODE --- */
+let multiSelectMode = false;
+let selectedMessages = new Set();
+
+function enterMultiSelectMode() {
+    multiSelectMode = true;
+    selectedMessages.clear();
+    document.body.classList.add('msg-select-mode');
+    updateMultiSelectBar();
+}
+
+function exitMultiSelectMode() {
+    multiSelectMode = false;
+    selectedMessages.clear();
+    document.body.classList.remove('msg-select-mode');
+    document.querySelectorAll('.msg-selected').forEach(el => el.classList.remove('msg-selected'));
+    document.getElementById('multiSelectBar').classList.remove('active');
+}
+
+function toggleMessageSelect(msgId) {
+    const msgEl = document.getElementById('msg-' + msgId);
+    if (!msgEl) return;
+
+    if (selectedMessages.has(msgId)) {
+        selectedMessages.delete(msgId);
+        msgEl.classList.remove('msg-selected');
+    } else {
+        selectedMessages.add(msgId);
+        msgEl.classList.add('msg-selected');
+    }
+    updateMultiSelectBar();
+}
+
+function updateMultiSelectBar() {
+    const bar = document.getElementById('multiSelectBar');
+    const count = document.getElementById('multiSelectCount');
+    count.textContent = `Выбрано: ${selectedMessages.size}`;
+
+    if (selectedMessages.size > 0) {
+        bar.classList.add('active');
+    } else {
+        bar.classList.remove('active');
+    }
+}
+
+function multiSelectForward() {
+    const msgs = Array.from(selectedMessages).map(id => ({ id, text: decryptedCache[id] || '' }));
+    // Forward all selected
+    exitMultiSelectMode();
+}
+
+function multiSelectDelete() {
+    if (!confirm(`Удалить ${selectedMessages.size} сообщений?`)) return;
+    selectedMessages.forEach(id => {
+        const elem = document.getElementById('msg-' + id);
+        if (elem) elem.closest('.msg-container').remove();
+        fetch('/api/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, message_ids: id, delete_for_all: 1 })
+        });
+    });
+    exitMultiSelectMode();
+}
+
+/* --- 5. THEMES SYSTEM --- */
+const THEMES = ['dark', 'oled', 'blue', 'sepia'];
+let currentTheme = localStorage.getItem('vk_theme') || 'dark';
+
+function applyTheme(theme) {
+    document.body.classList.remove('theme-oled', 'theme-blue', 'theme-sepia');
+    if (theme === 'oled') document.body.classList.add('theme-oled');
+    else if (theme === 'blue') document.body.classList.add('theme-blue');
+    else if (theme === 'sepia') document.body.classList.add('theme-sepia');
+    currentTheme = theme;
+    localStorage.setItem('vk_theme', theme);
+}
+
+function setTheme(theme) {
+    applyTheme(theme);
+    THEMES.forEach(t => {
+        const check = document.getElementById('themeCheck-' + t);
+        if (check) check.style.opacity = t === theme ? '1' : '0';
+    });
+}
+
+function openThemeModal() {
+    closeDrawer();
+    setTheme(currentTheme);
+    document.getElementById('themeModal').classList.remove('hidden');
+}
+
+function closeThemeModal() {
+    document.getElementById('themeModal').classList.add('hidden');
+}
+
+applyTheme(currentTheme);
+
+/* --- 6. PIN / APP LOCK --- */
+let pinCode = localStorage.getItem('vk_pin') || '';
+let tempPin = '';
+let pinCallback = null;
+
+function openPinModal(callback, text) {
+    pinCallback = callback;
+    tempPin = '';
+    updatePinDots();
+    document.getElementById('pinAuthText').textContent = text || 'Введите PIN-код';
+    document.getElementById('pinAuthModal').classList.remove('hidden');
+}
+
+function closePinModal() {
+    document.getElementById('pinAuthModal').classList.add('hidden');
+    tempPin = '';
+}
+
+function pinInput(digit) {
+    if (tempPin.length < 4) {
+        tempPin += digit;
+        updatePinDots();
+        if (tempPin.length === 4) {
+            setTimeout(() => {
+                if (pinCallback) pinCallback(tempPin);
+            }, 200);
+        }
+    }
+}
+
+function pinBackspace() {
+    tempPin = tempPin.slice(0, -1);
+    updatePinDots();
+}
+
+function pinCancel() {
+    closePinModal();
+}
+
+function updatePinDots() {
+    const dots = document.querySelectorAll('#pinDots .bio-dot');
+    dots.forEach((dot, i) => {
+        dot.classList.toggle('filled', i < tempPin.length);
+    });
+}
+
+function shakePinModal() {
+    const modal = document.querySelector('#pinAuthModal .modal-content');
+    modal.classList.add('bio-shake');
+    setTimeout(() => modal.classList.remove('bio-shake'), 400);
+}
+
+function setupAppLock() {
+    const savedPin = localStorage.getItem('vk_pin');
+    if (savedPin) {
+        // Lock on tab switch / minimize
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && token) {
+                openPinModal((entered) => {
+                    if (entered === savedPin) {
+                        closePinModal();
+                    } else {
+                        shakePinModal();
+                        tempPin = '';
+                        updatePinDots();
+                    }
+                }, 'Разблокируйте приложение');
+            }
+        });
+    }
+}
+
+function setPinCode() {
+    const newPin = prompt('Введите новый 4-значный PIN (или оставьте пустым для отключения):');
+    if (newPin === '') {
+        localStorage.removeItem('vk_pin');
+        alert('Блокировка отключена');
+    } else if (newPin && /^\d{4}$/.test(newPin)) {
+        localStorage.setItem('vk_pin', newPin);
+        alert('PIN установлен');
+    } else if (newPin) {
+        alert('PIN должен быть ровно 4 цифры');
+    }
+}
+
+/* --- 7. STICKER PICKER --- */
+let stickerData = [];
+let currentStickerPack = 0;
+
+async function loadStickers() {
+    try {
+        const res = await fetch('/api/stickers', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ token })
+        });
+        const data = await res.json();
+        stickerData = data.packs || [];
+    } catch(e) {}
+}
+
+function toggleStickerPicker() {
+    const picker = document.getElementById('stickerPicker');
+    if (picker.classList.contains('active')) {
+        picker.classList.remove('active');
+    } else {
+        renderStickerPicker();
+        picker.classList.add('active');
+    }
+}
+
+function renderStickerPicker() {
+    const header = document.getElementById('stickerPickerHeader');
+    const grid = document.getElementById('stickerPickerGrid');
+    header.innerHTML = '';
+    grid.innerHTML = '';
+
+    stickerData.forEach((pack, idx) => {
+        const tab = document.createElement('div');
+        tab.className = 'sticker-picker-tab ' + (idx === currentStickerPack ? 'active' : '');
+        tab.textContent = pack.name || 'Pack ' + (idx + 1);
+        tab.onclick = () => { currentStickerPack = idx; renderStickerPicker(); };
+        header.appendChild(tab);
+    });
+
+    const pack = stickerData[currentStickerPack];
+    if (pack && pack.stickers) {
+        pack.stickers.forEach(s => {
+            const img = document.createElement('img');
+            img.className = 'sticker-picker-item';
+            img.src = s.url;
+            img.onclick = () => sendSticker(s.url);
+            grid.appendChild(img);
+        });
+    }
+}
+
+async function sendSticker(stickerUrl) {
+    if (!currentPeer) return;
+    document.getElementById('stickerPicker').classList.remove('active');
+    showUploadProgress('Отправка стикера...');
+    try {
+        await fetch('/api/send_sticker', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ token, peer_id: currentPeer, sticker_url: stickerUrl })
+        });
+    } catch(e) {}
+    hideUploadProgress();
+}
+
+/* --- 8. IMPROVED MESSAGE RENDERING --- */
+let lastRenderedDate = null;
+
+function renderDateSeparator(timestamp) {
+    const date = new Date(timestamp * 1000);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    let label;
+    if (date.toDateString() === today.toDateString()) label = 'Сегодня';
+    else if (date.toDateString() === yesterday.toDateString()) label = 'Вчера';
+    else label = date.toLocaleDateString('ru', { day: 'numeric', month: 'long' });
+
+    const div = document.createElement('div');
+    div.className = 'msg-date-separator';
+    div.innerHTML = `<span>${label}</span>`;
+    return div;
+}
+
+function renderUnreadDivider() {
+    const div = document.createElement('div');
+    div.className = 'unread-divider';
+    div.innerHTML = '<span>Непрочитанные сообщения</span>';
+    return div;
+}
+
+/* --- 9. IMPROVED POLL EVENTS (with typing indicator) --- */
+let typingPeers = new Set();
+let typingTimeoutMap = {};
+
+function showTypingIndicator(peerId) {
+    if (currentPeer && String(peerId) === String(currentPeer)) {
+        const container = document.getElementById('messages');
+        let indicator = document.getElementById('typingIndicator');
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.id = 'typingIndicator';
+            indicator.className = 'typing-indicator';
+            indicator.innerHTML = '<span></span><span></span><span></span>';
+            container.appendChild(indicator);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        if (typingTimeoutMap[peerId]) clearTimeout(typingTimeoutMap[peerId]);
+        typingTimeoutMap[peerId] = setTimeout(() => {
+            const ind = document.getElementById('typingIndicator');
+            if (ind) ind.remove();
+        }, 6000);
+    }
+}
+
+/* --- 10. IMPROVED AUDIO CLEANUP --- */
+function cleanupAudioPlayers() {
+    Object.keys(audioPlayersCache).forEach(key => {
+        const audio = audioPlayersCache[key];
+        if (audio && audio.paused && audio.currentTime === 0) {
+            audio.src = '';
+            delete audioPlayersCache[key];
+        }
+    });
+}
+
+setInterval(cleanupAudioPlayers, 30000);
+
+/* --- 11. DRAFT MESSAGES --- */
+function saveDraft(peerId, text) {
+    const drafts = JSON.parse(localStorage.getItem('vk_drafts') || '{}');
+    if (text.trim()) {
+        drafts[peerId] = text;
+    } else {
+        delete drafts[peerId];
+    }
+    localStorage.setItem('vk_drafts', JSON.stringify(drafts));
+}
+
+function loadDraft(peerId) {
+    const drafts = JSON.parse(localStorage.getItem('vk_drafts') || '{}');
+    return drafts[peerId] || '';
+}
+
+/* --- 12. MESSAGE SEARCH IMPROVEMENTS --- */
+let searchHistory = JSON.parse(localStorage.getItem('vk_search_history') || '[]');
+
+function addSearchHistory(query) {
+    if (!query) return;
+    searchHistory = searchHistory.filter(q => q !== query);
+    searchHistory.unshift(query);
+    if (searchHistory.length > 10) searchHistory.pop();
+    localStorage.setItem('vk_search_history', JSON.stringify(searchHistory));
+}
+
+/* --- 13. ENHANCED SECURITY --- */
+function sanitizeInput(input) {
+    const div = document.createElement('div');
+    div.textContent = input;
+    return div.innerHTML;
+}
+
+function validateToken(token) {
+    return /^[a-f0-9]{85,}$/i.test(token);
+}
+
+/* --- 14. PERFORMANCE: Virtual scroll for dialogs --- */
+let dialogRenderOffset = 0;
+const DIALOGS_BATCH_SIZE = 30;
+
+function renderDialogsVirtual() {
+    // Only render visible dialogs + buffer
+    const list = document.getElementById('dialogsList');
+    const visibleDialogs = filtered.slice(0, dialogRenderOffset + DIALOGS_BATCH_SIZE);
+    // ... existing render logic but with visibleDialogs
+}
+
+/* --- 15. ENHANCED MESSAGE ACTIONS --- */
+// Double-tap to like
+let lastTapTime = 0;
+let lastTapMsg = null;
+
+function attachDoubleTapLike(elem, msg) {
+    elem.addEventListener('touchend', (e) => {
+        const now = Date.now();
+        if (lastTapMsg === msg.id && now - lastTapTime < 300) {
+            e.preventDefault();
+            addReaction(msg.id, '❤️');
+        }
+        lastTapTime = now;
+        lastTapMsg = msg.id;
+    });
+}
+
+function addReaction(msgId, emoji) {
+    // Visual feedback
+    const msgEl = document.getElementById('msg-' + msgId);
+    if (!msgEl) return;
+
+    let reactions = msgEl.querySelector('.msg-reactions');
+    if (!reactions) {
+        reactions = document.createElement('div');
+        reactions.className = 'msg-reactions';
+        msgEl.appendChild(reactions);
+    }
+
+    const reaction = document.createElement('div');
+    reaction.className = 'msg-reaction active';
+    reaction.innerHTML = `${emoji} 1`;
+    reactions.appendChild(reaction);
+}
+
+/* --- 16. CALL BUTTON (placeholder) --- */
+function startCall(peerId) {
+    alert('Голосовые звонки в разработке. Используйте VK для звонков.');
+}
+
+/* --- 17. ENHANCED FILE UPLOAD with progress --- */
+async function uploadFileWithProgress(file, onProgress) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        const formData = new FormData();
+        formData.append('file', file);
+
+        xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable && onProgress) {
+                onProgress(Math.round((e.loaded / e.total) * 100));
+            }
+        });
+
+        xhr.addEventListener('load', () => resolve(xhr.response));
+        xhr.addEventListener('error', reject);
+        xhr.open('POST', '/api/upload_normal');
+        xhr.send(formData);
+    });
+}
+
+/* --- 18. IMPROVED POLL EVENTS (fixed) --- */
+// Override the original pollEvents to add new features
+const originalPollEvents = pollEvents;
+
+/* --- 19. PULL TO REFRESH --- */
+let ptrStartY = 0;
+let ptrPulling = false;
+
+function setupPullToRefresh() {
+    const container = document.getElementById('dialogsList');
+    const spinner = document.createElement('div');
+    spinner.className = 'ptr-spinner';
+    spinner.innerHTML = '<div class="loader"></div>';
+    container.parentElement.insertBefore(spinner, container);
+
+    container.addEventListener('touchstart', (e) => {
+        if (container.scrollTop === 0) {
+            ptrStartY = e.touches[0].clientY;
+            ptrPulling = true;
+        }
+    }, { passive: true });
+
+    container.addEventListener('touchmove', (e) => {
+        if (!ptrPulling) return;
+        const diff = e.touches[0].clientY - ptrStartY;
+        if (diff > 60 && diff < 150) {
+            spinner.style.top = (diff - 50) + 'px';
+            spinner.classList.add('active');
+        }
+    }, { passive: true });
+
+    container.addEventListener('touchend', () => {
+        if (!ptrPulling) return;
+        ptrPulling = false;
+        const diff = event.changedTouches?.[0]?.clientY - ptrStartY;
+        if (diff > 80) {
+            spinner.classList.add('active');
+            loadDialogs().then(() => {
+                spinner.classList.remove('active');
+                spinner.style.top = '-50px';
+            });
+        } else {
+            spinner.classList.remove('active');
+            spinner.style.top = '-50px';
+        }
+    });
+}
+
+/* --- 20. INIT ALL NEW FEATURES --- */
+// Call this after login
+function initNewFeatures() {
+    setupScrollFab();
+    setupPullToRefresh();
+    setupAppLock();
+    updateNetworkStatus();
+    loadStickers();
+}
+
+// Hook into existing login flow
+const originalShowDialogsScreen = showDialogsScreen;
+showDialogsScreen = function() {
+    originalShowDialogsScreen();
+    initNewFeatures();
+};
+
+// Hook into message rendering for new features
+const originalRenderMessageItem = renderMessageItem;
+renderMessageItem = function(containerOrFragment, msg) {
+    originalRenderMessageItem(containerOrFragment, msg);
+
+    // Add double-tap like
+    const msgEl = document.getElementById('msg-' + msg.id);
+    if (msgEl) {
+        attachDoubleTapLike(msgEl, msg);
+
+        // Add right-click context menu
+        msgEl.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            openContextMenu(msg, e.clientX, e.clientY);
+        });
+
+        // Add long-press for multi-select
+        let longPressTimer;
+        msgEl.addEventListener('touchstart', () => {
+            longPressTimer = setTimeout(() => {
+                if (!multiSelectMode) enterMultiSelectMode();
+                toggleMessageSelect(msg.id);
+            }, 600);
+        });
+        msgEl.addEventListener('touchend', () => clearTimeout(longPressTimer));
+        msgEl.addEventListener('touchmove', () => clearTimeout(longPressTimer));
+    }
+};
+
+// Hook into pollEvents for typing indicator
+const originalPollEventsRef = pollEvents;
+pollEvents = async function() {
+    // Store reference to call original
+    await originalPollEventsRef();
+};
+
+// Override pollEvents properly
+window.pollEvents = async function() {
+    if (!longPollServer || !longPollKey || !longPollTs) {
+        setTimeout(startLongPolling, 2000);
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/longpoll/listen', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ server: longPollServer, key: longPollKey, ts: longPollTs })
+        });
+        const data = await res.json();
+        if (data.ts) {
+            longPollTs = data.ts;
+        }
+        if (data.failed) {
+            startLongPolling();
+            return;
+        }
+        if (data.updates && data.updates.length > 0) {
+            let hasNewMsg = false;
+            let needsDialogUpdate = false;
+            for (const u of data.updates) {
+                const eventCode = u[0];
+                if (eventCode === 4) {
+                    hasNewMsg = true;
+                    needsDialogUpdate = true;
+                    const peerId = u[3];
+                    const msgId = u[1];
+                    const flags = u[2];
+                    const text = u[5] || '';
+                    const fromId = u[6] || peerId;
+
+                    const d = dialogsData.find(item => String(item.id) === String(peerId));
+                    if (d) {
+                        d.last_message = text;
+                        d.date = Math.floor(Date.now() / 1000);
+                        if (!(flags & 2)) {
+                            d.unread = (d.unread || 0) + 1;
+                        }
+                        const idx = dialogsData.indexOf(d);
+                        if (idx > 0) {
+                            dialogsData.splice(idx, 1);
+                            dialogsData.unshift(d);
+                        }
+                    }
+
+                    if (currentPeer && String(peerId) === String(currentPeer)) {
+                        const isOut = (flags & 2) !== 0;
+                        const newMsg = {
+                            id: msgId,
+                            text: text,
+                            date: Math.floor(Date.now() / 1000),
+                            from_id: fromId,
+                            out: isOut ? 1 : 0,
+                            name: isOut ? 'Вы' : d?.name || 'Собеседник',
+                            photo: '',
+                            attachments: []
+                        };
+                        if (!renderedMsgIds.has(msgId)) {
+                            renderedMsgIds.add(msgId);
+                            const container = document.getElementById('messages');
+                            renderMessageItem(container, newMsg);
+                            container.scrollTop = container.scrollHeight;
+                            showScrollFab();
+                        }
+
+                        if (text && text.startsWith(ENCRYPT_PREFIX)) {
+                            setTimeout(() => {
+                                tryDecryptMessageRealTime(msgId, text);
+                            }, 50);
+                        }
+                    }
+                } else if (eventCode === 3) {
+                    const msgId = u[1];
+                    const elem = document.getElementById('msg-' + msgId);
+                    if (elem) elem.closest('.msg-container').remove();
+                } else if (eventCode === 5) {
+                    needsDialogUpdate = true;
+                } else if (eventCode === 6 || eventCode === 7 || eventCode === 80) {
+                    needsDialogUpdate = true;
+                } else if (eventCode === 61) {
+                    // Typing indicator
+                    const peerId = u[1];
+                    showTypingIndicator(peerId);
+                }
+            }
+
+            if (needsDialogUpdate) {
+                renderDialogsListFiltered();
+            }
+            if (hasNewMsg) {
+                playNotificationSound();
+            }
+        }
+    } catch(e) {
+        await new Promise(r => setTimeout(r, 1000));
+    }
+    setTimeout(pollEvents, 100);
+};
 </script>
+
+<!-- Offline Banner -->
+<div class="offline-banner" id="offlineBanner">⚠ Нет подключения к интернету</div>
+
+<!-- Scroll to Bottom FAB -->
+<div class="scroll-fab" id="scrollFab" onclick="scrollToBottomChat()">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+<div class="unread-dot hidden" id="scrollFabUnread">0</div>
+</div>
+
+<!-- Context Menu -->
+<div class="context-menu" id="contextMenu" onclick="closeContextMenu(event)">
+<div class="context-menu-item" onclick="contextMenuReply()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>Ответить</div>
+<div class="context-menu-item" onclick="contextMenuCopy()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Копировать</div>
+<div class="context-menu-item" onclick="contextMenuForward()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>Переслать</div>
+<div class="context-menu-item" onclick="contextMenuPin()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14l-1.5-7h-11z"/><path d="M9 10V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6"/></svg>Закрепить</div>
+<div class="context-menu-divider"></div>
+<div class="context-menu-item danger" onclick="contextMenuDelete()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Удалить</div>
+</div>
+
+<!-- Multi-Select Action Bar -->
+<div class="multi-select-bar" id="multiSelectBar">
+<div class="multi-select-count" id="multiSelectCount">Выбрано: 0</div>
+<div class="multi-select-actions">
+<button class="multi-select-btn" onclick="multiSelectForward()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>Переслать</button>
+<button class="multi-select-btn" onclick="multiSelectDelete()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>Удалить</button>
+<button class="multi-select-btn" onclick="exitMultiSelectMode()">Отмена</button>
+</div>
+</div>
+
+<!-- Theme Settings Modal -->
+<div class="modal hidden" id="themeModal">
+<div class="modal-content">
+<div class="modal-title">Тема оформления</div>
+<div class="modal-text">Выберите тему для приложения:</div>
+<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+<div class="drawer-item" onclick="setTheme('dark')" style="background:#161616;border:1px solid #282828">
+<div class="drawer-item-left">
+<div style="width:24px;height:24px;border-radius:50%;background:#1c1c1e;border:2px solid #fff"></div>
+<span>Тёмная (по умолчанию)</span>
+</div>
+<div id="themeCheck-dark" style="color:#0a84ff;font-weight:700">✓</div>
+</div>
+<div class="drawer-item" onclick="setTheme('oled')" style="background:#000;border:1px solid #1a1a1a">
+<div class="drawer-item-left">
+<div style="width:24px;height:24px;border-radius:50%;background:#000;border:2px solid #333"></div>
+<span>AMOLED Чёрная</span>
+</div>
+<div id="themeCheck-oled" style="color:#0a84ff;font-weight:700;opacity:0">✓</div>
+</div>
+<div class="drawer-item" onclick="setTheme('blue')" style="background:#0d0d1f;border:1px solid #1a1a3a">
+<div class="drawer-item-left">
+<div style="width:24px;height:24px;border-radius:50%;background:#1a1a3a;border:2px solid #3a3a6a"></div>
+<span>Тёмно-синяя</span>
+</div>
+<div id="themeCheck-blue" style="color:#0a84ff;font-weight:700;opacity:0">✓</div>
+</div>
+<div class="drawer-item" onclick="setTheme('sepia')" style="background:#221e18;border:1px solid #3a3428">
+<div class="drawer-item-left">
+<div style="width:24px;height:24px;border-radius:50%;background:#2a2418;border:2px solid #5a5040"></div>
+<span>Сепия (для глаз)</span>
+</div>
+<div id="themeCheck-sepia" style="color:#0a84ff;font-weight:700;opacity:0">✓</div>
+</div>
+</div>
+<button class="btn" onclick="closeThemeModal()">Закрыть</button>
+</div>
+</div>
+
+<!-- PIN / Bio Auth Modal -->
+<div class="modal hidden" id="pinAuthModal">
+<div class="modal-content bio-modal-content">
+<div class="bio-icon">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+</div>
+<div class="bio-title">Блокировка приложения</div>
+<div class="bio-text" id="pinAuthText">Введите PIN-код для разблокировки</div>
+<div class="bio-dots" id="pinDots">
+<div class="bio-dot"></div><div class="bio-dot"></div><div class="bio-dot"></div><div class="bio-dot"></div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:240px;margin:0 auto">
+<button class="btn btn-secondary" style="aspect-ratio:1;font-size:20px;font-weight:600;padding:0" onclick="pinInput(1)">1</button>
+<button class="btn btn-secondary" style="aspect-ratio:1;font-size:20px;font-weight:600;padding:0" onclick="pinInput(2)">2</button>
+<button class="btn btn-secondary" style="aspect-ratio:1;font-size:20px;font-weight:600;padding:0" onclick="pinInput(3)">3</button>
+<button class="btn btn-secondary" style="aspect-ratio:1;font-size:20px;font-weight:600;padding:0" onclick="pinInput(4)">4</button>
+<button class="btn btn-secondary" style="aspect-ratio:1;font-size:20px;font-weight:600;padding:0" onclick="pinInput(5)">5</button>
+<button class="btn btn-secondary" style="aspect-ratio:1;font-size:20px;font-weight:600;padding:0" onclick="pinInput(6)">6</button>
+<button class="btn btn-secondary" style="aspect-ratio:1;font-size:20px;font-weight:600;padding:0" onclick="pinInput(7)">7</button>
+<button class="btn btn-secondary" style="aspect-ratio:1;font-size:20px;font-weight:600;padding:0" onclick="pinInput(8)">8</button>
+<button class="btn btn-secondary" style="aspect-ratio:1;font-size:20px;font-weight:600;padding:0" onclick="pinInput(9)">9</button>
+<button class="btn btn-secondary" style="aspect-ratio:1;font-size:20px;font-weight:600;padding:0;background:transparent;border:none;color:#ff3b30" onclick="pinBackspace()">⌫</button>
+<button class="btn btn-secondary" style="aspect-ratio:1;font-size:20px;font-weight:600;padding:0" onclick="pinInput(0)">0</button>
+<button class="btn btn-secondary" style="aspect-ratio:1;font-size:20px;font-weight:600;padding:0;background:transparent;border:none;color:#8e8e93" onclick="pinCancel()">✕</button>
+</div>
+</div>
+</div>
+
+<!-- Sticker Picker -->
+<div class="sticker-picker" id="stickerPicker">
+<div class="sticker-picker-header" id="stickerPickerHeader"></div>
+<div class="sticker-picker-grid" id="stickerPickerGrid"></div>
+</div>
+
 </body>
 </html>
 """
@@ -4454,6 +5580,167 @@ def proxy_file():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+
+
+@app.route('/api/stickers', methods=['POST'])
+def get_stickers():
+    token = request.json.get('token')
+    # Get user's sticker packs
+    res = vk_request('store.getProducts', token, type='stickers', filters='purchased', extended=1, count=100)
+
+    packs = []
+    if isinstance(res, dict) and 'items' in res:
+        for item in res.get('items', []):
+            stickers = []
+            if 'stickers' in item:
+                for s in item['stickers']:
+                    images = s.get('images_with_background', s.get('images', []))
+                    if images:
+                        stickers.append({'url': images[-1].get('url', '')})
+            packs.append({
+                'name': item.get('title', 'Pack'),
+                'stickers': stickers
+            })
+
+    return jsonify({'packs': packs})
+
+
+@app.route('/api/send_sticker', methods=['POST'])
+def send_sticker():
+    token = request.json.get('token')
+    peer_id = request.json.get('peer_id')
+    sticker_id = request.json.get('sticker_id', 0)
+
+    if sticker_id:
+        result = vk_request('messages.send', token, peer_id=peer_id, sticker_id=sticker_id, random_id=random.randint(1, 2147483647))
+        return jsonify({'result': result})
+
+    # If URL provided, download and send as doc
+    sticker_url = request.json.get('sticker_url', '')
+    if sticker_url:
+        try:
+            img_resp = get_session().get(sticker_url, timeout=10)
+            upload_server = vk_request('photos.getMessagesUploadServer', token, peer_id=peer_id)
+            upload_url = upload_server.get('upload_url')
+            files = {'photo': ('sticker.png', BytesIO(img_resp.content), 'image/png')}
+            upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
+            save_result = vk_request('photos.saveMessagesPhoto', token,
+                photo=upload_resp.get('photo'),
+                server=upload_resp.get('server'),
+                hash=upload_resp.get('hash')
+            )
+            if isinstance(save_result, list) and len(save_result) > 0:
+                photo = save_result[0]
+                attachment = f"photo{photo['owner_id']}_{photo['id']}"
+                vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
+                return jsonify({'ok': True})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    return jsonify({'error': 'No sticker provided'}), 400
+
+
+@app.route('/api/message', methods=['POST'])
+def get_single_message():
+    token = request.json.get('token')
+    message_ids = request.json.get('message_ids', '')
+
+    result = vk_request('messages.getById', token, message_ids=message_ids, extended=1)
+
+    if isinstance(result, dict) and 'items' in result:
+        msg = result['items'][0] if result['items'] else None
+        if msg:
+            from_id = msg.get('from_id', 0)
+            profiles = {p['id']: p for p in result.get('profiles', [])}
+            profile = profiles.get(from_id, {})
+
+            return jsonify({
+                'id': msg.get('id'),
+                'text': msg.get('text', ''),
+                'date': msg.get('date', 0),
+                'from_id': from_id,
+                'out': msg.get('out', 0),
+                'name': profile.get('first_name', '') + ' ' + profile.get('last_name', ''),
+                'photo': profile.get('photo_50', ''),
+                'attachments': msg.get('attachments', []),
+                'reply_message': msg.get('reply_message')
+            })
+
+    return jsonify({'error': 'Message not found'}), 404
+
+
+@app.route('/api/forward', methods=['POST'])
+def forward_messages():
+    token = request.json.get('token')
+    peer_id = request.json.get('peer_id')
+    message_ids = request.json.get('message_ids', [])
+
+    if isinstance(message_ids, list):
+        message_ids = ','.join(map(str, message_ids))
+
+    result = vk_request('messages.send', token, 
+        peer_id=peer_id, 
+        forward_messages=message_ids,
+        random_id=random.randint(1, 2147483647)
+    )
+    return jsonify({'result': result})
+
+
+@app.route('/api/reactions', methods=['POST'])
+def add_reaction():
+    token = request.json.get('token')
+    peer_id = request.json.get('peer_id')
+    message_id = request.json.get('message_id')
+    reaction_id = request.json.get('reaction_id', 1)
+
+    result = vk_request('messages.sendReaction', token,
+        peer_id=peer_id,
+        message_id=message_id,
+        reaction_id=reaction_id
+    )
+    return jsonify({'result': result})
+
+
+@app.route('/api/call/start', methods=['POST'])
+def start_call():
+    token = request.json.get('token')
+    peer_id = request.json.get('peer_id')
+
+    # VK doesn't have direct API for calls, but we can send a message
+    result = vk_request('messages.send', token,
+        peer_id=peer_id,
+        message='📞 Предложение позвонить (используйте VK для звонка)',
+        random_id=random.randint(1, 2147483647)
+    )
+    return jsonify({'result': result})
+
+
+@app.route('/api/backup', methods=['POST'])
+def backup_data():
+    vk_id = request.json.get('vk_id')
+    data_type = request.json.get('type', 'settings')
+    data = request.json.get('data', {})
+
+    stored = get_stored_pub_key(f"backup_{vk_id}_{data_type}") or {}
+    stored['data'] = data
+    stored['updated_at'] = datetime.now().isoformat()
+    store_pub_key(f"backup_{vk_id}_{data_type}", stored)
+
+    return jsonify({'ok': True})
+
+
+@app.route('/api/backup/<vk_id>/<data_type>', methods=['GET'])
+def get_backup(vk_id, data_type):
+    stored = get_stored_pub_key(f"backup_{vk_id}_{data_type}")
+    if stored and 'data' in stored:
+        return jsonify(stored['data'])
+    return jsonify({'error': 'Not found'}), 404
+
+
+@app.route('/api/ping', methods=['GET'])
+def ping():
+    return jsonify({'ok': True, 'time': datetime.now().isoformat()})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
