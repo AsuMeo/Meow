@@ -560,21 +560,27 @@ input:checked + .slider:before{transform:translateX(20px)}
 .msg-circle-mode{background:transparent !important;padding:0 !important;border-radius:0 !important;box-shadow:none !important;max-width:200px !important}
 .msg-circle-mode .msg-time{position:absolute;bottom:6px;right:10px;background:rgba(0,0,0,0.55);padding:2px 6px;border-radius:10px;backdrop-filter:blur(4px);z-index:5}
 
-/* === MEDIA-ONLY MESSAGE (photo/video/sticker) — removes bubble background === */
-.msg-media-only{background:transparent !important;padding:0 !important;border:none !important;box-shadow:none !important;overflow:visible !important}
+/* === STABLE MEDIA CONTAINER (no jumping) === */
+.msg-media-only{background:transparent !important;padding:4px !important;border:none !important;box-shadow:none !important;min-height:80px}
 .msg-media-only .msg-text{display:none !important}
-.msg-media-only .msg-time{position:absolute;bottom:6px;right:8px;background:rgba(0,0,0,0.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);color:#fff;font-size:11px;font-weight:500;line-height:1;padding:3px 6px;border-radius:10px;pointer-events:none;display:flex;align-items:center;gap:3px;z-index:5}
-.msg-media-only.msg-out .msg-time{background:rgba(0,0,0,0.45)}
+.msg-media-only .msg-time{display:none !important}
 
-/* Wrapper for media with time overlay */
-.media-wrapper{position:relative;display:inline-block;max-width:100%;overflow:hidden;border-radius:12px}
-.media-wrapper .msg-photo,.media-wrapper .msg-video{margin:0 !important;border-radius:12px}
-.media-time-badge{position:absolute;bottom:6px;right:8px;background:rgba(0,0,0,0.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);color:#fff;font-size:11px;font-weight:500;line-height:1;padding:3px 6px;border-radius:10px;pointer-events:none;display:flex;align-items:center;gap:3px;z-index:5}
+/* Media wrapper — stable size during load/decrypt */
+.media-wrap{position:relative;display:inline-block;max-width:100%;border-radius:12px;overflow:hidden;min-height:60px;min-width:80px;background:#111}
+.media-wrap.loaded{background:transparent;min-height:0;min-width:0}
+.media-wrap .msg-photo,.media-wrap .msg-video{margin:0 !important;border-radius:12px;display:block}
+.media-wrap .media-time{position:absolute;bottom:6px;right:8px;background:rgba(0,0,0,0.45);backdrop-filter:blur(4px);color:#fff;font-size:11px;font-weight:500;padding:3px 7px;border-radius:10px;pointer-events:none;z-index:5;line-height:1}
+.media-wrap .media-time .status{margin-left:3px;opacity:0.8}
 
-/* Sticker wrapper with time */
-.sticker-wrapper{position:relative;display:inline-flex;justify-content:center;align-items:center;max-width:160px}
-.sticker-wrapper img{width:140px;height:140px;object-fit:contain;display:block;border-radius:18px;border:none !important;outline:none !important;box-shadow:none !important;filter:drop-shadow(0 4px 10px rgba(0,0,0,0.45))}
-.sticker-wrapper .media-time-badge{background:rgba(0,0,0,0.25);bottom:4px;right:6px}
+/* Sticker wrapper */
+.sticker-wrap{position:relative;display:inline-flex;justify-content:center;align-items:center;min-width:100px;min-height:100px;background:#111;border-radius:18px}
+.sticker-wrap.loaded{background:transparent;min-width:0;min-height:0}
+.sticker-wrap img{width:140px;height:140px;object-fit:contain;display:block;border-radius:18px;border:none !important;outline:none !important;box-shadow:none !important;filter:drop-shadow(0 4px 10px rgba(0,0,0,0.45))}
+.sticker-wrap .media-time{position:absolute;bottom:4px;right:6px;background:rgba(0,0,0,0.25);backdrop-filter:blur(4px);color:#fff;font-size:11px;font-weight:500;padding:2px 6px;border-radius:10px;pointer-events:none;z-index:5;line-height:1}
+
+/* Decrypt loading placeholder inside media wrap */
+.media-loading{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;z-index:2}
+.media-loading .loader{border-color:#333;border-top-color:#0a84ff;width:20px;height:20px}
 
 .msg-reply-quote{background:rgba(255,255,255,0.08);border-left:3px solid #8e8e93;padding:4px 8px;border-radius:4px;margin-bottom:6px;font-size:12px;cursor:pointer}
 .msg-reply-name{font-weight:600;color:#aaa;margin-bottom:2px;font-size:11px}
@@ -2586,11 +2592,6 @@ function renderMessageItem(containerOrFragment, msg) {
     swipeBgRight.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>`;
 
     const div = document.createElement('div');
-    let hasOnlyMedia = false;
-    if (msg.attachments && msg.attachments.length > 0 && !msg.text && !msg.reply_message) {
-        const types = msg.attachments.map(a => a.type);
-        hasOnlyMedia = types.every(t => ['photo','video','sticker','doc'].includes(t));
-    }
     div.className = 'msg ' + (msg.out ? 'msg-out' : 'msg-in') + (hasOnlyMedia ? ' msg-media-only' : '');
     div.id = 'msg-' + msg.id;
 
@@ -2616,6 +2617,14 @@ function renderMessageItem(containerOrFragment, msg) {
     let displayText = msg.text || '';
     let isPureCircle = false;
     let isSticker = false;
+    const msgTime = msg.date ? new Date(msg.date * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : '';
+    const msgStatus = msg.out ? '<span class="status">✓</span>' : '';
+
+    let hasOnlyMedia = false;
+    if (msg.attachments && msg.attachments.length > 0 && !msg.text && !msg.reply_message) {
+        const types = msg.attachments.map(a => a.type);
+        hasOnlyMedia = types.every(t => ['photo','video','sticker','doc'].includes(t));
+    }
 
     if (msg.attachments) {
         for (const a of msg.attachments) {
@@ -2649,13 +2658,13 @@ function renderMessageItem(containerOrFragment, msg) {
                 const stickerUrl = images.length > 0 ? images[images.length - 1].url : '';
                 if (stickerUrl) {
                     const proxiedUrl = `/api/proxy_file?url=${encodeURIComponent(stickerUrl)}`;
-                    html += `<div class="sticker-wrapper"><img src="${stickerUrl}" referrerpolicy="no-referrer" crossorigin="anonymous" onerror="this.onerror=null;this.src='${proxiedUrl}';" style="width:130px;height:130px;object-fit:contain;display:block"><div class="media-time-badge">${msgTime}</div></div>`;
+                    html += `<div class="sticker-wrap loaded"><img src="${stickerUrl}" referrerpolicy="no-referrer" crossorigin="anonymous" onerror="this.onerror=null;this.src='${proxiedUrl}';" style="width:130px;height:130px;object-fit:contain;display:block"><div class="media-time">${msgTime}${msgStatus}</div></div>`;
                 }
             } else if (a.type === 'photo') {
                 const p = a.photo?.sizes?.find(s => s.type === 'x') || a.photo?.sizes?.[a.photo?.sizes?.length - 1];
                 if (p) {
                     const photoUrl = p.url;
-                    html += `<div class="media-wrapper"><img class="msg-photo" src="${photoUrl}" onclick="openPhotoViewer('${photoUrl}')"><div class="media-time-badge">${msgTime}</div></div>`;
+                    html += `<div class="media-wrap loaded"><img class="msg-photo" src="${photoUrl}" onclick="openPhotoViewer('${photoUrl}')"><div class="media-time">${msgTime}${msgStatus}</div></div>`;
                 }
             } else if (a.type === 'video') {
                 const vidObj = a.video || {};
@@ -2663,11 +2672,11 @@ function renderMessageItem(containerOrFragment, msg) {
                 const frameUrl = vidObj.first_frame?.find(s => s.url)?.url || vidObj.image?.[0]?.url;
 
                 if (playerUrl) {
-                    html += `<div class="media-wrapper"><div class="tg-channel-video-wrap" style="border-radius:12px;overflow:hidden">
+                    html += `<div class="media-wrap loaded"><div class="tg-channel-video-wrap" style="border-radius:12px;overflow:hidden">
                         <iframe class="tg-channel-iframe" src="${playerUrl}" allowfullscreen></iframe>
-                    </div><div class="media-time-badge">${msgTime}</div></div>`;
+                    </div><div class="media-time">${msgTime}${msgStatus}</div></div>`;
                 } else if (frameUrl) {
-                    html += `<div class="media-wrapper"><img class="msg-photo" src="${frameUrl}" onclick="openPhotoViewer('${frameUrl}')"><div class="media-time-badge">${msgTime}</div></div>`;
+                    html += `<div class="media-wrap loaded"><img class="msg-photo" src="${frameUrl}" onclick="openPhotoViewer('${frameUrl}')"><div class="media-time">${msgTime}${msgStatus}</div></div>`;
                 }
             } else if (a.type === 'video_message') {
                 // FIX: Support video messages (circles) from regular VK app
@@ -2770,9 +2779,8 @@ function renderMessageItem(containerOrFragment, msg) {
         div.classList.add('msg-circle-mode');
     }
 
-    const msgTime = msg.date ? new Date(msg.date * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : '';
     if (!hasOnlyMedia) {
-        html += `<div class="msg-time">${msgTime} ${msg.out ? '<span class="msg-status">✓</span>' : ''}</div>`;
+        html += `<div class="msg-time">${msgTime} ${msgStatus}</div>`;
     }
     
     div.innerHTML = html;
