@@ -480,8 +480,10 @@ input:checked + .slider:before{transform:translateX(20px)}
 .msg-in{align-self:flex-start;background:#1c1c1e;border-bottom-left-radius:4px;color:#fff}
 .msg-out{align-self:flex-end;background:#2c2c2e;border-bottom-right-radius:4px;color:#fff}
 
-.msg-sticker{background:transparent !important;padding:0 !important;box-shadow:none !important;max-width:160px !important}
-.msg-sticker img{width:140px;height:140px;object-fit:contain;display:block}
+.msg-sticker{background:transparent !important;padding:4px !important;box-shadow:none !important;max-width:160px !important;border-radius:0 !important}
+.msg-sticker .msg-text{display:none !important}
+.msg-sticker .msg-time{position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.4);padding:2px 6px;border-radius:8px;backdrop-filter:blur(4px);font-size:10px;color:#fff}
+.msg-sticker-img{width:140px;height:140px;object-fit:contain;display:block}
 
 .msg-circle-mode{background:transparent !important;padding:0 !important;border-radius:0 !important;box-shadow:none !important;max-width:200px !important}
 .msg-circle-mode .msg-time{position:absolute;bottom:6px;right:10px;background:rgba(0,0,0,0.55);padding:2px 6px;border-radius:10px;backdrop-filter:blur(4px);z-index:5}
@@ -563,11 +565,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 .nav-item.active{color:#fff}
 .nav-item span{font-size:10px}
 
-/* Action Sheet */
-.action-sheet{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:500;display:flex;flex-direction:column;justify-content:flex-end}
-.action-sheet-content{background:#1c1c1e;border-top-left-radius:20px;border-top-right-radius:20px;padding:16px;display:flex;flex-direction:column;gap:8px}
-.action-sheet-item{padding:14px 16px;border-radius:12px;background:#2c2c2e;color:#fff;font-size:15px;font-weight:500;display:flex;align-items:center;gap:12px;cursor:pointer}
-.action-sheet-item.danger{color:#ff3b30}
+/* Action Sheet REMOVED */
 
 /* Forward Modal Target List */
 .forward-list{max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-top:12px}
@@ -608,21 +606,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 .ptr-spinner.active{top:12px}
 .ptr-spinner .loader{border-color:#333;border-top-color:#0a84ff;width:24px;height:24px}
 
-/* Message Selection Mode */
-.msg-select-mode .msg{cursor:pointer;transition:background 0.15s}
-.msg-select-mode .msg:hover{background:rgba(10,132,255,0.1)}
-.msg-selected{background:rgba(10,132,255,0.2)!important;border:1px solid #0a84ff!important}
-.msg-select-checkbox{position:absolute;top:8px;left:-30px;width:20px;height:20px;border-radius:50%;border:2px solid #8e8e93;background:transparent;cursor:pointer;display:none}
-.msg-select-mode .msg-select-checkbox{display:block}
-.msg-select-mode .msg-selected .msg-select-checkbox{background:#0a84ff;border-color:#0a84ff}
-
-/* Multi-select Action Bar */
-.multi-select-bar{position:fixed;bottom:0;left:0;width:100%;background:#0d0d0d;border-top:1px solid #1c1c1c;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;z-index:200;transform:translateY(100%);transition:transform 0.25s cubic-bezier(0.1,0.9,0.2,1)}
-.multi-select-bar.active{transform:translateY(0)}
-.multi-select-count{font-size:14px;font-weight:600;color:#fff}
-.multi-select-actions{display:flex;gap:12px}
-.multi-select-btn{background:#2c2c2e;color:#fff;border:none;padding:8px 14px;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px}
-.multi-select-btn:active{background:#3a3a3c}
+/* Multi-select REMOVED - using context menu only */
 
 /* Theme: OLED Black (darker) */
 /* Theme: Dark Blue */
@@ -1219,34 +1203,7 @@ Kate Mobile API • Cloud Realtime E2EE
 </div>
 </div>
 
-<!-- Action Sheet -->
-<div class="action-sheet hidden" id="actionSheet" onclick="closeActionSheet(event)">
-<div class="action-sheet-content" onclick="event.stopPropagation()">
-<div class="action-sheet-item" onclick="triggerReplyFromSheet()">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
-Ответить
-</div>
-<div class="action-sheet-item" onclick="triggerPinMessageFromSheet()">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14l-1.5-7h-11z"/><path d="M9 10V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6"/></svg>
-Закрепить сообщение
-</div>
-<div class="action-sheet-item" onclick="triggerForwardFromSheet()">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>
-Переслать
-</div>
-<div class="action-sheet-item" id="editSheetItem" onclick="triggerEditFromSheet()">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-Редактировать
-</div>
-<div class="action-sheet-item danger" onclick="triggerDeleteFromSheet()">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-Удалить
-</div>
-<div class="action-sheet-item" style="justify-content:center;color:#888" onclick="closeActionSheet()">
-Отмена
-</div>
-</div>
-</div>
+<!-- Action Sheet REMOVED - using context menu only -->
 
 </div>
 
@@ -2493,8 +2450,19 @@ function renderMessageItem(containerOrFragment, msg) {
 
     div.oncontextmenu = (e) => {
         e.preventDefault();
-        openActionSheet(msg);
+        e.stopPropagation();
+        openContextMenu(msg, e.clientX, e.clientY);
     };
+    // Also handle long-press on mobile as context menu
+    let pressTimer;
+    div.addEventListener('touchstart', (e) => {
+        pressTimer = setTimeout(() => {
+            const touch = e.touches[0];
+            openContextMenu(msg, touch.clientX, touch.clientY);
+        }, 500);
+    }, {passive: true});
+    div.addEventListener('touchend', () => clearTimeout(pressTimer));
+    div.addEventListener('touchmove', () => clearTimeout(pressTimer));
 
     attachSwipeToReply(containerDiv, div, msg);
 
@@ -2738,55 +2706,8 @@ function attachSwipeToReply(container, elem, msg) {
     });
 }
 
-function openActionSheet(msg) {
-    selectedMsgForAction = msg;
-    const editBtn = document.getElementById('editSheetItem');
-    if (msg.out) editBtn.classList.remove('hidden');
-    else editBtn.classList.add('hidden');
-    document.getElementById('actionSheet').classList.remove('hidden');
-}
-
-function closeActionSheet() {
-    document.getElementById('actionSheet').classList.add('hidden');
-}
-
-function triggerReplyFromSheet() {
-    closeActionSheet();
-    if (selectedMsgForAction) setReplyToMessage(selectedMsgForAction);
-}
-
-function triggerPinMessageFromSheet() {
-    closeActionSheet();
-    if (selectedMsgForAction && currentPeer) {
-        pinnedMessagesMap[String(currentPeer)] = {
-            id: selectedMsgForAction.id,
-            text: decryptedCache[selectedMsgForAction.id] || selectedMsgForAction.text || 'Сообщение'
-        };
-        localStorage.setItem('vk_pinned_messages', JSON.stringify(pinnedMessagesMap));
-        checkPinnedMessage();
-    }
-}
-
-function triggerForwardFromSheet() {
-    closeActionSheet();
-    if (!selectedMsgForAction) return;
-    const list = document.getElementById('forwardList');
-    list.innerHTML = '';
-
-    for (const d of dialogsData) {
-        if (d.type === 'user') {
-            const item = document.createElement('div');
-            item.className = 'forward-item';
-            item.onclick = () => confirmForwardToPeer(d.id);
-            item.innerHTML = `
-                <img src="${d.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
-                <div><b>${escapeHtml(d.name)}</b></div>
-            `;
-            list.appendChild(item);
-        }
-    }
-    document.getElementById('forwardModal').classList.remove('hidden');
-}
+/* Action Sheet functions REMOVED - using context menu only */
+let selectedMsgForAction = null;
 
 function closeForwardModal() {
     document.getElementById('forwardModal').classList.add('hidden');
@@ -2811,16 +2732,6 @@ async function confirmForwardToPeer(targetPeerId) {
     } finally {
         hideUploadProgress();
     }
-}
-
-function triggerEditFromSheet() {
-    closeActionSheet();
-    if (selectedMsgForAction && selectedMsgForAction.out) startEditingMessage(selectedMsgForAction);
-}
-
-function triggerDeleteFromSheet() {
-    closeActionSheet();
-    if (selectedMsgForAction) document.getElementById('deleteModal').classList.remove('hidden');
 }
 
 function closeDeleteModal() {
@@ -4123,10 +4034,23 @@ function openContextMenu(msg, x, y) {
 }
 
 function closeContextMenu(e) {
-    if (e && e.target === document.getElementById('contextMenu')) {
-        document.getElementById('contextMenu').classList.remove('active');
-    }
+    document.getElementById('contextMenu').classList.remove('active');
 }
+
+// Close context menu on click outside
+document.addEventListener('click', (e) => {
+    const menu = document.getElementById('contextMenu');
+    if (menu && menu.classList.contains('active') && !menu.contains(e.target)) {
+        menu.classList.remove('active');
+    }
+});
+
+document.addEventListener('touchstart', (e) => {
+    const menu = document.getElementById('contextMenu');
+    if (menu && menu.classList.contains('active') && !menu.contains(e.target)) {
+        menu.classList.remove('active');
+    }
+}, {passive: true});
 
 function contextMenuReply() {
     document.getElementById('contextMenu').classList.remove('active');
@@ -4148,7 +4072,18 @@ function contextMenuForward() {
     document.getElementById('contextMenu').classList.remove('active');
     if (contextMenuMsg) {
         selectedMsgForAction = contextMenuMsg;
-        triggerForwardFromSheet();
+        const list = document.getElementById('forwardList');
+        list.innerHTML = '';
+        for (const d of dialogsData) {
+            if (d.type === 'user') {
+                const item = document.createElement('div');
+                item.className = 'forward-item';
+                item.onclick = () => confirmForwardToPeer(d.id);
+                item.innerHTML = `<img src="${d.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'"><div><b>${escapeHtml(d.name)}</b></div>`;
+                list.appendChild(item);
+            }
+        }
+        document.getElementById('forwardModal').classList.remove('hidden');
     }
 }
 
@@ -4164,6 +4099,11 @@ function contextMenuPin() {
     }
 }
 
+function contextMenuEdit() {
+    document.getElementById('contextMenu').classList.remove('active');
+    if (contextMenuMsg && contextMenuMsg.out) startEditingMessage(contextMenuMsg);
+}
+
 function contextMenuDelete() {
     document.getElementById('contextMenu').classList.remove('active');
     if (contextMenuMsg) {
@@ -4172,70 +4112,7 @@ function contextMenuDelete() {
     }
 }
 
-/* --- 4. MULTI-SELECT MODE --- */
-let multiSelectMode = false;
-let selectedMessages = new Set();
-
-function enterMultiSelectMode() {
-    multiSelectMode = true;
-    selectedMessages.clear();
-    document.body.classList.add('msg-select-mode');
-    updateMultiSelectBar();
-}
-
-function exitMultiSelectMode() {
-    multiSelectMode = false;
-    selectedMessages.clear();
-    document.body.classList.remove('msg-select-mode');
-    document.querySelectorAll('.msg-selected').forEach(el => el.classList.remove('msg-selected'));
-    document.getElementById('multiSelectBar').classList.remove('active');
-}
-
-function toggleMessageSelect(msgId) {
-    const msgEl = document.getElementById('msg-' + msgId);
-    if (!msgEl) return;
-
-    if (selectedMessages.has(msgId)) {
-        selectedMessages.delete(msgId);
-        msgEl.classList.remove('msg-selected');
-    } else {
-        selectedMessages.add(msgId);
-        msgEl.classList.add('msg-selected');
-    }
-    updateMultiSelectBar();
-}
-
-function updateMultiSelectBar() {
-    const bar = document.getElementById('multiSelectBar');
-    const count = document.getElementById('multiSelectCount');
-    count.textContent = `Выбрано: ${selectedMessages.size}`;
-
-    if (selectedMessages.size > 0) {
-        bar.classList.add('active');
-    } else {
-        bar.classList.remove('active');
-    }
-}
-
-function multiSelectForward() {
-    const msgs = Array.from(selectedMessages).map(id => ({ id, text: decryptedCache[id] || '' }));
-    // Forward all selected
-    exitMultiSelectMode();
-}
-
-function multiSelectDelete() {
-    if (!confirm(`Удалить ${selectedMessages.size} сообщений?`)) return;
-    selectedMessages.forEach(id => {
-        const elem = document.getElementById('msg-' + id);
-        if (elem) elem.closest('.msg-container').remove();
-        fetch('/api/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token, message_ids: id, delete_for_all: 1 })
-        });
-    });
-    exitMultiSelectMode();
-}
+/* --- 4. MULTI-SELECT MODE REMOVED - using context menu only --- */
 
 /* --- 6. PIN / APP LOCK --- */
 let pinCode = localStorage.getItem('vk_pin') || '';
@@ -4556,7 +4433,7 @@ async function uploadFileWithProgress(file, onProgress) {
 
 /* --- 18. IMPROVED POLL EVENTS (fixed) --- */
 // Override the original pollEvents to add new features
-const originalPollEvents = pollEvents;
+
 
 /* --- 19. PULL TO REFRESH --- */
 let ptrStartY = 0;
@@ -4632,24 +4509,8 @@ renderMessageItem = function(containerOrFragment, msg) {
             openContextMenu(msg, e.clientX, e.clientY);
         });
 
-        // Add long-press for multi-select
-        let longPressTimer;
-        msgEl.addEventListener('touchstart', () => {
-            longPressTimer = setTimeout(() => {
-                if (!multiSelectMode) enterMultiSelectMode();
-                toggleMessageSelect(msg.id);
-            }, 600);
-        });
-        msgEl.addEventListener('touchend', () => clearTimeout(longPressTimer));
-        msgEl.addEventListener('touchmove', () => clearTimeout(longPressTimer));
+        // Long-press disabled - only context menu on right-click
     }
-};
-
-// Hook into pollEvents for typing indicator
-const originalPollEventsRef = pollEvents;
-pollEvents = async function() {
-    // Store reference to call original
-    await originalPollEventsRef();
 };
 
 // Override pollEvents properly
@@ -4702,7 +4563,7 @@ window.pollEvents = async function() {
                     }
 
                     if (currentPeer && String(peerId) === String(currentPeer)) {
-                        // Подгружаем полные данные сообщения с вложениями
+                        // ALWAYS load full message with attachments for real-time display
                         fetch('/api/message', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -4719,7 +4580,7 @@ window.pollEvents = async function() {
                                 }
                             }
                         }).catch(() => {
-                            // Фолбэк
+                            // Фолбэк - minimal message without attachments
                             if (!renderedMsgIds.has(msgId)) {
                                 renderedMsgIds.add(msgId);
                                 const isOut = (flags & 2) !== 0;
@@ -4784,18 +4645,11 @@ window.pollEvents = async function() {
 <div class="context-menu-item" onclick="contextMenuForward()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>Переслать</div>
 <div class="context-menu-item" onclick="contextMenuPin()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14l-1.5-7h-11z"/><path d="M9 10V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6"/></svg>Закрепить</div>
 <div class="context-menu-divider"></div>
+<div class="context-menu-item" onclick="contextMenuEdit()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>Редактировать</div>
 <div class="context-menu-item danger" onclick="contextMenuDelete()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Удалить</div>
 </div>
 
-<!-- Multi-Select Action Bar -->
-<div class="multi-select-bar" id="multiSelectBar">
-<div class="multi-select-count" id="multiSelectCount">Выбрано: 0</div>
-<div class="multi-select-actions">
-<button class="multi-select-btn" onclick="multiSelectForward()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>Переслать</button>
-<button class="multi-select-btn" onclick="multiSelectDelete()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>Удалить</button>
-<button class="multi-select-btn" onclick="exitMultiSelectMode()">Отмена</button>
-</div>
-</div>
+<!-- Multi-Select Action Bar REMOVED - using context menu only -->
 
 <!-- PIN / Bio Auth Modal -->
 <div class="modal hidden" id="pinAuthModal">
