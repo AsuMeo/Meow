@@ -166,7 +166,7 @@ def extract_doc_attachment(save_result):
     return None
 
 SW_JS = """
-const CACHE_NAME = 'vk-meow-v11-cache';
+const CACHE_NAME = 'vk-tsuyu-v1-cache';
 const STATIC_ASSETS = ['/', '/sw.js', '/api/ping'];
 
 // IndexedDB for offline messages
@@ -277,7 +277,7 @@ HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>VK Meow - True E2EE Messenger</title>
+<title>VK Tsuyu - True E2EE Messenger</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#000;color:#fff;height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
@@ -614,29 +614,8 @@ input:checked + .slider:before{transform:translateX(20px)}
 .multi-select-btn:active{background:#3a3a3c}
 
 /* Theme: OLED Black (darker) */
-body.theme-oled{background:#000}
-body.theme-oled .header{background:#000;border-bottom-color:#1a1a1a}
-body.theme-oled .input-area-wrapper{background:#000;border-top-color:#1a1a1a}
-body.theme-oled .bottom-nav{background:#000;border-top-color:#1a1a1a}
-
 /* Theme: Dark Blue */
-body.theme-blue{background:#0a0a1a}
-body.theme-blue .header{background:#0d0d1f;border-bottom-color:#1a1a3a}
-body.theme-blue .msg-in{background:#1a1a3a}
-body.theme-blue .msg-out{background:#2a2a4a}
-body.theme-blue .input-area-wrapper{background:#0d0d1f;border-top-color:#1a1a3a}
-body.theme-blue .bottom-nav{background:#0d0d1f;border-top-color:#1a1a3a}
-
 /* Theme: Sepia (easy on eyes) */
-body.theme-sepia{background:#1a1612;color:#e8dcc8}
-body.theme-sepia .header{background:#221e18;border-bottom-color:#3a3428}
-body.theme-sepia .msg-in{background:#2a2418;color:#e8dcc8}
-body.theme-sepia .msg-out{background:#3a3428;color:#e8dcc8}
-body.theme-sepia .dialog-name{color:#f0e6d0}
-body.theme-sepia .input-area-wrapper{background:#221e18;border-top-color:#3a3428}
-body.theme-sepia .message-input{background:#2a2418;color:#e8dcc8;border-color:#3a3428}
-body.theme-sepia .bottom-nav{background:#221e18;border-top-color:#3a3428}
-
 /* Offline Banner */
 .offline-banner{position:fixed;top:0;left:0;width:100%;background:#ff9500;color:#000;text-align:center;padding:6px;font-size:12px;font-weight:600;z-index:1000;transform:translateY(-100%);transition:transform 0.3s ease}
 .offline-banner.active{transform:translateY(0)}
@@ -645,12 +624,6 @@ body.theme-sepia .bottom-nav{background:#221e18;border-top-color:#3a3428}
 .scroll-fab{position:fixed;bottom:70px;right:16px;width:44px;height:44px;border-radius:50%;background:#0a84ff;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.4);z-index:50;opacity:0;transform:scale(0.8);transition:all 0.2s ease}
 .scroll-fab.active{opacity:1;transform:scale(1)}
 .scroll-fab .unread-dot{position:absolute;top:-2px;right:-2px;min-width:18px;height:18px;border-radius:50%;background:#ff3b30;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px}
-
-/* Message Reactions */
-.msg-reactions{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
-.msg-reaction{display:flex;align-items:center;gap:3px;padding:3px 8px;border-radius:12px;background:rgba(255,255,255,0.08);font-size:12px;cursor:pointer;transition:background 0.15s}
-.msg-reaction:hover{background:rgba(255,255,255,0.15)}
-.msg-reaction.active{background:rgba(10,132,255,0.25);border:1px solid #0a84ff}
 
 /* Voice Message Waveform Animation */
 .tg-voice-bar{transition:height 0.15s ease}
@@ -850,13 +823,6 @@ body.theme-sepia .bottom-nav{background:#221e18;border-top-color:#3a3428}
 <span>Сменить аватар (Kate Mobile)</span>
 </div>
 </div>
-<div class="drawer-item" onclick="openThemeModal()">
-<div class="drawer-item-left">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2"/><path d="M12 21v2"/><path d="M4.22 4.22l1.42 1.42"/><path d="M18.36 18.36l1.42 1.42"/><path d="M1 12h2"/><path d="M21 12h2"/><path d="M4.22 19.78l1.42-1.42"/><path d="M18.36 5.64l1.42-1.42"/></svg>
-<span>Тема оформления</span>
-</div>
-</div>
-
 <div class="drawer-item" onclick="setPinCode()">
 <div class="drawer-item-left">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -1038,7 +1004,7 @@ body.theme-sepia .bottom-nav{background:#221e18;border-top-color:#3a3428}
 
 <!-- Login Screen -->
 <div class="login-screen" id="loginScreen">
-<h1>VK Meow</h1>
+<h1>VK Tsuyu</h1>
 <div class="badge-e2e">
 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
 Kate Mobile API • Cloud Realtime E2EE
@@ -1073,7 +1039,7 @@ Kate Mobile API • Cloud Realtime E2EE
 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
 </div>
 <div class="header-info" onclick="openDrawer()">
-<div class="header-title-main" id="dialogsHeaderTitle">VK Meow</div>
+<div class="header-title-main" id="dialogsHeaderTitle">VK Tsuyu</div>
 <div class="header-subtitle" id="dialogsHeaderSubtitle">Защищено Cloud E2EE</div>
 </div>
 <div class="header-actions">
@@ -1760,7 +1726,7 @@ async function login() {
 function showDialogsScreen() {
     document.getElementById('dialogsScreen').classList.remove('hidden');
     if (currentUser) {
-        document.getElementById('dialogsHeaderTitle').textContent = 'VK Meow';
+        document.getElementById('dialogsHeaderTitle').textContent = 'VK Tsuyu';
         document.getElementById('dialogsHeaderSubtitle').textContent = 'Защищено Cloud E2EE';
         updateDrawerProfile();
     }
@@ -2916,7 +2882,10 @@ async function processEncryptedAttachment(elemId, url, extInfo) {
                 if (headerLen > 0 && headerLen < encArrayBuf.byteLength - 4) {
                     const headerJsonBytes = new Uint8Array(encArrayBuf, 4, headerLen);
                     const headerStr = new TextDecoder().decode(headerJsonBytes);
-                    const header = JSON.parse(headerStr);
+
+                    // FIX: Unescape HTML entities from VK LongPoll in header
+                    const cleanHeaderStr = unescapeVkText(headerStr);
+                    const header = JSON.parse(cleanHeaderStr);
 
                     if (header.k1 && header.k2) {
                         const encPayload = encArrayBuf.slice(4 + headerLen);
@@ -2944,7 +2913,7 @@ async function processEncryptedAttachment(elemId, url, extInfo) {
         if (extInfo.includes('mgs') || extInfo.includes('meg') || extInfo.includes('audio')) fallbackMime = 'audio/webm';
         else if (extInfo.includes('meow') || extInfo.includes('image')) fallbackMime = 'image/jpeg';
         else if (extInfo.includes('mer') || extInfo.includes('video')) fallbackMime = 'video/mp4';
-        
+
         decryptedCache[elemId] = { blobUrl: `/api/proxy_file?url=${encodeURIComponent(url)}`, mime: fallbackMime, name: extInfo, extInfo };
         renderDecryptedMedia(elem, decryptedCache[elemId]);
 
@@ -4224,39 +4193,6 @@ function multiSelectDelete() {
     exitMultiSelectMode();
 }
 
-/* --- 5. THEMES SYSTEM --- */
-const THEMES = ['dark', 'oled', 'blue', 'sepia'];
-let currentTheme = localStorage.getItem('vk_theme') || 'dark';
-
-function applyTheme(theme) {
-    document.body.classList.remove('theme-oled', 'theme-blue', 'theme-sepia');
-    if (theme === 'oled') document.body.classList.add('theme-oled');
-    else if (theme === 'blue') document.body.classList.add('theme-blue');
-    else if (theme === 'sepia') document.body.classList.add('theme-sepia');
-    currentTheme = theme;
-    localStorage.setItem('vk_theme', theme);
-}
-
-function setTheme(theme) {
-    applyTheme(theme);
-    THEMES.forEach(t => {
-        const check = document.getElementById('themeCheck-' + t);
-        if (check) check.style.opacity = t === theme ? '1' : '0';
-    });
-}
-
-function openThemeModal() {
-    closeDrawer();
-    setTheme(currentTheme);
-    document.getElementById('themeModal').classList.remove('hidden');
-}
-
-function closeThemeModal() {
-    document.getElementById('themeModal').classList.add('hidden');
-}
-
-applyTheme(currentTheme);
-
 /* --- 6. PIN / APP LOCK --- */
 let pinCode = localStorage.getItem('vk_pin') || '';
 let tempPin = '';
@@ -4342,72 +4278,6 @@ function setPinCode() {
     }
 }
 
-/* --- 7. STICKER PICKER --- */
-let stickerData = [];
-let currentStickerPack = 0;
-
-async function loadStickers() {
-    try {
-        const res = await fetch('/api/stickers', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ token })
-        });
-        const data = await res.json();
-        stickerData = data.packs || [];
-    } catch(e) {}
-}
-
-function toggleStickerPicker() {
-    const picker = document.getElementById('stickerPicker');
-    if (picker.classList.contains('active')) {
-        picker.classList.remove('active');
-    } else {
-        renderStickerPicker();
-        picker.classList.add('active');
-    }
-}
-
-function renderStickerPicker() {
-    const header = document.getElementById('stickerPickerHeader');
-    const grid = document.getElementById('stickerPickerGrid');
-    header.innerHTML = '';
-    grid.innerHTML = '';
-
-    stickerData.forEach((pack, idx) => {
-        const tab = document.createElement('div');
-        tab.className = 'sticker-picker-tab ' + (idx === currentStickerPack ? 'active' : '');
-        tab.textContent = pack.name || 'Pack ' + (idx + 1);
-        tab.onclick = () => { currentStickerPack = idx; renderStickerPicker(); };
-        header.appendChild(tab);
-    });
-
-    const pack = stickerData[currentStickerPack];
-    if (pack && pack.stickers) {
-        pack.stickers.forEach(s => {
-            const img = document.createElement('img');
-            img.className = 'sticker-picker-item';
-            img.src = s.url;
-            img.onclick = () => sendSticker(s.url);
-            grid.appendChild(img);
-        });
-    }
-}
-
-async function sendSticker(stickerUrl) {
-    if (!currentPeer) return;
-    document.getElementById('stickerPicker').classList.remove('active');
-    showUploadProgress('Отправка стикера...');
-    try {
-        await fetch('/api/send_sticker', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ token, peer_id: currentPeer, sticker_url: stickerUrl })
-        });
-    } catch(e) {}
-    hideUploadProgress();
-}
-
 /* --- 8. IMPROVED MESSAGE RENDERING --- */
 let lastRenderedDate = null;
 
@@ -4473,6 +4343,99 @@ function cleanupAudioPlayers() {
 
 setInterval(cleanupAudioPlayers, 30000);
 
+/* --- 7. STICKER PICKER (VK API Official) --- */
+let stickerProducts = [];
+let currentStickerPack = 0;
+let favoriteStickers = [];
+
+async function loadStickers() {
+    try {
+        const res = await fetch('/api/stickers', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ token })
+        });
+        const data = await res.json();
+        stickerProducts = data.items || [];
+        favoriteStickers = data.favorites || [];
+    } catch(e) { console.log('Stickers load error:', e); }
+}
+
+function toggleStickerPicker() {
+    const picker = document.getElementById('stickerPicker');
+    if (picker.classList.contains('active')) {
+        picker.classList.remove('active');
+    } else {
+        if (stickerProducts.length === 0) loadStickers();
+        renderStickerPicker();
+        picker.classList.add('active');
+    }
+}
+
+function renderStickerPicker() {
+    const header = document.getElementById('stickerPickerHeader');
+    const grid = document.getElementById('stickerPickerGrid');
+    header.innerHTML = '';
+    grid.innerHTML = '';
+
+    // Favorites tab
+    if (favoriteStickers.length > 0) {
+        const favTab = document.createElement('div');
+        favTab.className = 'sticker-picker-tab ' + (currentStickerPack === -1 ? 'active' : '');
+        favTab.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+        favTab.onclick = () => { currentStickerPack = -1; renderStickerPicker(); };
+        header.appendChild(favTab);
+    }
+
+    stickerProducts.forEach((pack, idx) => {
+        const tab = document.createElement('div');
+        tab.className = 'sticker-picker-tab ' + (idx === currentStickerPack ? 'active' : '');
+        const iconUrl = pack.icon || pack.preview || '';
+        if (iconUrl) {
+            tab.innerHTML = `<img src="${iconUrl}" style="width:28px;height:28px;object-fit:contain;border-radius:4px">`;
+        } else {
+            tab.textContent = (pack.title || 'Pack').substring(0, 3);
+        }
+        tab.onclick = () => { currentStickerPack = idx; renderStickerPicker(); };
+        header.appendChild(tab);
+    });
+
+    let stickersToShow = [];
+    if (currentStickerPack === -1) {
+        stickersToShow = favoriteStickers;
+    } else {
+        const pack = stickerProducts[currentStickerPack];
+        if (pack && pack.stickers) stickersToShow = pack.stickers;
+    }
+
+    stickersToShow.forEach(s => {
+        const img = document.createElement('img');
+        img.className = 'sticker-picker-item';
+        const imgUrl = s.images?.[s.images.length - 1]?.url || s.url || '';
+        img.src = imgUrl;
+        img.onerror = function() { this.style.display = 'none'; };
+        img.onclick = () => sendStickerVK(s.sticker_id || s.id);
+        grid.appendChild(img);
+    });
+}
+
+async function sendStickerVK(stickerId) {
+    if (!currentPeer || !stickerId) return;
+    document.getElementById('stickerPicker').classList.remove('active');
+    showUploadProgress('Отправка...');
+    try {
+        const res = await fetch('/api/send_sticker', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ token, peer_id: currentPeer, sticker_id: stickerId })
+        });
+        const data = await res.json();
+        if (data.error) console.error('Sticker send error:', data.error);
+    } catch(e) { console.error('Sticker send network error:', e); }
+    hideUploadProgress();
+}
+
+
 /* --- 11. DRAFT MESSAGES --- */
 function saveDraft(peerId, text) {
     const drafts = JSON.parse(localStorage.getItem('vk_drafts') || '{}');
@@ -4520,41 +4483,6 @@ function renderDialogsVirtual() {
     const list = document.getElementById('dialogsList');
     const visibleDialogs = filtered.slice(0, dialogRenderOffset + DIALOGS_BATCH_SIZE);
     // ... existing render logic but with visibleDialogs
-}
-
-/* --- 15. ENHANCED MESSAGE ACTIONS --- */
-// Double-tap to like
-let lastTapTime = 0;
-let lastTapMsg = null;
-
-function attachDoubleTapLike(elem, msg) {
-    elem.addEventListener('touchend', (e) => {
-        const now = Date.now();
-        if (lastTapMsg === msg.id && now - lastTapTime < 300) {
-            e.preventDefault();
-            addReaction(msg.id, '❤️');
-        }
-        lastTapTime = now;
-        lastTapMsg = msg.id;
-    });
-}
-
-function addReaction(msgId, emoji) {
-    // Visual feedback
-    const msgEl = document.getElementById('msg-' + msgId);
-    if (!msgEl) return;
-
-    let reactions = msgEl.querySelector('.msg-reactions');
-    if (!reactions) {
-        reactions = document.createElement('div');
-        reactions.className = 'msg-reactions';
-        msgEl.appendChild(reactions);
-    }
-
-    const reaction = document.createElement('div');
-    reaction.className = 'msg-reaction active';
-    reaction.innerHTML = `${emoji} 1`;
-    reactions.appendChild(reaction);
 }
 
 /* --- 16. CALL BUTTON (placeholder) --- */
@@ -4652,12 +4580,9 @@ const originalRenderMessageItem = renderMessageItem;
 renderMessageItem = function(containerOrFragment, msg) {
     originalRenderMessageItem(containerOrFragment, msg);
 
-    // Add double-tap like
+    // Add right-click context menu
     const msgEl = document.getElementById('msg-' + msg.id);
     if (msgEl) {
-        attachDoubleTapLike(msgEl, msg);
-
-        // Add right-click context menu
         msgEl.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             openContextMenu(msg, e.clientX, e.clientY);
@@ -4813,45 +4738,6 @@ window.pollEvents = async function() {
 <button class="multi-select-btn" onclick="multiSelectForward()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>Переслать</button>
 <button class="multi-select-btn" onclick="multiSelectDelete()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>Удалить</button>
 <button class="multi-select-btn" onclick="exitMultiSelectMode()">Отмена</button>
-</div>
-</div>
-
-<!-- Theme Settings Modal -->
-<div class="modal hidden" id="themeModal">
-<div class="modal-content">
-<div class="modal-title">Тема оформления</div>
-<div class="modal-text">Выберите тему для приложения:</div>
-<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
-<div class="drawer-item" onclick="setTheme('dark')" style="background:#161616;border:1px solid #282828">
-<div class="drawer-item-left">
-<div style="width:24px;height:24px;border-radius:50%;background:#1c1c1e;border:2px solid #fff"></div>
-<span>Тёмная (по умолчанию)</span>
-</div>
-<div id="themeCheck-dark" style="color:#0a84ff;font-weight:700">✓</div>
-</div>
-<div class="drawer-item" onclick="setTheme('oled')" style="background:#000;border:1px solid #1a1a1a">
-<div class="drawer-item-left">
-<div style="width:24px;height:24px;border-radius:50%;background:#000;border:2px solid #333"></div>
-<span>AMOLED Чёрная</span>
-</div>
-<div id="themeCheck-oled" style="color:#0a84ff;font-weight:700;opacity:0">✓</div>
-</div>
-<div class="drawer-item" onclick="setTheme('blue')" style="background:#0d0d1f;border:1px solid #1a1a3a">
-<div class="drawer-item-left">
-<div style="width:24px;height:24px;border-radius:50%;background:#1a1a3a;border:2px solid #3a3a6a"></div>
-<span>Тёмно-синяя</span>
-</div>
-<div id="themeCheck-blue" style="color:#0a84ff;font-weight:700;opacity:0">✓</div>
-</div>
-<div class="drawer-item" onclick="setTheme('sepia')" style="background:#221e18;border:1px solid #3a3428">
-<div class="drawer-item-left">
-<div style="width:24px;height:24px;border-radius:50%;background:#2a2418;border:2px solid #5a5040"></div>
-<span>Сепия (для глаз)</span>
-</div>
-<div id="themeCheck-sepia" style="color:#0a84ff;font-weight:700;opacity:0">✓</div>
-</div>
-</div>
-<button class="btn" onclick="closeThemeModal()">Закрыть</button>
 </div>
 </div>
 
@@ -5586,24 +5472,47 @@ def proxy_file():
 @app.route('/api/stickers', methods=['POST'])
 def get_stickers():
     token = request.json.get('token')
-    # Get user's sticker packs
-    res = vk_request('store.getProducts', token, type='stickers', filters='purchased', extended=1, count=100)
 
-    packs = []
-    if isinstance(res, dict) and 'items' in res:
-        for item in res.get('items', []):
-            stickers = []
-            if 'stickers' in item:
+    # Get user's sticker products (purchased + free)
+    products = vk_request('store.getProducts', token, type='stickers', filters='purchased', extended=1, count=100)
+
+    # Get favorite stickers
+    favorites = vk_request('store.getFavoriteStickers', token)
+
+    items = []
+    fav_stickers = []
+
+    if isinstance(products, dict) and 'items' in products:
+        for item in products.get('items', []):
+            stickers_list = []
+            if 'stickers' in item and isinstance(item['stickers'], list):
                 for s in item['stickers']:
                     images = s.get('images_with_background', s.get('images', []))
-                    if images:
-                        stickers.append({'url': images[-1].get('url', '')})
-            packs.append({
-                'name': item.get('title', 'Pack'),
-                'stickers': stickers
+                    sticker_data = {
+                        'sticker_id': s.get('sticker_id', s.get('id', 0)),
+                        'images': images,
+                        'url': images[-1].get('url', '') if images else ''
+                    }
+                    stickers_list.append(sticker_data)
+
+            items.append({
+                'id': item.get('id'),
+                'title': item.get('title', 'Pack'),
+                'icon': item.get('icon', {}).get('base_url', '') if isinstance(item.get('icon'), dict) else '',
+                'preview': item.get('thumb_photo', ''),
+                'stickers': stickers_list
             })
 
-    return jsonify({'packs': packs})
+    if isinstance(favorites, dict) and 'items' in favorites:
+        for s in favorites.get('items', []):
+            images = s.get('images_with_background', s.get('images', []))
+            fav_stickers.append({
+                'sticker_id': s.get('sticker_id', s.get('id', 0)),
+                'images': images,
+                'url': images[-1].get('url', '') if images else ''
+            })
+
+    return jsonify({'items': items, 'favorites': fav_stickers})
 
 
 @app.route('/api/send_sticker', methods=['POST'])
@@ -5612,33 +5521,19 @@ def send_sticker():
     peer_id = request.json.get('peer_id')
     sticker_id = request.json.get('sticker_id', 0)
 
-    if sticker_id:
-        result = vk_request('messages.send', token, peer_id=peer_id, sticker_id=sticker_id, random_id=random.randint(1, 2147483647))
-        return jsonify({'result': result})
+    if not sticker_id:
+        return jsonify({'error': 'No sticker_id provided'}), 400
 
-    # If URL provided, download and send as doc
-    sticker_url = request.json.get('sticker_url', '')
-    if sticker_url:
-        try:
-            img_resp = get_session().get(sticker_url, timeout=10)
-            upload_server = vk_request('photos.getMessagesUploadServer', token, peer_id=peer_id)
-            upload_url = upload_server.get('upload_url')
-            files = {'photo': ('sticker.png', BytesIO(img_resp.content), 'image/png')}
-            upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
-            save_result = vk_request('photos.saveMessagesPhoto', token,
-                photo=upload_resp.get('photo'),
-                server=upload_resp.get('server'),
-                hash=upload_resp.get('hash')
-            )
-            if isinstance(save_result, list) and len(save_result) > 0:
-                photo = save_result[0]
-                attachment = f"photo{photo['owner_id']}_{photo['id']}"
-                vk_request('messages.send', token, peer_id=peer_id, attachment=attachment, random_id=random.randint(1, 2147483647))
-                return jsonify({'ok': True})
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
+    result = vk_request('messages.send', token, 
+        peer_id=peer_id, 
+        sticker_id=int(sticker_id),
+        random_id=random.randint(1, 2147483647)
+    )
 
-    return jsonify({'error': 'No sticker provided'}), 400
+    if isinstance(result, dict) and 'error' in result:
+        return jsonify(result), 400
+
+    return jsonify({'result': result})
 
 
 @app.route('/api/message', methods=['POST'])
@@ -5683,21 +5578,6 @@ def forward_messages():
         peer_id=peer_id, 
         forward_messages=message_ids,
         random_id=random.randint(1, 2147483647)
-    )
-    return jsonify({'result': result})
-
-
-@app.route('/api/reactions', methods=['POST'])
-def add_reaction():
-    token = request.json.get('token')
-    peer_id = request.json.get('peer_id')
-    message_id = request.json.get('message_id')
-    reaction_id = request.json.get('reaction_id', 1)
-
-    result = vk_request('messages.sendReaction', token,
-        peer_id=peer_id,
-        message_id=message_id,
-        reaction_id=reaction_id
     )
     return jsonify({'result': result})
 
