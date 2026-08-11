@@ -1161,11 +1161,6 @@ Kate Mobile API • Cloud Realtime E2EE
 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
 </button>
 
-<!-- SVG ICON FOR OFFICIAL STICKERS -->
-<button class="media-rec-btn" id="officialStickerBtn" onclick="toggleStickerPicker()" title="Официальные стикеры VK">
-<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-</button>
-
 <!-- SVG ICON FOR CUSTOM STICKER FROM GALLERY -->
 <button class="media-rec-btn" id="stickerBtn" onclick="createStickerFromPhoto()" title="Свой стикер из галереи (.mst)">
 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
@@ -2893,7 +2888,6 @@ function scrollToMsg(msgId) {
 async function processEncryptedAttachment(elemId, url, extInfo, retryCount = 0) {
     const elem = document.getElementById(elemId);
     if (!elem) {
-        // FIX: Retry if element not in DOM yet
         if (retryCount < 5) {
             setTimeout(() => processEncryptedAttachment(elemId, url, extInfo, retryCount + 1), 100);
         }
@@ -2907,6 +2901,9 @@ async function processEncryptedAttachment(elemId, url, extInfo, retryCount = 0) 
 
     try {
         const resp = await fetch(`/api/proxy_file?url=${encodeURIComponent(url)}`);
+        if (!resp.ok) {
+            throw new Error(`Proxy error: ${resp.status}`);
+        }
         const encArrayBuf = await resp.arrayBuffer();
 
         if (encArrayBuf.byteLength > 4) {
@@ -2943,10 +2940,11 @@ async function processEncryptedAttachment(elemId, url, extInfo, retryCount = 0) 
             }
         }
 
-        let fallbackMime = 'video/webm';
-        if (extInfo.includes('mgs') || extInfo.includes('meg') || extInfo.includes('audio')) fallbackMime = 'audio/webm';
+        let fallbackMime = 'application/octet-stream';
+        if (extInfo.includes('mgs') || extInfo.includes('audio')) fallbackMime = 'audio/webm';
         else if (extInfo.includes('meow') || extInfo.includes('image')) fallbackMime = 'image/jpeg';
         else if (extInfo.includes('mer') || extInfo.includes('video')) fallbackMime = 'video/mp4';
+        else if (extInfo.includes('mst')) fallbackMime = 'image/png';
 
         decryptedCache[elemId] = { blobUrl: `/api/proxy_file?url=${encodeURIComponent(url)}`, mime: fallbackMime, name: extInfo, extInfo };
         renderDecryptedMedia(elem, decryptedCache[elemId]);
@@ -2958,21 +2956,22 @@ async function processEncryptedAttachment(elemId, url, extInfo, retryCount = 0) 
 }
 
 function renderDecryptedMedia(elem, data) {
-    const isCircle = (data.name && (data.name.endsWith('.mkru') || data.name.endsWith('.mec'))) || 
-        data.mime.includes('mkru') || data.mime.includes('mec') || 
-        (data.extInfo && (data.extInfo.includes('mkru') || data.extInfo.includes('mec')));
+    const nameStr = (data.name || '').toLowerCase();
+    const extStr = (data.extInfo || '').toLowerCase();
+    const mimeStr = (data.mime || '').toLowerCase();
 
-    const isVoice = (data.name && (data.name.endsWith('.mgs') || data.name.endsWith('.meg'))) || 
-        data.mime.includes('mgs') || data.mime.includes('meg') || 
-        (data.extInfo && (data.extInfo.includes('mgs') || data.extInfo.includes('meg')));
+    const isCircle = nameStr.includes('.mkru') || nameStr.includes('.mec') || 
+                     extStr.includes('mkru') || extStr.includes('mec') || mimeStr.includes('video/webm');
 
-    const isPhoto = (data.name && data.name.endsWith('.meow')) || 
-        data.mime.startsWith('image/') || 
-        (data.extInfo && (data.extInfo.includes('meow') || data.extInfo.includes('image')));
+    const isVoice = nameStr.includes('.mgs') || nameStr.includes('.meg') || 
+                    extStr.includes('mgs') || extStr.includes('meg') || mimeStr.includes('audio/');
 
-    const isVideo = (data.name && data.name.endsWith('.mer')) || 
-        data.mime.startsWith('video/') || 
-        (data.extInfo && (data.extInfo.includes('mer') || data.extInfo.includes('video')));
+    const isPhoto = nameStr.includes('.meow') || extStr.includes('meow') || 
+                    (mimeStr.startsWith('image/') && !nameStr.includes('.mst'));
+
+    const isVideo = nameStr.includes('.mer') || extStr.includes('mer') || mimeStr.startsWith('video/mp4');
+
+    const isSticker = nameStr.includes('.mst') || extStr.includes('.mst');
 
     if (isCircle) {
         const container = document.createElement('div');
@@ -4692,32 +4691,44 @@ window.pollEvents = async function() {
                     }
 
                     if (currentPeer && String(peerId) === String(currentPeer)) {
-                        const isOut = (flags & 2) !== 0;
-                        const newMsg = {
-                            id: msgId,
-                            text: text,
-                            date: Math.floor(Date.now() / 1000),
-                            from_id: fromId,
-                            out: isOut ? 1 : 0,
-                            name: isOut ? 'Вы' : d?.name || 'Собеседник',
-                            photo: '',
-                            attachments: []
-                        };
-                        if (!renderedMsgIds.has(msgId)) {
-                            renderedMsgIds.add(msgId);
-                            const container = document.getElementById('messages');
-                            renderMessageItem(container, newMsg);
-                            container.scrollTop = container.scrollHeight;
-                            showScrollFab();
-                        }
-
-                        if (text && text.startsWith(ENCRYPT_PREFIX)) {
-                            setTimeout(() => {
-                                tryDecryptMessageRealTime(msgId, text);
-                            }, 50);
-                        }
-                    }
-                } else if (eventCode === 3) {
+                        // Подгружаем полные данные сообщения с вложениями
+                        fetch('/api/message', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ token, message_ids: msgId })
+                        }).then(r => r.json()).then(fullMsg => {
+                            if (fullMsg && !fullMsg.error && !renderedMsgIds.has(msgId)) {
+                                renderedMsgIds.add(msgId);
+                                const container = document.getElementById('messages');
+                                renderMessageItem(container, fullMsg);
+                                container.scrollTop = container.scrollHeight;
+                                showScrollFab();
+                                if (fullMsg.text && fullMsg.text.startsWith(ENCRYPT_PREFIX)) {
+                                    setTimeout(() => tryDecryptMessageRealTime(msgId, fullMsg.text), 50);
+                                }
+                            }
+                        }).catch(() => {
+                            // Фолбэк
+                            if (!renderedMsgIds.has(msgId)) {
+                                renderedMsgIds.add(msgId);
+                                const isOut = (flags & 2) !== 0;
+                                const newMsg = {
+                                    id: msgId,
+                                    text: text,
+                                    date: Math.floor(Date.now() / 1000),
+                                    from_id: fromId,
+                                    out: isOut ? 1 : 0,
+                                    name: isOut ? 'Вы' : d?.name || 'Собеседник',
+                                    photo: '',
+                                    attachments: []
+                                };
+                                const container = document.getElementById('messages');
+                                renderMessageItem(container, newMsg);
+                                container.scrollTop = container.scrollHeight;
+                                showScrollFab();
+                            }
+                        });
+                    }} else if (eventCode === 3) {
                     const msgId = u[1];
                     const elem = document.getElementById('msg-' + msgId);
                     if (elem) elem.closest('.msg-container').remove();
@@ -5151,7 +5162,9 @@ def upload_encrypted_doc():
     files = {'file': (file.filename, file.read(), 'application/octet-stream')}
     upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
 
-    save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=file.filename)
+    # ДОБАВЛЕН СУФФИКС .doc ДЛЯ ОБХОДА БЛОКИРОВКИ РАСШИРЕНИЙ В VK API
+    safe_title = file.filename if file.filename.endswith('.doc') else f"{file.filename}.doc"
+    save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=safe_title)
     attachment = extract_doc_attachment(save_result)
 
     if attachment:
@@ -5173,13 +5186,13 @@ def upload_normal():
     filename = file.filename.lower()
     file_bytes = file.read()
 
-    if filename.endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp', '.meow')):
+    if filename.endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp', '.meow', '.mst')):
         upload_server = vk_request('photos.getMessagesUploadServer', token, peer_id=peer_id)
         if isinstance(upload_server, dict) and 'error' in upload_server:
             return jsonify(upload_server), 400
 
         upload_url = upload_server.get('upload_url')
-        files = {'photo': (filename, BytesIO(file_bytes), file.content_type or 'image/jpeg')}
+        files = {'photo': (filename, BytesIO(file_bytes), file.content_type or 'image/png')}
         upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
 
         save_result = vk_request('photos.saveMessagesPhoto', token,
@@ -5202,7 +5215,8 @@ def upload_normal():
     files = {'file': (filename, BytesIO(file_bytes), file.content_type or 'application/octet-stream')}
     upload_resp = get_session().post(upload_url, files=files, timeout=15).json()
 
-    save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=filename)
+    safe_title = filename if filename.endswith('.doc') else f"{filename}.doc"
+    save_result = vk_request('docs.save', token, file=upload_resp.get('file'), title=safe_title)
     attachment = extract_doc_attachment(save_result)
 
     if attachment:
@@ -5495,8 +5509,12 @@ def proxy_file():
     if not url:
         return jsonify({'error': 'No URL'}), 400
     try:
-        resp = get_session().get(url, timeout=15)
-        return Response(resp.content, mimetype='application/octet-stream')
+        resp = get_session().get(url, timeout=15, allow_redirects=True)
+        if resp.status_code != 200:
+            return jsonify({'error': f'HTTP {resp.status_code}'}), resp.status_code
+        return Response(resp.content, mimetype='application/octet-stream', headers={
+            'Access-Control-Allow-Origin': '*'
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
