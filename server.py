@@ -8,6 +8,8 @@ from io import BytesIO
 from datetime import datetime
 from flask import Flask, render_template_string, request, jsonify, Response
 
+from cloud import cloud_bp
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET', os.urandom(32).hex())
 
@@ -560,28 +562,6 @@ input:checked + .slider:before{transform:translateX(20px)}
 .msg-circle-mode{background:transparent !important;padding:0 !important;border-radius:0 !important;box-shadow:none !important;max-width:200px !important}
 .msg-circle-mode .msg-time{position:absolute;bottom:6px;right:10px;background:rgba(0,0,0,0.55);padding:2px 6px;border-radius:10px;backdrop-filter:blur(4px);z-index:5}
 
-/* === STABLE MEDIA CONTAINER (no jumping) === */
-.msg-media-only{background:transparent !important;padding:4px !important;border:none !important;box-shadow:none !important;min-height:80px}
-.msg-media-only .msg-text{display:none !important}
-.msg-media-only .msg-time{display:none !important}
-
-/* Media wrapper — stable size during load/decrypt */
-.media-wrap{position:relative;display:inline-block;max-width:100%;border-radius:12px;overflow:hidden;min-height:60px;min-width:80px;background:#111}
-.media-wrap.loaded{background:transparent;min-height:0;min-width:0}
-.media-wrap .msg-photo,.media-wrap .msg-video{margin:0 !important;border-radius:12px;display:block}
-.media-wrap .media-time{position:absolute;bottom:6px;right:8px;background:rgba(0,0,0,0.45);backdrop-filter:blur(4px);color:#fff;font-size:11px;font-weight:500;padding:3px 7px;border-radius:10px;pointer-events:none;z-index:5;line-height:1}
-.media-wrap .media-time .status{margin-left:3px;opacity:0.8}
-
-/* Sticker wrapper */
-.sticker-wrap{position:relative;display:inline-flex;justify-content:center;align-items:center;min-width:100px;min-height:100px;background:#111;border-radius:18px}
-.sticker-wrap.loaded{background:transparent;min-width:0;min-height:0}
-.sticker-wrap img{width:140px;height:140px;object-fit:contain;display:block;border-radius:18px;border:none !important;outline:none !important;box-shadow:none !important;filter:drop-shadow(0 4px 10px rgba(0,0,0,0.45))}
-.sticker-wrap .media-time{position:absolute;bottom:4px;right:6px;background:rgba(0,0,0,0.25);backdrop-filter:blur(4px);color:#fff;font-size:11px;font-weight:500;padding:2px 6px;border-radius:10px;pointer-events:none;z-index:5;line-height:1}
-
-/* Decrypt loading placeholder inside media wrap */
-.media-loading{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;z-index:2}
-.media-loading .loader{border-color:#333;border-top-color:#0a84ff;width:20px;height:20px}
-
 .msg-reply-quote{background:rgba(255,255,255,0.08);border-left:3px solid #8e8e93;padding:4px 8px;border-radius:4px;margin-bottom:6px;font-size:12px;cursor:pointer}
 .msg-reply-name{font-weight:600;color:#aaa;margin-bottom:2px;font-size:11px}
 .msg-reply-text{color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -947,6 +927,12 @@ input:checked + .slider:before{transform:translateX(20px)}
 <div class="drawer-item-left">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
 <span>Облачное E2EE Шифрование</span>
+</div>
+</div>
+<div class="drawer-item" onclick="window.location.href='/cloud'">
+<div class="drawer-item-left">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+<span>☁️ Облако VK Tsuyu</span>
 </div>
 </div>
 <div style="flex:1"></div>
@@ -2592,7 +2578,7 @@ function renderMessageItem(containerOrFragment, msg) {
     swipeBgRight.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>`;
 
     const div = document.createElement('div');
-    div.className = 'msg ' + (msg.out ? 'msg-out' : 'msg-in') + (hasOnlyMedia ? ' msg-media-only' : '');
+    div.className = 'msg ' + (msg.out ? 'msg-out' : 'msg-in');
     div.id = 'msg-' + msg.id;
 
 
@@ -2617,14 +2603,6 @@ function renderMessageItem(containerOrFragment, msg) {
     let displayText = msg.text || '';
     let isPureCircle = false;
     let isSticker = false;
-    const msgTime = msg.date ? new Date(msg.date * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : '';
-    const msgStatus = msg.out ? '<span class="status">✓</span>' : '';
-
-    let hasOnlyMedia = false;
-    if (msg.attachments && msg.attachments.length > 0 && !msg.text && !msg.reply_message) {
-        const types = msg.attachments.map(a => a.type);
-        hasOnlyMedia = types.every(t => ['photo','video','sticker','doc'].includes(t));
-    }
 
     if (msg.attachments) {
         for (const a of msg.attachments) {
@@ -2658,13 +2636,13 @@ function renderMessageItem(containerOrFragment, msg) {
                 const stickerUrl = images.length > 0 ? images[images.length - 1].url : '';
                 if (stickerUrl) {
                     const proxiedUrl = `/api/proxy_file?url=${encodeURIComponent(stickerUrl)}`;
-                    html += `<div class="sticker-wrap loaded"><img src="${stickerUrl}" referrerpolicy="no-referrer" crossorigin="anonymous" onerror="this.onerror=null;this.src='${proxiedUrl}';" style="width:130px;height:130px;object-fit:contain;display:block"><div class="media-time">${msgTime}${msgStatus}</div></div>`;
+                    html += `<img src="${stickerUrl}" referrerpolicy="no-referrer" crossorigin="anonymous" onerror="this.onerror=null;this.src='${proxiedUrl}';" style="width:130px;height:130px;object-fit:contain;display:block">`;
                 }
             } else if (a.type === 'photo') {
                 const p = a.photo?.sizes?.find(s => s.type === 'x') || a.photo?.sizes?.[a.photo?.sizes?.length - 1];
                 if (p) {
                     const photoUrl = p.url;
-                    html += `<div class="media-wrap loaded"><img class="msg-photo" src="${photoUrl}" onclick="openPhotoViewer('${photoUrl}')"><div class="media-time">${msgTime}${msgStatus}</div></div>`;
+                    html += `<img class="msg-photo" src="${photoUrl}" onclick="openPhotoViewer('${photoUrl}')">`;
                 }
             } else if (a.type === 'video') {
                 const vidObj = a.video || {};
@@ -2672,11 +2650,11 @@ function renderMessageItem(containerOrFragment, msg) {
                 const frameUrl = vidObj.first_frame?.find(s => s.url)?.url || vidObj.image?.[0]?.url;
 
                 if (playerUrl) {
-                    html += `<div class="media-wrap loaded"><div class="tg-channel-video-wrap" style="border-radius:12px;overflow:hidden">
+                    html += `<div class="tg-channel-video-wrap" style="margin-top:6px;border-radius:12px;overflow:hidden">
                         <iframe class="tg-channel-iframe" src="${playerUrl}" allowfullscreen></iframe>
-                    </div><div class="media-time">${msgTime}${msgStatus}</div></div>`;
+                    </div>`;
                 } else if (frameUrl) {
-                    html += `<div class="media-wrap loaded"><img class="msg-photo" src="${frameUrl}" onclick="openPhotoViewer('${frameUrl}')"><div class="media-time">${msgTime}${msgStatus}</div></div>`;
+                    html += `<img class="msg-photo" src="${frameUrl}" onclick="openPhotoViewer('${frameUrl}')">`;
                 }
             } else if (a.type === 'video_message') {
                 // FIX: Support video messages (circles) from regular VK app
@@ -2771,7 +2749,7 @@ function renderMessageItem(containerOrFragment, msg) {
         }
     }
 
-    if (isSticker && !hasOnlyMedia) {
+    if (isSticker) {
         div.classList.add('msg-sticker');
     }
 
@@ -2779,9 +2757,8 @@ function renderMessageItem(containerOrFragment, msg) {
         div.classList.add('msg-circle-mode');
     }
 
-    if (!hasOnlyMedia) {
-        html += `<div class="msg-time">${msgTime} ${msgStatus}</div>`;
-    }
+    const msgTime = msg.date ? new Date(msg.date * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : '';
+    html += `<div class="msg-time">${msgTime} ${msg.out ? '<span class="msg-status">✓</span>' : ''}</div>`;
     
     div.innerHTML = html;
     containerDiv.appendChild(div);
@@ -5769,6 +5746,9 @@ def get_backup(vk_id, data_type):
 @app.route('/api/ping', methods=['GET'])
 def ping():
     return jsonify({'ok': True, 'time': datetime.now().isoformat()})
+
+# Register cloud storage blueprint
+app.register_blueprint(cloud_bp, url_prefix='/cloud')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
