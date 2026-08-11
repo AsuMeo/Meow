@@ -4191,7 +4191,7 @@ function setPinCode() {
     if (newPin === '') {
         localStorage.removeItem('vk_pin');
         alert('Блокировка отключена');
-    } else if (newPin && /^\d{4}$/.test(newPin)) {
+    } else if (newPin && /^\\d{4}$/.test(newPin)) {
         localStorage.setItem('vk_pin', newPin);
         alert('PIN установлен');
     } else if (newPin) {
