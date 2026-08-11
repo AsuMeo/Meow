@@ -470,15 +470,15 @@ input:checked + .slider:before{transform:translateX(20px)}
 .messages{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch}
 
 /* Message styling */
-.msg-container{position:relative;display:flex;width:100%;align-items:flex-end;touch-action:pan-y;margin-bottom:2px;border:none !important;outline:none !important;box-shadow:none !important}
+.msg-container{position:relative;display:flex;width:100%;align-items:flex-end;touch-action:pan-y;margin-bottom:2px}
 .msg-swipe-bg{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;width:40px;opacity:0;transition:opacity 0.15s;color:#8e8e93;z-index:1}
 .msg-swipe-right{right:-40px}
 
 .msg{max-width:82%;padding:8px 12px;border-radius:18px;font-size:14px;line-height:1.4;word-wrap:break-word;position:relative;animation:msgAppear 0.15s ease-out}
 @keyframes msgAppear{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
-.msg-in{align-self:flex-start;background:#1c1c1e;border-bottom-left-radius:4px;color:#fff;border:none !important;outline:none !important;box-shadow:none !important}
-.msg-out{align-self:flex-end;background:#2c2c2e;border-bottom-right-radius:4px;color:#fff;border:none !important;outline:none !important;box-shadow:none !important}
+.msg-in{align-self:flex-start;background:#1c1c1e;border-bottom-left-radius:4px;color:#fff}
+.msg-out{align-self:flex-end;background:#2c2c2e;border-bottom-right-radius:4px;color:#fff}
 
 /* Стикеры в стиле Telegram */
 .msg-sticker{
@@ -523,60 +523,6 @@ input:checked + .slider:before{transform:translateX(20px)}
     gap: 3px;
 }
 
-/* === ГЛОБАЛЬНОЕ УДАЛЕНИЕ ОБВОДОК У ВСЕХ МЕДИА === */
-/* Все изображения и видео внутри сообщений — без обводок */
-.msg img,
-.msg video,
-.msg .msg-photo,
-.msg .msg-video,
-.msg .msg-sticker,
-.msg .msg-sticker img,
-.msg .msg-sticker-vk,
-.msg .msg-circle-frame,
-.msg .tg-circle-video,
-.msg .tg-circle-container,
-.msg .msg-file,
-.msg .tg-channel-media,
-.msg .tg-channel-iframe,
-.msg .link-preview-img {
-    border: none !important;
-    outline: none !important;
-    box-shadow: none !important;
-    -webkit-box-shadow: none !important;
-    -moz-box-shadow: none !important;
-}
-
-/* Специально для кружочков — скругление через CSS */
-.msg .msg-circle-frame {
-    border-radius: 50%;
-    width: 200px;
-    height: 200px;
-    object-fit: cover;
-    display: block;
-}
-
-/* Специально для официальных стикеров ВК */
-.msg .msg-sticker-vk {
-    width: 130px;
-    height: 130px;
-    object-fit: contain;
-    display: block;
-    border: none !important;
-    outline: none !important;
-    box-shadow: none !important;
-}
-
-/* Специально для .mst стикеров */
-.msg .msg-sticker-img {
-    width: 140px;
-    height: 140px;
-    object-fit: contain;
-    display: block;
-    border: none !important;
-    outline: none !important;
-    box-shadow: none !important;
-}
-
 /* Оформление времени поверх фото/видео/стикеров (Telegram Style) */
 .media-wrapper,
 .sticker-wrapper {
@@ -613,6 +559,22 @@ input:checked + .slider:before{transform:translateX(20px)}
 
 .msg-circle-mode{background:transparent !important;padding:0 !important;border-radius:0 !important;box-shadow:none !important;max-width:200px !important}
 .msg-circle-mode .msg-time{position:absolute;bottom:6px;right:10px;background:rgba(0,0,0,0.55);padding:2px 6px;border-radius:10px;backdrop-filter:blur(4px);z-index:5}
+
+/* === MEDIA-ONLY MESSAGE (photo/video/sticker) — removes bubble background === */
+.msg-media-only{background:transparent !important;padding:0 !important;border:none !important;box-shadow:none !important;overflow:visible !important}
+.msg-media-only .msg-text{display:none !important}
+.msg-media-only .msg-time{position:absolute;bottom:6px;right:8px;background:rgba(0,0,0,0.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);color:#fff;font-size:11px;font-weight:500;line-height:1;padding:3px 6px;border-radius:10px;pointer-events:none;display:flex;align-items:center;gap:3px;z-index:5}
+.msg-media-only.msg-out .msg-time{background:rgba(0,0,0,0.45)}
+
+/* Wrapper for media with time overlay */
+.media-wrapper{position:relative;display:inline-block;max-width:100%;overflow:hidden;border-radius:12px}
+.media-wrapper .msg-photo,.media-wrapper .msg-video{margin:0 !important;border-radius:12px}
+.media-time-badge{position:absolute;bottom:6px;right:8px;background:rgba(0,0,0,0.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);color:#fff;font-size:11px;font-weight:500;line-height:1;padding:3px 6px;border-radius:10px;pointer-events:none;display:flex;align-items:center;gap:3px;z-index:5}
+
+/* Sticker wrapper with time */
+.sticker-wrapper{position:relative;display:inline-flex;justify-content:center;align-items:center;max-width:160px}
+.sticker-wrapper img{width:140px;height:140px;object-fit:contain;display:block;border-radius:18px;border:none !important;outline:none !important;box-shadow:none !important;filter:drop-shadow(0 4px 10px rgba(0,0,0,0.45))}
+.sticker-wrapper .media-time-badge{background:rgba(0,0,0,0.25);bottom:4px;right:6px}
 
 .msg-reply-quote{background:rgba(255,255,255,0.08);border-left:3px solid #8e8e93;padding:4px 8px;border-radius:4px;margin-bottom:6px;font-size:12px;cursor:pointer}
 .msg-reply-name{font-weight:600;color:#aaa;margin-bottom:2px;font-size:11px}
@@ -862,9 +824,8 @@ input:checked + .slider:before{transform:translateX(20px)}
 @keyframes skeletonPulse{0%{opacity:0.4}50%{opacity:0.8}100%{opacity:0.4}}
 
 /* Improved message bubble shadows */
-.msg{box-shadow:none !important}
-.msg-in{box-shadow:none !important}
-.msg-out{box-shadow:none !important}
+.msg{box-shadow:0 1px 2px rgba(0,0,0,0.2)}
+.msg-out{box-shadow:0 1px 2px rgba(0,0,0,0.3)}
 
 /* Call button in header */
 .call-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;color:#34c759;background:rgba(52,199,89,0.1);border:none;outline:none;margin-right:6px}
@@ -2625,7 +2586,12 @@ function renderMessageItem(containerOrFragment, msg) {
     swipeBgRight.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>`;
 
     const div = document.createElement('div');
-    div.className = 'msg ' + (msg.out ? 'msg-out' : 'msg-in');
+    let hasOnlyMedia = false;
+    if (msg.attachments && msg.attachments.length > 0 && !msg.text && !msg.reply_message) {
+        const types = msg.attachments.map(a => a.type);
+        hasOnlyMedia = types.every(t => ['photo','video','sticker','doc'].includes(t));
+    }
+    div.className = 'msg ' + (msg.out ? 'msg-out' : 'msg-in') + (hasOnlyMedia ? ' msg-media-only' : '');
     div.id = 'msg-' + msg.id;
 
 
@@ -2683,13 +2649,13 @@ function renderMessageItem(containerOrFragment, msg) {
                 const stickerUrl = images.length > 0 ? images[images.length - 1].url : '';
                 if (stickerUrl) {
                     const proxiedUrl = `/api/proxy_file?url=${encodeURIComponent(stickerUrl)}`;
-                    html += `<img src="${stickerUrl}" referrerpolicy="no-referrer" crossorigin="anonymous" onerror="this.onerror=null;this.src='${proxiedUrl}';" style="width:130px;height:130px;object-fit:contain;display:block">`;
+                    html += `<div class="sticker-wrapper"><img src="${stickerUrl}" referrerpolicy="no-referrer" crossorigin="anonymous" onerror="this.onerror=null;this.src='${proxiedUrl}';" style="width:130px;height:130px;object-fit:contain;display:block"><div class="media-time-badge">${msgTime}</div></div>`;
                 }
             } else if (a.type === 'photo') {
                 const p = a.photo?.sizes?.find(s => s.type === 'x') || a.photo?.sizes?.[a.photo?.sizes?.length - 1];
                 if (p) {
                     const photoUrl = p.url;
-                    html += `<img class="msg-photo" src="${photoUrl}" onclick="openPhotoViewer('${photoUrl}')">`;
+                    html += `<div class="media-wrapper"><img class="msg-photo" src="${photoUrl}" onclick="openPhotoViewer('${photoUrl}')"><div class="media-time-badge">${msgTime}</div></div>`;
                 }
             } else if (a.type === 'video') {
                 const vidObj = a.video || {};
@@ -2697,11 +2663,11 @@ function renderMessageItem(containerOrFragment, msg) {
                 const frameUrl = vidObj.first_frame?.find(s => s.url)?.url || vidObj.image?.[0]?.url;
 
                 if (playerUrl) {
-                    html += `<div class="tg-channel-video-wrap" style="margin-top:6px;border-radius:12px;overflow:hidden">
+                    html += `<div class="media-wrapper"><div class="tg-channel-video-wrap" style="border-radius:12px;overflow:hidden">
                         <iframe class="tg-channel-iframe" src="${playerUrl}" allowfullscreen></iframe>
-                    </div>`;
+                    </div><div class="media-time-badge">${msgTime}</div></div>`;
                 } else if (frameUrl) {
-                    html += `<img class="msg-photo" src="${frameUrl}" onclick="openPhotoViewer('${frameUrl}')">`;
+                    html += `<div class="media-wrapper"><img class="msg-photo" src="${frameUrl}" onclick="openPhotoViewer('${frameUrl}')"><div class="media-time-badge">${msgTime}</div></div>`;
                 }
             } else if (a.type === 'video_message') {
                 // FIX: Support video messages (circles) from regular VK app
@@ -2717,7 +2683,7 @@ function renderMessageItem(containerOrFragment, msg) {
                         <div class="tg-circle-overlay"></div>
                     </div>`;
                 } else if (frameUrl) {
-                    html += `<img class="msg-photo msg-circle-frame" src="${frameUrl}">`;
+                    html += `<img class="msg-photo" src="${frameUrl}" style="border-radius:50%;width:200px;height:200px;object-fit:cover">`;
                 }
             } else if (a.type === 'audio_message') {
                 const am = a.audio_message || {};
@@ -2796,7 +2762,7 @@ function renderMessageItem(containerOrFragment, msg) {
         }
     }
 
-    if (isSticker) {
+    if (isSticker && !hasOnlyMedia) {
         div.classList.add('msg-sticker');
     }
 
@@ -2805,7 +2771,9 @@ function renderMessageItem(containerOrFragment, msg) {
     }
 
     const msgTime = msg.date ? new Date(msg.date * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : '';
-    html += `<div class="msg-time">${msgTime} ${msg.out ? '<span class="msg-status">✓</span>' : ''}</div>`;
+    if (!hasOnlyMedia) {
+        html += `<div class="msg-time">${msgTime} ${msg.out ? '<span class="msg-status">✓</span>' : ''}</div>`;
+    }
     
     div.innerHTML = html;
     containerDiv.appendChild(div);
@@ -3125,15 +3093,9 @@ function renderDecryptedMedia(elem, data) {
     if (isCircle) {
         const container = document.createElement('div');
         container.className = 'tg-circle-container';
-        container.style.border = 'none';
-        container.style.outline = 'none';
-        container.style.boxShadow = 'none';
-
+        
         const video = document.createElement('video');
         video.className = 'tg-circle-video';
-        video.style.border = 'none';
-        video.style.outline = 'none';
-        video.style.boxShadow = 'none';
         video.src = data.blobUrl;
         video.loop = true;
         video.playsInline = true;
@@ -3141,9 +3103,6 @@ function renderDecryptedMedia(elem, data) {
 
         const overlay = document.createElement('div');
         overlay.className = 'tg-circle-overlay';
-        overlay.style.border = 'none';
-        overlay.style.outline = 'none';
-        overlay.style.boxShadow = 'none';
 
         container.appendChild(video);
         container.appendChild(overlay);
@@ -3218,38 +3177,32 @@ function renderDecryptedMedia(elem, data) {
     } else if (isPhoto) {
         const img = document.createElement('img');
         img.className = 'msg-photo';
-        img.style.border = 'none';
-        img.style.outline = 'none';
-        img.style.boxShadow = 'none';
         img.src = data.blobUrl;
         img.onclick = () => openPhotoViewer(data.blobUrl);
         elem.replaceWith(img);
     } else if (isVideo) {
         const vid = document.createElement('video');
         vid.className = 'msg-video';
-        vid.style.border = 'none';
-        vid.style.outline = 'none';
-        vid.style.boxShadow = 'none';
         vid.src = data.blobUrl;
         vid.controls = true;
         elem.replaceWith(vid);
     } else if ((data.name && data.name.endsWith('.mst')) || (data.extInfo && data.extInfo.includes('mst')) || data.mime === 'image/png') {
         const img = document.createElement('img');
-        img.className = 'msg-sticker-img';
-        img.style.border = 'none';
-        img.style.outline = 'none';
-        img.style.boxShadow = 'none';
+        img.style.width = '140px';
+        img.style.height = '140px';
+        img.style.objectFit = 'contain';
+        img.style.display = 'block';
         img.src = data.blobUrl;
 
         const parentMsg = elem.closest('.msg');
         if (parentMsg) {
+            // Применяем новый класс для стилей Telegram
             parentMsg.classList.add('msg-sticker');
+            // Удаляем старые inline-стили, которые теперь управляются CSS-классом
             parentMsg.style.background = '';
             parentMsg.style.padding = '';
             parentMsg.style.borderRadius = '';
             parentMsg.style.boxShadow = '';
-            parentMsg.style.border = '';
-            parentMsg.style.outline = '';
             parentMsg.style.maxWidth = '';
         }
         elem.replaceWith(img);
