@@ -494,25 +494,28 @@ input:checked + .slider:before{transform:translateX(20px)}
     min-height: 140px; /* Минимальная высота, чтобы вместить стикер и время */
 }
 .msg-sticker img{
-    width:140px;
-    height:140px;
-    object-fit:contain;
-    display:block;
+    width: 140px;
+    height: 140px;
+    object-fit: contain;
+    display: block;
+    border-radius: 18px;
+    filter: drop-shadow(0 4px 10px rgba(0,0,0,0.45));
 }
-.msg-sticker .msg-time { /* Перепозиционирование времени для стикеров */
+.msg-sticker .msg-time {
     position: absolute;
-    bottom: 6px; /* Отступ снизу */
-    right: 10px; /* Отступ справа */
-    background: rgba(0,0,0,0.55); /* Полупрозрачный фон */
+    bottom: 4px;
+    right: 6px;
+    background: rgba(0,0,0,0.65);
     padding: 2px 6px;
     border-radius: 10px;
-    backdrop-filter: blur(4px); /* Эффект размытия */
-    z-index: 5; /* Поверх стикера */
-    color: #fff; /* Белый текст */
-    display:flex;
-    align-items:center;
-    justify-content:flex-end;
-    gap:3px;
+    backdrop-filter: blur(6px);
+    z-index: 5;
+    color: #fff;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 3px;
 }
 
 .msg-circle-mode{background:transparent !important;padding:0 !important;border-radius:0 !important;box-shadow:none !important;max-width:200px !important}
@@ -2577,7 +2580,8 @@ function renderMessageItem(containerOrFragment, msg) {
                 const images = a.sticker?.images || a.sticker?.images_with_background || [];
                 const stickerUrl = images.length > 0 ? images[images.length - 1].url : '';
                 if (stickerUrl) {
-                    html += `<img src="${stickerUrl}" style="width:130px;height:130px;object-fit:contain;display:block">`;
+                    const proxiedUrl = `/api/proxy_file?url=${encodeURIComponent(stickerUrl)}`;
+                    html += `<img src="${stickerUrl}" referrerpolicy="no-referrer" crossorigin="anonymous" onerror="this.onerror=null;this.src='${proxiedUrl}';" style="width:130px;height:130px;object-fit:contain;display:block">`;
                 }
             } else if (a.type === 'photo') {
                 const p = a.photo?.sizes?.find(s => s.type === 'x') || a.photo?.sizes?.[a.photo?.sizes?.length - 1];
@@ -3576,6 +3580,16 @@ async function createStickerFromPhoto() {
                     const size = 512;
                     canvas.width = size;
                     canvas.height = size;
+
+                    const radius = 48; // Скругление углов для стиля ТГ
+                    ctx.beginPath();
+                    ctx.moveTo(radius, 0);
+                    ctx.arcTo(size, 0, size, size, radius);
+                    ctx.arcTo(size, size, 0, size, radius);
+                    ctx.arcTo(0, size, 0, 0, radius);
+                    ctx.arcTo(0, 0, size, 0, radius);
+                    ctx.closePath();
+                    ctx.clip();
 
                     const minDim = Math.min(img.width, img.height);
                     const sx = (img.width - minDim) / 2;
@@ -4593,51 +4607,52 @@ showDialogsScreen = function() {
 // ЭТО ЕДИНСТВЕННЫЙ МЕХАНИЗМ ОБРАБОТКИ ВЗАИМОДЕЙСТВИЙ С СООБЩЕНИЯМИ
 const originalRenderMessageItem = renderMessageItem;
 renderMessageItem = function(containerOrFragment, msg) {
-    // Вызываем оригинальную функцию рендеринга сообщения
     originalRenderMessageItem(containerOrFragment, msg);
 
     const msgEl = document.getElementById('msg-' + msg.id);
     if (!msgEl) return;
 
     let longPressTimer;
-    let touchMoved = false; // Флаг, указывающий, было ли движение пальца
+    let startX = 0, startY = 0;
+    let touchMoved = false;
 
-    // Обработчик touchstart: запускает таймер для долгого нажатия
     msgEl.addEventListener('touchstart', (e) => {
-        touchMoved = false; // Сбрасываем флаг движения
-        // Отменяем стандартное контекстное меню браузера при долгом нажатии
-        e.preventDefault(); 
+        touchMoved = false;
+        if (e.touches.length === 1) {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
 
-        if (e.touches.length === 1) { // Обрабатываем только одно касание
             longPressTimer = setTimeout(() => {
-                if (!multiSelectMode) {
-                    // Если не в режиме мультивыбора, открываем action sheet
-                    openActionSheet(msg);
-                } else {
-                    // Если в режиме мультивыбора, переключаем выделение
-                    toggleMessageSelect(msg.id);
+                if (!touchMoved) {
+                    if (navigator.vibrate) navigator.vibrate(20);
+                    if (!multiSelectMode) {
+                        openActionSheet(msg);
+                    } else {
+                        toggleMessageSelect(msg.id);
+                    }
                 }
-            }, 600); // 600мс для распознавания долгого нажатия
+            }, 500);
         }
-    }, { passive: false }); // Должно быть non-passive, чтобы e.preventDefault() работало
-
-    // Обработчик touchmove: если палец движется значительно, отменяем долгое нажатие
-    msgEl.addEventListener('touchmove', () => {
-        touchMoved = true;
-        clearTimeout(longPressTimer);
     }, { passive: true });
 
-    // Обработчик touchend: очищает таймер; если это было короткое нажатие в режиме мультивыбора, переключает выделение
-    msgEl.addEventListener('touchend', (e) => {
+    msgEl.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 1) {
+            const diffX = Math.abs(e.touches[0].clientX - startX);
+            const diffY = Math.abs(e.touches[0].clientY - startY);
+            if (diffX > 8 || diffY > 8) { // Если палец сдвинулся больше чем на 8px — это скролл
+                touchMoved = true;
+                clearTimeout(longPressTimer);
+            }
+        }
+    }, { passive: true });
+
+    msgEl.addEventListener('touchend', () => {
         clearTimeout(longPressTimer);
-        // Если это было короткое нажатие (без значительного движения) И мы в режиме мультивыбора,
-        // то переключаем выделение сообщения.
         if (!touchMoved && multiSelectMode) {
-             toggleMessageSelect(msg.id);
+            toggleMessageSelect(msg.id);
         }
     }, { passive: true });
 
-    // Обработчик правого клика (для десктопа): открывает action sheet
     msgEl.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         openActionSheet(msg);
