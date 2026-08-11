@@ -482,16 +482,18 @@ input:checked + .slider:before{transform:translateX(20px)}
 
 /* Стикеры в стиле Telegram */
 .msg-sticker{
-    background:transparent !important; /* Без фона */
-    padding: 0 !important;             /* Без отступов */
-    box-shadow: none !important;       /* Без тени */
-    border-radius: 0 !important;       /* Без скругления углов */
-    max-width: 160px !important;       /* Ограничение ширины */
-    display: flex;                     /* Использовать flexbox для центрирования */
+    background: transparent !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    outline: none !important;
+    border-radius: 0 !important;
+    max-width: 160px !important;
+    display: flex;
     justify-content: center;
     align-items: center;
-    position: relative; /* Для правильного позиционирования времени */
-    min-height: 140px; /* Минимальная высота, чтобы вместить стикер и время */
+    position: relative;
+    min-height: 140px;
 }
 .msg-sticker img{
     width: 140px;
@@ -499,6 +501,9 @@ input:checked + .slider:before{transform:translateX(20px)}
     object-fit: contain;
     display: block;
     border-radius: 18px;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
     filter: drop-shadow(0 4px 10px rgba(0,0,0,0.45));
 }
 .msg-sticker .msg-time {
@@ -518,29 +523,39 @@ input:checked + .slider:before{transform:translateX(20px)}
     gap: 3px;
 }
 
-/* E2EE Плашка реакций, прикреплённая к сообщению */
-.msg-reactions-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 4px;
-    z-index: 6;
-}
-.msg-reaction-badge {
-    background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.18);
+/* Оформление времени поверх фото/видео/стикеров (Telegram Style) */
+.media-wrapper,
+.sticker-wrapper {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
     border-radius: 12px;
-    padding: 2px 7px;
-    font-size: 13px;
-    display: inline-flex;
-    align-items: center;
+}
+.media-time-badge {
+    position: absolute;
+    bottom: 6px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.45);
     backdrop-filter: blur(4px);
-    animation: popReaction 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    -webkit-backdrop-filter: blur(4px);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+    padding: 3px 6px;
+    border-radius: 10px;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    z-index: 5;
 }
-@keyframes popReaction {
-    from { transform: scale(0.5); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
+.sticker-wrapper .media-time-badge {
+    background: rgba(0, 0, 0, 0.25);
 }
+
+
 
 .msg-circle-mode{background:transparent !important;padding:0 !important;border-radius:0 !important;box-shadow:none !important;max-width:200px !important}
 .msg-circle-mode .msg-time{position:absolute;bottom:6px;right:10px;background:rgba(0,0,0,0.55);padding:2px 6px;border-radius:10px;backdrop-filter:blur(4px);z-index:5}
@@ -582,6 +597,12 @@ input:checked + .slider:before{transform:translateX(20px)}
 
 .msg-photo{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;object-fit:cover;cursor:pointer;background:#111;border:none!important;outline:none!important;box-shadow:none!important}
 .msg-video{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;background:#000;border:none!important;outline:none!important;box-shadow:none!important}
+/* Удаление обводок у медиа-контейнеров */
+.msg-photo, .msg-video, .msg-sticker, .msg-sticker img {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
 .msg-file{background:rgba(255,255,255,.05);padding:10px;border-radius:12px;margin-top:6px;display:flex;align-items:center;gap:10px;cursor:pointer;color:#aaa}
 
 /* Input Bar & Actions */
@@ -1301,12 +1322,6 @@ Kate Mobile API • Cloud Realtime E2EE
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
 Удалить
 </div>
-<div class="action-sheet-item" onclick="sendQuickReaction('👍')">👍 Реакция</div>
-<div class="action-sheet-item" onclick="sendQuickReaction('❤️')">❤️ Реакция</div>
-<div class="action-sheet-item" onclick="sendQuickReaction('😂')">😂 Реакция</div>
-<div class="action-sheet-item" onclick="sendQuickReaction('😮')">😮 Реакция</div>
-<div class="action-sheet-item" onclick="sendQuickReaction('😢')">😢 Реакция</div>
-<div class="action-sheet-item" onclick="sendQuickReaction('🔥')">🔥 Реакция</div>
 <div class="action-sheet-item" style="justify-content:center;color:#888" onclick="closeActionSheet()">
 Отмена
 </div>
@@ -2514,15 +2529,7 @@ async function tryDecryptMessageRealTime(msgId, encryptedText) {
             const plainText = new TextDecoder().decode(decBuf);
             decryptedCache[msgId] = plainText;
 
-            // Проверяем, является ли расшифрованное сообщение реакцией к другому сообщению
-            try {
-                if (plainText.startsWith('{') && plainText.includes('is_reaction')) {
-                    const parsed = JSON.parse(plainText);
-                    if (parsed.is_reaction && parsed.target_id && parsed.reaction) {
-                        attachReactionToMessageUI(parsed.target_id, parsed.reaction);
-                    }
-                }
-            } catch(eJson) {}
+
 
             // Используем setTimeout, чтобы гарантировать, что элемент уже находится в DOM
             setTimeout(() => {
@@ -2821,76 +2828,6 @@ function openActionSheet(msg) {
 
 function closeActionSheet() {
     document.getElementById('actionSheet').classList.add('hidden');
-}
-
-/* --- E2EE РЕАКЦИИ --- */
-async function sendQuickReaction(emoji) {
-    closeActionSheet();
-    if (!selectedMsgForAction || !currentPeer) return;
-
-    const targetId = selectedMsgForAction.id;
-    showUploadProgress('Зашифровка реакции...');
-
-    // Формируем структуру реакции с ID целевого сообщения
-    const reactionPayload = JSON.stringify({
-        is_reaction: true,
-        reaction: emoji,
-        target_id: targetId
-    });
-
-    let sendText = reactionPayload;
-
-    if (encryptionEnabled) {
-        try {
-            const peerKey = await getPeerPubKey(currentPeer);
-            if (peerKey) {
-                const plainBuf = new TextEncoder().encode(reactionPayload).buffer;
-                const encObj = await clientEncryptData(peerKey, plainBuf);
-                sendText = ENCRYPT_PREFIX + JSON.stringify(encObj);
-            }
-        } catch(eEnc) {
-            console.error("Reaction encryption failed:", eEnc);
-        }
-    }
-
-    try {
-        await fetch('/api/send', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                token,
-                peer_id: currentPeer,
-                text: sendText,
-                reply_to: targetId
-            })
-        });
-
-        // Отображаем реакцию локально мгновенно
-        attachReactionToMessageUI(targetId, emoji);
-        loadMessages(true);
-    } catch(err) {
-        console.error("Reaction send error:", err);
-    } finally {
-        hideUploadProgress();
-    }
-}
-
-// Функция добавления плашки реакции прямо на блок сообщения по его ID
-function attachReactionToMessageUI(msgId, emoji) {
-    const msgEl = document.getElementById('msg-' + msgId);
-    if (!msgEl) return;
-
-    let bar = msgEl.querySelector('.msg-reactions-bar');
-    if (!bar) {
-        bar = document.createElement('div');
-        bar.className = 'msg-reactions-bar';
-        msgEl.appendChild(bar);
-    }
-
-    const badge = document.createElement('span');
-    badge.className = 'msg-reaction-badge';
-    badge.textContent = emoji;
-    bar.appendChild(badge);
 }
 
 function triggerReplyFromSheet() {
@@ -4626,7 +4563,11 @@ function renderDialogsVirtual() {
 
 /* --- 16. CALL BUTTON (placeholder) --- */
 function startCall(peerId) {
-    alert('Голосовые звонки в разработке. Используйте VK для звонков.');
+    if (!peerId) {
+        alert("Выберите собеседника для звонка");
+        return;
+    }
+    window.location.href = `call.py?peer=${encodeURIComponent(peerId)}`;
 }
 
 /* --- 17. ENHANCED FILE UPLOAD with progress --- */
