@@ -1161,9 +1161,14 @@ Kate Mobile API • Cloud Realtime E2EE
 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
 </button>
 
-<!-- SVG ICON FOR STICKER FROM GALLERY -->
-<button class="media-rec-btn" id="stickerBtn" onclick="createStickerFromPhoto()" title="Стикер из галереи (.mst)">
+<!-- SVG ICON FOR OFFICIAL STICKERS -->
+<button class="media-rec-btn" id="officialStickerBtn" onclick="toggleStickerPicker()" title="Официальные стикеры VK">
 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+</button>
+
+<!-- SVG ICON FOR CUSTOM STICKER FROM GALLERY -->
+<button class="media-rec-btn" id="stickerBtn" onclick="createStickerFromPhoto()" title="Свой стикер из галереи (.mst)">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
 </button>
 
 <button class="send-btn hidden" id="sendBtn" onclick="sendMessage()">
@@ -2557,6 +2562,22 @@ function renderMessageItem(containerOrFragment, msg) {
                 } else if (frameUrl) {
                     html += `<img class="msg-photo" src="${frameUrl}" onclick="openPhotoViewer('${frameUrl}')">`;
                 }
+            } else if (a.type === 'video_message') {
+                // FIX: Support video messages (circles) from regular VK app
+                const vm = a.video_message || {};
+                const videoUrl = vm.link_mp4 || vm.link_ogg || '';
+                const frameUrl = vm.first_frame?.find(s => s.url)?.url || vm.image?.[0]?.url || '';
+                const vmId = `vm_${msg.id}_${vm.id || Date.now()}`;
+
+                if (videoUrl) {
+                    isPureCircle = true;
+                    html += `<div class="tg-circle-container" id="${vmId}">
+                        <video class="tg-circle-video" src="${videoUrl}" loop playsinline autoplay muted onclick="this.muted=!this.muted;this.paused?this.play():this.pause()"></video>
+                        <div class="tg-circle-overlay"></div>
+                    </div>`;
+                } else if (frameUrl) {
+                    html += `<img class="msg-photo" src="${frameUrl}" style="border-radius:50%;width:200px;height:200px;object-fit:cover">`;
+                }
             } else if (a.type === 'audio_message') {
                 const am = a.audio_message || {};
                 const audioUrl = am.link_mp3 || am.link_ogg || '';
@@ -2619,7 +2640,14 @@ function renderMessageItem(containerOrFragment, msg) {
                         html += `<div class="msg-file" id="${docId}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-right:8px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><div class="msg-file-info"><div class="msg-file-name">Зашифрованный файл</div><div class="msg-file-size">Загрузка...</div></div></div>`;
                     }
 
-                    setTimeout(() => processEncryptedAttachment(docId, doc.url, ext || title), 10);
+                    // FIX: Delayed decryption to ensure DOM is ready
+                    requestAnimationFrame(() => {
+                        setTimeout(() => {
+                            const el = document.getElementById(docId);
+                            if (el) processEncryptedAttachment(docId, doc.url, ext || title);
+                            else setTimeout(() => processEncryptedAttachment(docId, doc.url, ext || title), 100);
+                        }, 50);
+                    });
                 } else {
                     html += `<div class="msg-file" onclick="window.open('${doc.url}', '_blank')"><span class="msg-file-icon">📎</span><div class="msg-file-info"><div class="msg-file-name">${escapeHtml(doc.title || 'Файл')}</div><div class="msg-file-size">${(doc.size / 1024).toFixed(1)} KB</div></div></div>`;
                 }
@@ -2862,9 +2890,15 @@ function scrollToMsg(msgId) {
     }
 }
 
-async function processEncryptedAttachment(elemId, url, extInfo) {
+async function processEncryptedAttachment(elemId, url, extInfo, retryCount = 0) {
     const elem = document.getElementById(elemId);
-    if (!elem) return;
+    if (!elem) {
+        // FIX: Retry if element not in DOM yet
+        if (retryCount < 5) {
+            setTimeout(() => processEncryptedAttachment(elemId, url, extInfo, retryCount + 1), 100);
+        }
+        return;
+    }
 
     if (decryptedCache[elemId]) {
         renderDecryptedMedia(elem, decryptedCache[elemId]);
