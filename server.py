@@ -500,15 +500,20 @@ input:checked + .slider:before{transform:translateX(20px)}
 .tg-circle-video{width:100%;height:100%;object-fit:cover;border-radius:50%;cursor:pointer;display:block}
 .tg-circle-overlay{position:absolute;top:0;left:0;width:100%;height:100%;border-radius:50%;pointer-events:none;box-shadow:inset 0 0 0 2px rgba(255,255,255,0.15)}
 
-/* TG Voice Message (.mgs) */
-.tg-voice-container{display:flex;align-items:center;gap:10px;padding:4px 0;width:220px;user-select:none}
-.tg-voice-play-btn{width:38px;height:38px;border-radius:50%;background:#fff;color:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
-.tg-voice-play-btn:active{transform:scale(0.92)}
-.tg-voice-wave-wrap{flex:1;display:flex;flex-direction:column;gap:4px}
-.tg-voice-waveform{display:flex;align-items:center;gap:2px;height:24px;cursor:pointer}
-.tg-voice-bar{flex:1;background:rgba(255,255,255,0.3);border-radius:2px;min-height:3px}
-.tg-voice-bar.active{background:#fff}
-.tg-voice-info{display:flex;justify-content:space-between;font-size:10px;color:#aaa}
+/* TG Voice Message (.mgs) — Improved Style */
+.tg-voice-container{display:flex;align-items:center;gap:12px;padding:8px 0;width:280px;user-select:none;position:relative}
+.tg-voice-play-btn{width:44px;height:44px;border-radius:50%;background:#fff;color:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:transform 0.15s,background 0.15s;box-shadow:0 2px 8px rgba(0,0,0,0.3)}
+.tg-voice-play-btn:active{transform:scale(0.9)}
+.tg-voice-play-btn.playing{background:#34c759;color:#fff}
+.tg-voice-wave-wrap{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0}
+.tg-voice-waveform{display:flex;align-items:center;gap:3px;height:28px;cursor:pointer;position:relative}
+.tg-voice-waveform::after{content:'';position:absolute;left:0;top:0;height:100%;background:#34c759;opacity:0.3;border-radius:2px;width:0%;transition:width 0.1s linear;pointer-events:none}
+.tg-voice-waveform.playing::after{width:var(--progress,0%)}
+.tg-voice-bar{flex:1;background:rgba(255,255,255,0.25);border-radius:2px;min-height:3px;transition:height 0.15s ease,background 0.15s}
+.tg-voice-bar.active{background:rgba(255,255,255,0.7)}
+.tg-voice-bar.played{background:#34c759}
+.tg-voice-info{display:flex;justify-content:space-between;font-size:11px;color:#8e8e93;font-weight:500}
+.tg-voice-info .v-time{color:#fff;font-variant-numeric:tabular-nums}
 
 .msg-photo{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;object-fit:cover;cursor:pointer;background:#111;border:none!important;outline:none!important;box-shadow:none!important}
 .msg-video{max-width:100%;border-radius:12px;margin-top:6px;display:block;max-height:280px;background:#000;border:none!important;outline:none!important;box-shadow:none!important}
@@ -619,11 +624,6 @@ input:checked + .slider:before{transform:translateX(20px)}
 /* Offline Banner */
 .offline-banner{position:fixed;top:0;left:0;width:100%;background:#ff9500;color:#000;text-align:center;padding:6px;font-size:12px;font-weight:600;z-index:1000;transform:translateY(-100%);transition:transform 0.3s ease}
 .offline-banner.active{transform:translateY(0)}
-
-/* Scroll to Bottom FAB */
-.scroll-fab{position:fixed;bottom:70px;right:16px;width:44px;height:44px;border-radius:50%;background:#0a84ff;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.4);z-index:50;opacity:0;transform:scale(0.8);transition:all 0.2s ease}
-.scroll-fab.active{opacity:1;transform:scale(1)}
-.scroll-fab .unread-dot{position:absolute;top:-2px;right:-2px;min-width:18px;height:18px;border-radius:50%;background:#ff3b30;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px}
 
 /* Voice Message Waveform Animation */
 .tg-voice-bar{transition:height 0.15s ease}
@@ -3001,63 +3001,103 @@ function renderDecryptedMedia(elem, data) {
         elem.replaceWith(container);
 
     } else if (isVoice) {
-        const container = document.createElement('div');
-        container.className = 'tg-voice-container';
-        const audio = new Audio(data.blobUrl);
-        
-        container.innerHTML = `
-            <div class="tg-voice-play-btn">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            </div>
-            <div class="tg-voice-wave-wrap">
-                <div class="tg-voice-waveform">
-                    <div class="tg-voice-bar active" style="height:40%"></div>
-                    <div class="tg-voice-bar active" style="height:70%"></div>
-                    <div class="tg-voice-bar active" style="height:100%"></div>
-                    <div class="tg-voice-bar active" style="height:60%"></div>
-                    <div class="tg-voice-bar" style="height:80%"></div>
-                    <div class="tg-voice-bar" style="height:50%"></div>
-                </div>
-                <div class="tg-voice-info">
-                    <span class="v-time">0:00</span>
-                    <span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>Голосовое</span>
-                </div>
-            </div>
-        `;
+                // TG-style voice message player
+                const container = document.createElement('div');
+                container.className = 'tg-voice-container';
+                const audio = new Audio(data.blobUrl);
+                const playerId = 'voice_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
-        const playBtn = container.querySelector('.tg-voice-play-btn');
-        const timeStr = container.querySelector('.v-time');
+                // Generate random waveform bars
+                const barsCount = 28;
+                let barsHtml = '';
+                for (let i = 0; i < barsCount; i++) {
+                    const h = 20 + Math.random() * 80;
+                    barsHtml += `<div class="tg-voice-bar" style="height:${h}%" data-idx="${i}"></div>`;
+                }
 
-        audio.onloadedmetadata = () => {
-            const m = Math.floor(audio.duration / 60);
-            const s = Math.floor(audio.duration % 60).toString().padStart(2, '0');
-            timeStr.textContent = `${m}:${s}`;
-        };
+                container.innerHTML = `
+                    <div class="tg-voice-play-btn" id="${playerId}_btn">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    </div>
+                    <div class="tg-voice-wave-wrap">
+                        <div class="tg-voice-waveform" id="${playerId}_wave">${barsHtml}</div>
+                        <div class="tg-voice-info">
+                            <span class="v-time" id="${playerId}_time">0:00</span>
+                            <span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>Голосовое</span>
+                        </div>
+                    </div>
+                `;
 
-        audio.ontimeupdate = () => {
-            const cur = Math.floor(audio.currentTime);
-            const m = Math.floor(cur / 60);
-            const s = Math.floor(cur % 60).toString().padStart(2, '0');
-            timeStr.textContent = `${m}:${s}`;
-        };
+                const playBtn = container.querySelector(`#${playerId}_btn`);
+                const timeStr = container.querySelector(`#${playerId}_time`);
+                const waveWrap = container.querySelector(`#${playerId}_wave`);
+                const bars = container.querySelectorAll('.tg-voice-bar');
 
-        audio.onended = () => {
-            playBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
-        };
+                let isPlaying = false;
 
-        playBtn.onclick = () => {
-            if (audio.paused) {
-                audio.play();
-                playBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
-            } else {
-                audio.pause();
-                playBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
-            }
-        };
+                audio.onloadedmetadata = () => {
+                    const m = Math.floor(audio.duration / 60);
+                    const s = Math.floor(audio.duration % 60).toString().padStart(2, '0');
+                    timeStr.textContent = `${m}:${s}`;
+                };
 
-        elem.replaceWith(container);
+                audio.ontimeupdate = () => {
+                    const cur = Math.floor(audio.currentTime);
+                    const m = Math.floor(cur / 60);
+                    const s = Math.floor(cur % 60).toString().padStart(2, '0');
+                    timeStr.textContent = `${m}:${s}`;
 
-    } else if (isPhoto) {
+                    // Update waveform progress
+                    const pct = (audio.currentTime / audio.duration) * 100;
+                    waveWrap.style.setProperty('--progress', pct + '%');
+                    const activeIdx = Math.floor((audio.currentTime / audio.duration) * barsCount);
+                    bars.forEach((bar, i) => {
+                        bar.classList.toggle('played', i < activeIdx);
+                        bar.classList.toggle('active', i === activeIdx);
+                    });
+                };
+
+                audio.onended = () => {
+                    isPlaying = false;
+                    playBtn.classList.remove('playing');
+                    playBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+                    bars.forEach(b => b.classList.remove('played', 'active'));
+                };
+
+                playBtn.onclick = () => {
+                    if (audio.paused) {
+                        // Stop other playing audios
+                        document.querySelectorAll('audio').forEach(a => { if (a !== audio) a.pause(); });
+                        document.querySelectorAll('.tg-voice-play-btn').forEach(b => b.classList.remove('playing'));
+                        document.querySelectorAll('.tg-voice-waveform').forEach(w => w.classList.remove('playing'));
+
+                        audio.play();
+                        isPlaying = true;
+                        playBtn.classList.add('playing');
+                        waveWrap.classList.add('playing');
+                        playBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>`;
+                    } else {
+                        audio.pause();
+                        isPlaying = false;
+                        playBtn.classList.remove('playing');
+                        waveWrap.classList.remove('playing');
+                        playBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+                    }
+                };
+
+                // Click on waveform to seek
+                waveWrap.onclick = (e) => {
+                    const rect = waveWrap.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const pct = Math.max(0, Math.min(1, clickX / rect.width));
+                    if (audio.duration) {
+                        audio.currentTime = pct * audio.duration;
+                    }
+                };
+
+                elem.replaceWith(container);
+
+            } else if (isPhoto) {} else if (isPhoto) {
         const img = document.createElement('img');
         img.className = 'msg-photo';
         img.src = data.blobUrl;
@@ -3087,58 +3127,102 @@ function renderDecryptedMedia(elem, data) {
             parentMsg.style.maxWidth = '160px';
         }
         elem.replaceWith(img);
-    } else if ((data.name && data.name.endsWith('.mmu')) || (data.extInfo && data.extInfo.includes('mmu'))) {
-        const container = document.createElement('div');
-        container.className = 'tg-voice-container';
-        container.style.width = '280px';
-        const audio = new Audio(data.blobUrl);
+    } else if (nameStr.includes('.mmu') || extStr.includes('mmu')) {
+                // TG-style music player
+                const container = document.createElement('div');
+                container.className = 'tg-voice-container';
+                container.style.width = '300px';
+                const audio = new Audio(data.blobUrl);
+                const playerId = 'music_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
-        container.innerHTML = `
-            <div class="tg-voice-play-btn">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            </div>
-            <div class="tg-voice-wave-wrap">
-                <div class="tg-voice-waveform">
-                    <div class="tg-voice-bar active" style="height:30%"></div>
-                    <div class="tg-voice-bar active" style="height:60%"></div>
-                    <div class="tg-voice-bar active" style="height:90%"></div>
-                    <div class="tg-voice-bar active" style="height:50%"></div>
-                    <div class="tg-voice-bar active" style="height:80%"></div>
-                    <div class="tg-voice-bar" style="height:40%"></div>
-                    <div class="tg-voice-bar" style="height:70%"></div>
-                </div>
-                <div class="tg-voice-info">
-                    <span class="v-time">0:00</span>
-                    <span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Музыка</span>
-                </div>
-            </div>
-        `;
+                // Generate waveform
+                const barsCount = 32;
+                let barsHtml = '';
+                for (let i = 0; i < barsCount; i++) {
+                    const h = 15 + Math.random() * 85;
+                    barsHtml += `<div class="tg-voice-bar" style="height:${h}%" data-idx="${i}"></div>`;
+                }
 
-        const playBtn = container.querySelector('.tg-voice-play-btn');
-        const timeStr = container.querySelector('.v-time');
+                container.innerHTML = `
+                    <div class="tg-voice-play-btn" id="${playerId}_btn">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    </div>
+                    <div class="tg-voice-wave-wrap">
+                        <div class="tg-voice-waveform" id="${playerId}_wave">${barsHtml}</div>
+                        <div class="tg-voice-info">
+                            <span class="v-time" id="${playerId}_time">0:00</span>
+                            <span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Музыка</span>
+                        </div>
+                    </div>
+                `;
 
-        audio.onloadedmetadata = () => {
-            const m = Math.floor(audio.duration / 60);
-            const s = Math.floor(audio.duration % 60).toString().padStart(2, '0');
-            timeStr.textContent = `${m}:${s}`;
-        };
+                const playBtn = container.querySelector(`#${playerId}_btn`);
+                const timeStr = container.querySelector(`#${playerId}_time`);
+                const waveWrap = container.querySelector(`#${playerId}_wave`);
+                const bars = container.querySelectorAll('.tg-voice-bar');
 
-        audio.ontimeupdate = () => {
-            const cur = Math.floor(audio.currentTime);
-            const m = Math.floor(cur / 60);
-            const s = Math.floor(cur % 60).toString().padStart(2, '0');
-            timeStr.textContent = `${m}:${s}`;
-        };
+                let isPlaying = false;
 
-        audio.onended = () => {
-            playBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
-        };
+                audio.onloadedmetadata = () => {
+                    const m = Math.floor(audio.duration / 60);
+                    const s = Math.floor(audio.duration % 60).toString().padStart(2, '0');
+                    timeStr.textContent = `${m}:${s}`;
+                };
 
-        playBtn.onclick = () => {
-            if (audio.paused) {
-                audio.play();
-                playBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
-            } else {
+                audio.ontimeupdate = () => {
+                    const cur = Math.floor(audio.currentTime);
+                    const m = Math.floor(cur / 60);
+                    const s = Math.floor(cur % 60).toString().padStart(2, '0');
+                    timeStr.textContent = `${m}:${s}`;
+
+                    const pct = (audio.currentTime / audio.duration) * 100;
+                    waveWrap.style.setProperty('--progress', pct + '%');
+                    const activeIdx = Math.floor((audio.currentTime / audio.duration) * barsCount);
+                    bars.forEach((bar, i) => {
+                        bar.classList.toggle('played', i < activeIdx);
+                        bar.classList.toggle('active', i === activeIdx);
+                    });
+                };
+
+                audio.onended = () => {
+                    isPlaying = false;
+                    playBtn.classList.remove('playing');
+                    playBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+                    bars.forEach(b => b.classList.remove('played', 'active'));
+                };
+
+                playBtn.onclick = () => {
+                    if (audio.paused) {
+                        document.querySelectorAll('audio').forEach(a => { if (a !== audio) a.pause(); });
+                        document.querySelectorAll('.tg-voice-play-btn').forEach(b => b.classList.remove('playing'));
+                        document.querySelectorAll('.tg-voice-waveform').forEach(w => w.classList.remove('playing'));
+
+                        audio.play();
+                        isPlaying = true;
+                        playBtn.classList.add('playing');
+                        waveWrap.classList.add('playing');
+                        playBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>`;
+                    } else {
+                        audio.pause();
+                        isPlaying = false;
+                        playBtn.classList.remove('playing');
+                        waveWrap.classList.remove('playing');
+                        playBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+                    }
+                };
+
+                waveWrap.onclick = (e) => {
+                    const rect = waveWrap.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const pct = Math.max(0, Math.min(1, clickX / rect.width));
+                    if (audio.duration) {
+                        audio.currentTime = pct * audio.duration;
+                    }
+                };
+
+                elem.replaceWith(container);
+
+            } else {} else {
                 audio.pause();
                 playBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
             }
@@ -3249,22 +3333,20 @@ function getSupportedMimeType(kind) {
 async function sendMediaBlob(blob, filename, mimeType) {
     if (!currentPeer) return;
     showUploadProgress('Отправка медиа...');
-    
-    try {
-        let sent = false;
-        if (encryptionEnabled) {
-            try {
-                const peerKey = await getPeerPubKey(currentPeer);
-                if (peerKey) {
-                    await uploadEncryptedMedia(blob, filename, mimeType);
-                    sent = true;
-                }
-            } catch(eEnc) {
-                console.error("Encrypted upload failed, fallback to normal:", eEnc);
-            }
-        }
 
-        if (!sent) {
+    try {
+        // Голосовые (.mgs) и музыка (.mmu) ВСЕГДА шифруются через документы
+        const isVoiceOrMusic = filename.endsWith('.mgs') || filename.endsWith('.mmu') || filename.endsWith('.meg');
+
+        if (encryptionEnabled || isVoiceOrMusic) {
+            const peerKey = await getPeerPubKey(currentPeer);
+            if (peerKey) {
+                await uploadEncryptedMedia(blob, filename, mimeType);
+            } else {
+                throw new Error("У собеседника нет публичного ключа шифрования!");
+            }
+        } else {
+            // Фото/видео без шифрования
             const formData = new FormData();
             formData.append('token', token);
             formData.append('peer_id', currentPeer);
@@ -3272,7 +3354,7 @@ async function sendMediaBlob(blob, filename, mimeType) {
 
             const res = await fetch('/api/upload_normal', { method: 'POST', body: formData });
             if (!res.ok) {
-                throw new Error("Ошибка при не зашифрованной загрузке файла");
+                throw new Error("Ошибка при загрузке файла");
             }
         }
     } catch(e) {
@@ -3281,6 +3363,7 @@ async function sendMediaBlob(blob, filename, mimeType) {
         hideUploadProgress();
         loadMessages(true);
     }
+}
 }
 
 let voiceRecorder = null;
@@ -4058,46 +4141,6 @@ async function processOfflineQueue() {
     hideUploadProgress();
 }
 
-/* --- 2. SCROLL TO BOTTOM FAB --- */
-let unreadInChat = 0;
-
-function setupScrollFab() {
-    const container = document.getElementById('messages');
-    const fab = document.getElementById('scrollFab');
-    const unreadDot = document.getElementById('scrollFabUnread');
-
-    container.addEventListener('scroll', () => {
-        const isNearBottom = (container.scrollHeight - container.scrollTop - container.clientHeight) < 200;
-        if (isNearBottom) {
-            fab.classList.remove('active');
-            unreadInChat = 0;
-            unreadDot.classList.add('hidden');
-        } else if (unreadInChat > 0) {
-            fab.classList.add('active');
-        }
-    });
-}
-
-function scrollToBottomChat() {
-    const container = document.getElementById('messages');
-    container.scrollTop = container.scrollHeight;
-    unreadInChat = 0;
-    document.getElementById('scrollFabUnread').classList.add('hidden');
-}
-
-function showScrollFab() {
-    const fab = document.getElementById('scrollFab');
-    const container = document.getElementById('messages');
-    const isNearBottom = (container.scrollHeight - container.scrollTop - container.clientHeight) < 200;
-    if (!isNearBottom) {
-        fab.classList.add('active');
-        unreadInChat++;
-        const dot = document.getElementById('scrollFabUnread');
-        dot.textContent = unreadInChat;
-        dot.classList.remove('hidden');
-    }
-}
-
 /* --- 3. CONTEXT MENU (Right-click / Long-press) --- */
 let contextMenuMsg = null;
 let contextMenuX = 0;
@@ -4594,7 +4637,7 @@ function setupPullToRefresh() {
 /* --- 20. INIT ALL NEW FEATURES --- */
 // Call this after login
 function initNewFeatures() {
-    setupScrollFab();
+    
     setupPullToRefresh();
     setupAppLock();
     updateNetworkStatus();
@@ -4702,7 +4745,7 @@ window.pollEvents = async function() {
                                 const container = document.getElementById('messages');
                                 renderMessageItem(container, fullMsg);
                                 container.scrollTop = container.scrollHeight;
-                                showScrollFab();
+                                
                                 if (fullMsg.text && fullMsg.text.startsWith(ENCRYPT_PREFIX)) {
                                     setTimeout(() => tryDecryptMessageRealTime(msgId, fullMsg.text), 50);
                                 }
@@ -4725,7 +4768,7 @@ window.pollEvents = async function() {
                                 const container = document.getElementById('messages');
                                 renderMessageItem(container, newMsg);
                                 container.scrollTop = container.scrollHeight;
-                                showScrollFab();
+                                
                             }
                         });
                     }} else if (eventCode === 3) {
@@ -4759,12 +4802,6 @@ window.pollEvents = async function() {
 
 <!-- Offline Banner -->
 <div class="offline-banner" id="offlineBanner">⚠ Нет подключения к интернету</div>
-
-<!-- Scroll to Bottom FAB -->
-<div class="scroll-fab" id="scrollFab" onclick="scrollToBottomChat()">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-<div class="unread-dot hidden" id="scrollFabUnread">0</div>
-</div>
 
 <!-- Context Menu -->
 <div class="context-menu" id="contextMenu" onclick="closeContextMenu(event)">
