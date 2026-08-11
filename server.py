@@ -523,6 +523,60 @@ input:checked + .slider:before{transform:translateX(20px)}
     gap: 3px;
 }
 
+/* === ГЛОБАЛЬНОЕ УДАЛЕНИЕ ОБВОДОК У ВСЕХ МЕДИА === */
+/* Все изображения и видео внутри сообщений — без обводок */
+.msg img,
+.msg video,
+.msg .msg-photo,
+.msg .msg-video,
+.msg .msg-sticker,
+.msg .msg-sticker img,
+.msg .msg-sticker-vk,
+.msg .msg-circle-frame,
+.msg .tg-circle-video,
+.msg .tg-circle-container,
+.msg .msg-file,
+.msg .tg-channel-media,
+.msg .tg-channel-iframe,
+.msg .link-preview-img {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    -webkit-box-shadow: none !important;
+    -moz-box-shadow: none !important;
+}
+
+/* Специально для кружочков — скругление через CSS */
+.msg .msg-circle-frame {
+    border-radius: 50%;
+    width: 200px;
+    height: 200px;
+    object-fit: cover;
+    display: block;
+}
+
+/* Специально для официальных стикеров ВК */
+.msg .msg-sticker-vk {
+    width: 130px;
+    height: 130px;
+    object-fit: contain;
+    display: block;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* Специально для .mst стикеров */
+.msg .msg-sticker-img {
+    width: 140px;
+    height: 140px;
+    object-fit: contain;
+    display: block;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
 /* Оформление времени поверх фото/видео/стикеров (Telegram Style) */
 .media-wrapper,
 .sticker-wrapper {
@@ -2662,7 +2716,7 @@ function renderMessageItem(containerOrFragment, msg) {
                         <div class="tg-circle-overlay"></div>
                     </div>`;
                 } else if (frameUrl) {
-                    html += `<img class="msg-photo" src="${frameUrl}" style="border-radius:50%;width:200px;height:200px;object-fit:cover">`;
+                    html += `<img class="msg-photo msg-circle-frame" src="${frameUrl}">`;
                 }
             } else if (a.type === 'audio_message') {
                 const am = a.audio_message || {};
@@ -3165,21 +3219,18 @@ function renderDecryptedMedia(elem, data) {
         elem.replaceWith(vid);
     } else if ((data.name && data.name.endsWith('.mst')) || (data.extInfo && data.extInfo.includes('mst')) || data.mime === 'image/png') {
         const img = document.createElement('img');
-        img.style.width = '140px';
-        img.style.height = '140px';
-        img.style.objectFit = 'contain';
-        img.style.display = 'block';
+        img.className = 'msg-sticker-img';
         img.src = data.blobUrl;
 
         const parentMsg = elem.closest('.msg');
         if (parentMsg) {
-            // Применяем новый класс для стилей Telegram
             parentMsg.classList.add('msg-sticker');
-            // Удаляем старые inline-стили, которые теперь управляются CSS-классом
             parentMsg.style.background = '';
             parentMsg.style.padding = '';
             parentMsg.style.borderRadius = '';
             parentMsg.style.boxShadow = '';
+            parentMsg.style.border = '';
+            parentMsg.style.outline = '';
             parentMsg.style.maxWidth = '';
         }
         elem.replaceWith(img);
