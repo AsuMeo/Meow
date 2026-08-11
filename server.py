@@ -470,15 +470,15 @@ input:checked + .slider:before{transform:translateX(20px)}
 .messages{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch}
 
 /* Message styling */
-.msg-container{position:relative;display:flex;width:100%;align-items:flex-end;touch-action:pan-y;margin-bottom:2px}
+.msg-container{position:relative;display:flex;width:100%;align-items:flex-end;touch-action:pan-y;margin-bottom:2px;border:none !important;outline:none !important;box-shadow:none !important}
 .msg-swipe-bg{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;width:40px;opacity:0;transition:opacity 0.15s;color:#8e8e93;z-index:1}
 .msg-swipe-right{right:-40px}
 
 .msg{max-width:82%;padding:8px 12px;border-radius:18px;font-size:14px;line-height:1.4;word-wrap:break-word;position:relative;animation:msgAppear 0.15s ease-out}
 @keyframes msgAppear{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
-.msg-in{align-self:flex-start;background:#1c1c1e;border-bottom-left-radius:4px;color:#fff}
-.msg-out{align-self:flex-end;background:#2c2c2e;border-bottom-right-radius:4px;color:#fff}
+.msg-in{align-self:flex-start;background:#1c1c1e;border-bottom-left-radius:4px;color:#fff;border:none !important;outline:none !important;box-shadow:none !important}
+.msg-out{align-self:flex-end;background:#2c2c2e;border-bottom-right-radius:4px;color:#fff;border:none !important;outline:none !important;box-shadow:none !important}
 
 /* Стикеры в стиле Telegram */
 .msg-sticker{
@@ -862,8 +862,9 @@ input:checked + .slider:before{transform:translateX(20px)}
 @keyframes skeletonPulse{0%{opacity:0.4}50%{opacity:0.8}100%{opacity:0.4}}
 
 /* Improved message bubble shadows */
-.msg{box-shadow:0 1px 2px rgba(0,0,0,0.2)}
-.msg-out{box-shadow:0 1px 2px rgba(0,0,0,0.3)}
+.msg{box-shadow:none !important}
+.msg-in{box-shadow:none !important}
+.msg-out{box-shadow:none !important}
 
 /* Call button in header */
 .call-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;color:#34c759;background:rgba(52,199,89,0.1);border:none;outline:none;margin-right:6px}
@@ -3124,9 +3125,15 @@ function renderDecryptedMedia(elem, data) {
     if (isCircle) {
         const container = document.createElement('div');
         container.className = 'tg-circle-container';
-        
+        container.style.border = 'none';
+        container.style.outline = 'none';
+        container.style.boxShadow = 'none';
+
         const video = document.createElement('video');
         video.className = 'tg-circle-video';
+        video.style.border = 'none';
+        video.style.outline = 'none';
+        video.style.boxShadow = 'none';
         video.src = data.blobUrl;
         video.loop = true;
         video.playsInline = true;
@@ -3134,6 +3141,9 @@ function renderDecryptedMedia(elem, data) {
 
         const overlay = document.createElement('div');
         overlay.className = 'tg-circle-overlay';
+        overlay.style.border = 'none';
+        overlay.style.outline = 'none';
+        overlay.style.boxShadow = 'none';
 
         container.appendChild(video);
         container.appendChild(overlay);
@@ -3208,18 +3218,27 @@ function renderDecryptedMedia(elem, data) {
     } else if (isPhoto) {
         const img = document.createElement('img');
         img.className = 'msg-photo';
+        img.style.border = 'none';
+        img.style.outline = 'none';
+        img.style.boxShadow = 'none';
         img.src = data.blobUrl;
         img.onclick = () => openPhotoViewer(data.blobUrl);
         elem.replaceWith(img);
     } else if (isVideo) {
         const vid = document.createElement('video');
         vid.className = 'msg-video';
+        vid.style.border = 'none';
+        vid.style.outline = 'none';
+        vid.style.boxShadow = 'none';
         vid.src = data.blobUrl;
         vid.controls = true;
         elem.replaceWith(vid);
     } else if ((data.name && data.name.endsWith('.mst')) || (data.extInfo && data.extInfo.includes('mst')) || data.mime === 'image/png') {
         const img = document.createElement('img');
         img.className = 'msg-sticker-img';
+        img.style.border = 'none';
+        img.style.outline = 'none';
+        img.style.boxShadow = 'none';
         img.src = data.blobUrl;
 
         const parentMsg = elem.closest('.msg');
