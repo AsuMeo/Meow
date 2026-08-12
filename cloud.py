@@ -284,7 +284,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Ro
 .preview-body audio{width:100%;max-width:400px}
 .preview-filename{color:#fff;font-size:14px;font-weight:600;flex:1;text-align:center;padding:0 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}\n.hidden{display:none!important}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+.hidden{display:none!important}
 </style>
 </head>
 <body>
@@ -473,7 +474,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Ro
 </div>
 
 <script>
-const MAX_FILE_SIZE_JS = 200 * 1024 * 1024; // 200 MB in bytes (client-side constant)
+const MAX_FILE_SIZE_JS = 200 * 1024 * 1024; // 200 MB limit
 let token = localStorage.getItem('vk_token');
 let myVkId = null;
 let cloudKey = null;
@@ -486,7 +487,7 @@ let currentPreviewFile = null;
 let isMultiSelectMode = false;
 let selectedDocIds = new Set();
 
-// Memory leak protection cache & abort controllers
+// Decryption cache & controllers
 const decryptionCache = {}; // doc_id -> { blobUrl, blob }
 let activeAbortController = null;
 let intersectionObserver = null;
@@ -608,51 +609,41 @@ async function importCloudCryptoKey(jwkStr) {
     return await crypto.subtle.importKey("jwk", jwk, {name:"AES-GCM", length:256}, true, ["encrypt","decrypt"]);
 }
 
-// Client-side Encrypted Filename Helpers (Masked as camera/system filenames)
+// Encrypted Filename generation (Masked as standard camera files)
 async function encryptFilename(plainName, fileType) {
     const enc = new TextEncoder();
     const data = enc.encode(JSON.stringify({ n: plainName, t: fileType }));
     const encryptedBuf = await encryptAESGCM(cloudKey, data);
     const b64 = btoa(String.fromCharCode(...new Uint8Array(encryptedBuf)))
-        .replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     
     let prefix = 'IMG_';
     let ext = '.jpg';
     if (fileType === 'video') { prefix = 'VID_'; ext = '.mp4'; }
     else if (fileType === 'audio') { prefix = 'AUD_'; ext = '.mp3'; }
-    else if (fileType === 'doc') { prefix = 'DOC_'; ext = '.pdf'; } // Default for docs, can be overridden by actual file ext if desired
+    else if (fileType === 'doc') { prefix = 'DOC_'; ext = '.pdf'; }
 
-    // Try to preserve original extension for docs if possible, otherwise use default .pdf
-    const originalExtMatch = plainName.match(/\\.[0-9a-z]+$/i);
-    const originalExt = originalExtMatch ? originalExtMatch[0].toLowerCase() : '';
-    if (fileType === 'doc' && originalExt && originalExt.length <= 5 && originalExt !== '.doc') { // Limit to 4 chars for safety and common extensions
-        ext = originalExt;
+    // Preserve actual file extension for 'doc' category so download has the right type
+    const origExtMatch = plainName.match(/\.[0-9a-z]+$/i);
+    if (fileType === 'doc' && origExtMatch && origExtMatch[0].length <= 6 && origExtMatch[0].toLowerCase() !== '.doc') {
+        ext = origExtMatch[0].toLowerCase();
     }
-
 
     return `${prefix}${b64}${ext}`;
 }
 
 async function decryptFilename(title) {
     let rawB64 = '';
-    let expectedExt = ''; // To verify consistent extension after decryption
-
-    if (title.startsWith('IMG_') && title.match(/\\.jpg$/i)) { rawB64 = title.slice(4, -4); expectedExt = '.jpg'; }
-    else if (title.startsWith('VID_') && title.match(/\\.mp4$/i)) { rawB64 = title.slice(4, -4); expectedExt = '.mp4'; }
-    else if (title.startsWith('AUD_') && title.match(/\\.mp3$/i)) { rawB64 = title.slice(4, -4); expectedExt = '.mp3'; }
-    // For DOC_ type, we need to be flexible with extension
+    if (title.startsWith('IMG_') && title.match(/\.jpg$/i)) rawB64 = title.slice(4, -4);
+    else if (title.startsWith('VID_') && title.match(/\.mp4$/i)) rawB64 = title.slice(4, -4);
+    else if (title.startsWith('AUD_') && title.match(/\.mp3$/i)) rawB64 = title.slice(4, -4);
     else if (title.startsWith('DOC_')) {
-        const lastDotIndex = title.lastIndexOf('.');
-        if (lastDotIndex > 4) { // DOC_ + min 1 char + . + min 1 char
-            rawB64 = title.slice(4, lastDotIndex);
-            expectedExt = title.slice(lastDotIndex);
-        } else {
-            return null; // Invalid DOC_ format
-        }
+        const lastDot = title.lastIndexOf('.');
+        if (lastDot > 4) rawB64 = title.slice(4, lastDot);
+        else return null;
     }
-    // Legacy encrypted titles
-    else if (title.startsWith('enc_') && title.endsWith('.doc')) { rawB64 = title.slice(4, -4); expectedExt = '.doc'; }
-    else return null; // Not one of our client-encrypted formats
+    else if (title.startsWith('enc_') && title.endsWith('.doc')) rawB64 = title.slice(4, -4); // legacy encrypted title
+    else return null;
 
     try {
         const b64 = rawB64.replace(/-/g, '+').replace(/_/g, '/');
@@ -666,45 +657,35 @@ async function decryptFilename(title) {
         const parsed = JSON.parse(jsonStr);
         return { origName: parsed.n, fileType: parsed.t };
     } catch (e) {
-        // console.warn("Decryption failed for:", title, e); // For debugging decryption failures
         return null;
     }
 }
 
-// Client-side decoding for old 'cl_' obfuscated titles (not truly encrypted with cloudKey)
+// Legacy non-encrypted 'cl_' obfuscated title support
 function decodeOldObfuscatedTitle(title) {
     if (!(title.startsWith('cl_') && title.endsWith('.doc'))) {
         return null;
     }
     try {
-        const titleWithoutPrefixSuffix = title.slice(3, -4); // Remove "cl_" and ".doc"
-        const firstUnderscoreIndex = titleWithoutPrefixSuffix.indexOf('_');
+        const payload = title.slice(3, -4);
+        const idx = payload.indexOf('_');
+        if (idx === -1) return null;
 
-        if (firstUnderscoreIndex === -1) {
-            return null; 
-        }
-
-        const t_char = titleWithoutPrefixSuffix.substring(0, firstUnderscoreIndex);
-        let b64_name = titleWithoutPrefixSuffix.substring(firstUnderscoreIndex + 1);
+        const t_char = payload.substring(0, idx);
+        let b64_name = payload.substring(idx + 1);
 
         const type_map = {'p': 'photo', 'v': 'video', 'a': 'audio', 'd': 'doc'};
-        const file_type = type_map[t_char] || 'doc'; 
+        const file_type = type_map[t_char] || 'doc';
 
-        // Restore URL-safe base64 to standard base64 and add padding
         b64_name = b64_name.replace(/-/g, '+').replace(/_/g, '/');
         const padding = '='.repeat((4 - (b64_name.length % 4)) % 4);
-        const orig_name_b64 = b64_name + padding;
-        
-        // Atob returns a string of bytes, then decode as UTF-8
-        const orig_name = new TextDecoder().decode(Uint8Array.from(atob(orig_name_b64), c => c.charCodeAt(0)));
+        const orig_name = new TextDecoder().decode(Uint8Array.from(atob(b64_name + padding), c => c.charCodeAt(0)));
         
         return { origName: orig_name, fileType: file_type };
     } catch (e) {
-        console.error("Error decoding old obfuscated title:", e);
         return null;
     }
 }
-
 
 async function loadFiles() {
     showToastProgress('Синхронизация...', 20);
@@ -723,10 +704,11 @@ async function loadFiles() {
             const title = item.title || '';
             const docId = `doc${item.owner_id}_${item.id}`;
 
+            // Try decoding/decrypted first
             const meta = await decryptFilename(title);
 
             if (meta) {
-                // Successfully decrypted (either new format or old 'enc_' format)
+                // Successfully decrypted (image, video, audio, doc)
                 decryptedFiles.push({
                     'doc_id': docId,
                     'name': meta.origName,
@@ -737,33 +719,41 @@ async function loadFiles() {
                     'type': meta.fileType,
                 });
             } else {
-                // Decryption failed. Now, determine if it *looks* like one of our client-encrypted files.
-                // If it does, but failed decryption, then it's corrupted and we hide it.
-                const isOurClientEncryptedFormat = title.startsWith('IMG_') || title.startsWith('VID_') ||
-                                                    title.startsWith('AUD_') || title.startsWith('DOC_') ||
-                                                    (title.startsWith('enc_') && title.endsWith('.doc'));
-                
-                if (isOurClientEncryptedFormat) {
-                    // This file was intended to be client-encrypted but couldn't be decrypted.
-                    // It's considered "corrupted" (lost key, etc.) and is hidden from the UI.
-                    // console.warn(`Hidden corrupted client-encrypted file: ${title}`); // For debugging
+                // Decryption with current key failed. Is it an old 'cl_' file?
+                const oldObfuscated = decodeOldObfuscatedTitle(title);
+                if (oldObfuscated) {
+                    decryptedFiles.push({
+                        'doc_id': docId,
+                        'name': oldObfuscated.origName,
+                        'url': item.url || '',
+                        'size': item.size || 0,
+                        'mime': item.type || 'application/octet-stream',
+                        'date': item.date ? new Date(item.date * 1000).toISOString().split('T')[0] : '',
+                        'type': oldObfuscated.fileType,
+                    });
                 } else {
-                    // This file is NOT in our recognized client-side encrypted format.
-                    // It could be an old 'cl_' obfuscated file or a plain VK document.
-                    const oldObfuscated = decodeOldObfuscatedTitle(title);
-                    if (oldObfuscated) {
-                        decryptedFiles.push({
-                            'doc_id': docId,
-                            'name': oldObfuscated.origName,
-                            'url': item.url || '',
-                            'size': item.size || 0,
-                            'mime': item.type || 'application/octet-stream',
-                            'date': item.date ? new Date(item.date * 1000).toISOString().split('T')[0] : '',
-                            'type': oldObfuscated.fileType,
-                        });
+                    // Check if the title matches ANY of our encrypted/obfuscated filename prefixes.
+                    // If it does but decryption and legacy decoding BOTH failed, it's a "lost key" / corrupted file.
+                    // We must HIDE it completely (never add to list) from all tabs!
+                    const titleLower = title.toLowerCase();
+                    const isOurLostKeyFile = 
+                        title.startsWith('IMG_') || 
+                        title.startsWith('VID_') || 
+                        title.startsWith('AUD_') || 
+                        title.startsWith('DOC_') ||
+                        title.startsWith('enc_') ||
+                        title.startsWith('cl_') ||
+                        titleLower.startsWith('cloud_') ||
+                        titleLower.endsWith('.cimg.doc') || 
+                        titleLower.endsWith('.cvid.doc') ||
+                        titleLower.endsWith('.caud.doc') || 
+                        titleLower.endsWith('.cld.doc');
+
+                    if (isOurLostKeyFile) {
+                        // HIDDEN: Skip item. No traffic consumption, no UI pollution.
+                        continue;
                     } else {
-                        // Truly plain VK documents or other unrecognized formats.
-                        // Infer type from VK's MIME/extension.
+                        // Truly plain unencrypted VK documents.
                         let fileType = 'doc';
                         const itemMime = item.type || 'application/octet-stream';
                         if (itemMime.startsWith('image/')) fileType = 'photo';
@@ -856,7 +846,7 @@ function renderGrid(filteredFiles) {
             if (entry.isIntersecting) {
                 const docId = entry.target.dataset.id;
                 const fileObj = filteredFiles.find(f => f.doc_id === docId);
-                if (fileObj) { // No more corrupted check needed here, as corrupted files are filtered out
+                if (fileObj) {
                     lazyLoadThumbnail(fileObj);
                     intersectionObserver.unobserve(entry.target);
                 }
@@ -933,9 +923,9 @@ function renderGrid(filteredFiles) {
 
         grid.appendChild(itemDiv);
 
-        // Traffic saving: Don't load audio at all, only load thumbnails for photo/video if cached
-        if (f.type !== 'audio') { // Audio thumbnails are just an icon
-            if (decryptionCache[f.doc_id]) { // If full file already cached, use its blobUrl for preview
+        // Traffic saving: Don't load audio/docs at all in grid, only load thumbnails for photo/video if cached
+        if (f.type !== 'audio' && f.type !== 'doc') {
+            if (decryptionCache[f.doc_id]) {
                 applyThumbnailPreview(f.doc_id, decryptionCache[f.doc_id].blobUrl, f.type);
             } else {
                 intersectionObserver.observe(itemDiv);
@@ -946,7 +936,7 @@ function renderGrid(filteredFiles) {
 
 // Lazy Thumbnail Downloader & Decryptor (Traffic Saving feature)
 async function lazyLoadThumbnail(f) {
-    if (decryptionCache[f.doc_id]) { // If already fully decrypted, no need to re-fetch/decrypt
+    if (decryptionCache[f.doc_id]) {
         applyThumbnailPreview(f.doc_id, decryptionCache[f.doc_id].blobUrl, f.type);
         return;
     }
@@ -1051,7 +1041,6 @@ async function downloadSelectedBatch() {
                 a.download = fileObj.name;
                 a.click();
             } else {
-                // If not cached, trigger full download
                 openFile(fileObj);
             }
         }
@@ -1111,9 +1100,9 @@ async function handleFiles(e) {
 
             let fileType = 'doc';
             const lowerName = file.name.toLowerCase();
-            if (lowerName.match(/\\.(png|jpg|jpeg|gif|webp|bmp)$/)) fileType = 'photo';
-            else if (lowerName.match(/\\.(mp4|mov|avi|mkv|3gp)$/)) fileType = 'video';
-            else if (lowerName.match(/\\.(mp3|ogg|wav|m4a)$/)) fileType = 'audio';
+            if (lowerName.match(/\.(png|jpg|jpeg|gif|webp|bmp)$/)) fileType = 'photo';
+            else if (lowerName.match(/\.(mp4|mov|avi|mkv|3gp)$/)) fileType = 'video';
+            else if (lowerName.match(/\.(mp3|ogg|wav|m4a)$/)) fileType = 'audio';
 
             const encryptedTitle = await encryptFilename(file.name, fileType);
 
@@ -1236,7 +1225,6 @@ function downloadSelectedFile() {
             a.download = selectedFile.name;
             a.click();
         } else {
-            // If not cached, trigger full download by opening the file
             openFile(selectedFile);
         }
     }
@@ -1504,4 +1492,4 @@ def cloud_delete():
 
 @cloud_bp.route('/api/ping', methods=['GET'])
 def cloud_ping():
-    return jsonify({'ok': True, 'time': datetime.now().isoformat()}))
+    return jsonify({'ok': True, 'time': datetime.now().isoformat()})
