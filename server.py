@@ -10,6 +10,14 @@ from flask import Flask, render_template_string, request, jsonify, Response
 
 from cloud import cloud_bp
 
+# Import music module (VK Web scraping)
+try:
+    from music import music_bp
+    MUSIC_AVAILABLE = True
+except ImportError:
+    MUSIC_AVAILABLE = False
+    music_bp = None
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET', os.urandom(32).hex())
 
@@ -935,8 +943,13 @@ input:checked + .slider:before{transform:translateX(20px)}
 <span>☁️ Облако VK Tsuyu</span>
 </div>
 </div>
+<div class="drawer-item" onclick="window.location.href='/music'">
+<div class="drawer-item-left">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+<span>🎵 Музыка VK</span>
+</div>
+</div>
 <div style="flex:1"></div>
-<div class="drawer-item" style="color:#ff3b30" onclick="logout()">
 <div class="drawer-item-left">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
 <span>Выйти из аккаунта</span>
@@ -1170,6 +1183,10 @@ Kate Mobile API • Cloud Realtime E2EE
 <div class="nav-item" onclick="openDrawer()">
 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
 <span>Профиль</span>
+</div>
+<div class="nav-item" onclick="window.location.href='/music'">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+<span>Музыка</span>
 </div>
 <div class="nav-item" onclick="logout()">
 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -5749,6 +5766,10 @@ def ping():
 
 # Register cloud storage blueprint
 app.register_blueprint(cloud_bp, url_prefix='/cloud')
+
+# Register music blueprint (VK Web scraping)
+if MUSIC_AVAILABLE and music_bp:
+    app.register_blueprint(music_bp)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
