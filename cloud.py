@@ -236,7 +236,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Ro
 .file-item.decrypting .file-thumb-container::after{content:'';position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);backdrop-filter:blur(2px)}
 .file-item.decrypting .file-thumb-container::before{content:'';position:absolute;z-index:3;width:18px;height:18px;border:2px solid rgba(255,255,255,0.2);border-top-color:#0a84ff;border-radius:50%;animation:spin 0.6s linear infinite}
 
-/* Minimal Info Card (NO BADGES OVERLAY) */
+/* Minimal Info Card */
 .file-info{padding:8px;background:#141416;display:flex;flex-direction:column;gap:2px}
 .file-name{font-size:11px;font-weight:500;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .file-meta{font-size:10px;color:#8e8e93;display:flex;justify-content:space-between;align-items:center}
@@ -488,6 +488,8 @@ let selectedDocIds = new Set();
 
 // Memory leak protection cache & abort controllers
 const decryptionCache = {}; // doc_id -> { blobUrl, blob }
+const thumbnailCache = {}; // doc_id -> thumbBlobUrl (Encrypted lightweight client-side downscaled JPEG preview)
+const corruptedDocIds = new Set(); // doc_ids that failed decryption (lost keys)
 let activeAbortController = null;
 let intersectionObserver = null;
 
@@ -608,23 +610,34 @@ async function importCloudCryptoKey(jwkStr) {
     return await crypto.subtle.importKey("jwk", jwk, {name:"AES-GCM", length:256}, true, ["encrypt","decrypt"]);
 }
 
-// Client-side Encrypted Title Helpers (AES-GCM filename encryption)
+// Client-side Encrypted Filename Helpers (Masked as camera/system filenames)
 async function encryptFilename(plainName, fileType) {
     const enc = new TextEncoder();
     const data = enc.encode(JSON.stringify({ n: plainName, t: fileType }));
     const encryptedBuf = await encryptAESGCM(cloudKey, data);
-    // Base64url without padding so VK sees just a random string
     const b64 = btoa(String.fromCharCode(...new Uint8Array(encryptedBuf)))
         .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    return `enc_${b64}.doc`;
+    
+    let prefix = 'IMG_';
+    let ext = '.jpg';
+    if (fileType === 'video') { prefix = 'VID_'; ext = '.mp4'; }
+    else if (fileType === 'audio') { prefix = 'AUD_'; ext = '.mp3'; }
+    else if (fileType === 'doc') { prefix = 'DOC_'; ext = '.pdf'; }
+
+    return `${prefix}${b64}${ext}`;
 }
 
 async function decryptFilename(title) {
-    if (!title.startsWith('enc_') || !title.endsWith('.doc')) {
-        return null;
-    }
+    let rawB64 = '';
+    if (title.startsWith('IMG_') && title.endsWith('.jpg')) rawB64 = title.slice(4, -4);
+    else if (title.startsWith('VID_') && title.endsWith('.mp4')) rawB64 = title.slice(4, -4);
+    else if (title.startsWith('AUD_') && title.endsWith('.mp3')) rawB64 = title.slice(4, -4);
+    else if (title.startsWith('DOC_') && title.endsWith('.pdf')) rawB64 = title.slice(4, -4);
+    else if (title.startsWith('enc_') && title.endsWith('.doc')) rawB64 = title.slice(4, -4); // legacy
+    else return null;
+
     try {
-        const b64 = title.slice(4, -4).replace(/-/g, '+').replace(/_/g, '/');
+        const b64 = rawB64.replace(/-/g, '+').replace(/_/g, '/');
         const bin = atob(b64);
         const bytes = new Uint8Array(bin.length);
         for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
@@ -636,6 +649,49 @@ async function decryptFilename(title) {
     } catch (e) {
         return null;
     }
+}
+
+// Client-side Image Downscaler for Encrypted Thumbnails
+async function generateEncryptedThumbnail(file) {
+    return new Promise((resolve) => {
+        if (!file.type.startsWith('image/')) {
+            resolve(null);
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = async () => {
+                const canvas = document.createElement('canvas');
+                const MAX_SIZE = 180; // Small lightweight encrypted thumbnail
+                let width = img.width;
+                let height = img.height;
+                if (width > height) {
+                    if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
+                } else {
+                    if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                canvas.toBlob(async (blob) => {
+                    if (!blob) { resolve(null); return; }
+                    try {
+                        const buf = await blob.arrayBuffer();
+                        const encBuf = await encryptAESGCM(cloudKey, buf);
+                        resolve(encBuf);
+                    } catch(err) {
+                        resolve(null);
+                    }
+                }, 'image/jpeg', 0.7);
+            };
+            img.onerror = () => resolve(null);
+            img.src = e.target.result;
+        };
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+    });
 }
 
 async function loadFiles() {
@@ -650,36 +706,57 @@ async function loadFiles() {
         const rawItems = data.items || [];
         
         const decryptedFiles = [];
+        corruptedDocIds.clear();
+
         for (const item of rawItems) {
             const title = item.title || '';
             const meta = await decryptFilename(title);
+            const docId = `doc${item.owner_id}_${item.id}`;
+
             if (meta) {
                 decryptedFiles.push({
-                    'doc_id': `doc${item.owner_id}_${item.id}`,
+                    'doc_id': docId,
                     'name': meta.origName,
                     'url': item.url || '',
                     'size': item.size || 0,
                     'mime': item.type || 'application/octet-stream',
                     'date': item.date ? new Date(item.date * 1000).toISOString().split('T')[0] : '',
-                    'type': meta.fileType
+                    'type': meta.fileType,
+                    'corrupted': false
                 });
             } else {
-                // Fallback for old/unencrypted titles
-                const titleLower = title.toLowerCase();
-                let fileType = 'doc';
-                if (titleLower.includes('photo') || titleLower.endsWith('.png') || titleLower.endsWith('.jpg')) fileType = 'photo';
-                else if (titleLower.includes('video') || titleLower.endsWith('.mp4')) fileType = 'video';
-                else if (titleLower.includes('audio') || titleLower.endsWith('.mp3')) fileType = 'audio';
+                // Check if it's an encrypted file whose decryption failed due to lost key
+                if (title.startsWith('IMG_') || title.startsWith('VID_') || title.startsWith('AUD_') || title.startsWith('DOC_') || title.startsWith('enc_')) {
+                    corruptedDocIds.add(docId);
+                    decryptedFiles.push({
+                        'doc_id': docId,
+                        'name': '⚠️ Повреждён / Утерян ключ',
+                        'url': item.url || '',
+                        'size': item.size || 0,
+                        'mime': item.type || 'application/octet-stream',
+                        'date': item.date ? new Date(item.date * 1000).toISOString().split('T')[0] : '',
+                        'type': 'doc',
+                        'corrupted': true
+                    });
+                } else {
+                    // Backward compatibility fallback for unencrypted old files
+                    const titleLower = title.toLowerCase();
+                    let fileType = 'doc';
+                    if (titleLower.includes('photo') || titleLower.endsWith('.png') || titleLower.endsWith('.jpg')) fileType = 'photo';
+                    else if (titleLower.includes('video') || titleLower.endsWith('.mp4')) fileType = 'video';
+                    else if (titleLower.includes('audio') || titleLower.endsWith('.mp3')) fileType = 'audio';
 
-                decryptedFiles.push({
-                    'doc_id': `doc${item.owner_id}_${item.id}`,
-                    'name': title || 'unknown_file',
-                    'url': item.url || '',
-                    'size': item.size || 0,
-                    'mime': item.type || 'application/octet-stream',
-                    'date': item.date ? new Date(item.date * 1000).toISOString().split('T')[0] : '',
-                    'type': fileType
-                });
+                    decryptedFiles.push({
+                        'doc_id': docId,
+                        'name': title || 'unknown_file',
+                        'url': item.url || '',
+                        'size': item.size || 0,
+                        'mime': item.type || 'application/octet-stream',
+                        'date': item.date ? new Date(item.date * 1000).toISOString().split('T')[0] : '',
+                        'type': fileType,
+                        'corrupted': false
+                    });
+                }
             }
         }
         filesData = decryptedFiles;
@@ -705,7 +782,6 @@ function switchCategory(cat) {
 
 // Search, Sort & Render Files
 function filterAndRenderFiles() {
-    // Abort previous background decrypt requests
     if (activeAbortController) {
         activeAbortController.abort();
     }
@@ -749,7 +825,6 @@ function renderGrid(filteredFiles) {
     }
     empty.classList.add('hidden');
 
-    // Setup Lazy Decryption Observer
     if (intersectionObserver) intersectionObserver.disconnect();
 
     intersectionObserver = new IntersectionObserver((entries) => {
@@ -757,13 +832,13 @@ function renderGrid(filteredFiles) {
             if (entry.isIntersecting) {
                 const docId = entry.target.dataset.id;
                 const fileObj = filteredFiles.find(f => f.doc_id === docId);
-                if (fileObj) {
-                    lazyDecryptItem(fileObj);
+                if (fileObj && !fileObj.corrupted) {
+                    lazyLoadThumbnail(fileObj);
                     intersectionObserver.unobserve(entry.target);
                 }
             }
         });
-    }, { root: grid, rootMargin: '100px' });
+    }, { root: grid, rootMargin: '150px' });
 
     for (const f of filteredFiles) {
         const itemDiv = document.createElement('div');
@@ -777,14 +852,26 @@ function renderGrid(filteredFiles) {
         checkDiv.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`;
         itemDiv.appendChild(checkDiv);
 
-        // Thumbnail Container (WITHOUT ANY TYPE BADGES OVERLAY AS REQUESTED)
+        // Thumbnail Container
         const thumbContainer = document.createElement('div');
         thumbContainer.className = 'file-thumb-container';
 
         const placeholderIcon = document.createElement('div');
         placeholderIcon.className = 'file-thumb';
         placeholderIcon.style.cssText = 'display:flex;align-items:center;justify-content:center';
-        placeholderIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 15V3m0 12l-4-4m4 4l4-4M2 17l.621 2.485A2 2 0 004.561 21h14.878a2 2 0 001.94-1.515L22 17"/></svg>`;
+        
+        if (f.corrupted) {
+            placeholderIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+        } else if (f.type === 'photo') {
+            placeholderIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`;
+        } else if (f.type === 'video') {
+            placeholderIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>`;
+        } else if (f.type === 'audio') {
+            placeholderIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#30d158" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+        } else {
+            placeholderIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#af52de" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+        }
+
         thumbContainer.appendChild(placeholderIcon);
         itemDiv.appendChild(thumbContainer);
 
@@ -810,6 +897,12 @@ function renderGrid(filteredFiles) {
 
         // Click / Select Handlers
         itemDiv.onclick = (e) => {
+            if (f.corrupted) {
+                if (confirm('Этот файл был зашифрован другим ключом и не может быть расшифрован. Удалить его из списка?')) {
+                    deleteCorruptedFile(f.doc_id);
+                }
+                return;
+            }
             if (isMultiSelectMode) {
                 toggleItemSelection(f.doc_id, itemDiv);
             } else {
@@ -824,19 +917,25 @@ function renderGrid(filteredFiles) {
 
         grid.appendChild(itemDiv);
 
-        // Check cache or observe for lazy loading
-        if (decryptionCache[f.doc_id]) {
-            applyDecryptedPreview(f.doc_id, f.type);
-        } else {
-            intersectionObserver.observe(itemDiv);
+        // Traffic saving: Don't load audio at all, only load thumbnails for photo/video if cached
+        if (!f.corrupted && f.type !== 'audio') {
+            if (thumbnailCache[f.doc_id]) {
+                applyThumbnailPreview(f.doc_id, thumbnailCache[f.doc_id], f.type);
+            } else {
+                intersectionObserver.observe(itemDiv);
+            }
         }
     }
 }
 
-// On-the-fly Lazy Decryptor
-async function lazyDecryptItem(f) {
-    if (decryptionCache[f.doc_id]) {
-        applyDecryptedPreview(f.doc_id, f.type);
+// Lazy Thumbnail Downloader & Decryptor (Traffic Saving feature)
+async function lazyLoadThumbnail(f) {
+    if (thumbnailCache[f.doc_id] || decryptionCache[f.doc_id]) {
+        if (decryptionCache[f.doc_id]) {
+            applyThumbnailPreview(f.doc_id, decryptionCache[f.doc_id].blobUrl, f.type);
+        } else {
+            applyThumbnailPreview(f.doc_id, thumbnailCache[f.doc_id], f.type);
+        }
         return;
     }
 
@@ -846,6 +945,7 @@ async function lazyDecryptItem(f) {
     itemEl.classList.add('decrypting');
 
     try {
+        // For photos and videos, we fetch the encrypted payload. To save traffic, we can stream or download.
         const resp = await fetch('/cloud/api/download?url=' + encodeURIComponent(f.url), {
             signal: activeAbortController ? activeAbortController.signal : null
         });
@@ -857,37 +957,33 @@ async function lazyDecryptItem(f) {
         const blobUrl = URL.createObjectURL(blob);
 
         decryptionCache[f.doc_id] = { blobUrl, blob };
-        applyDecryptedPreview(f.doc_id, f.type);
+        applyThumbnailPreview(f.doc_id, blobUrl, f.type);
     } catch (e) {
         if (e.name !== 'AbortError') {
-            console.error("Decrypt error:", f.name, e);
+            console.error("Thumbnail load error:", f.name, e);
         }
     } finally {
         itemEl.classList.remove('decrypting');
     }
 }
 
-function applyDecryptedPreview(doc_id, type) {
+function applyThumbnailPreview(doc_id, url, type) {
     const itemEl = document.getElementById(`item_${doc_id}`);
     if (!itemEl) return;
-
-    const cache = decryptionCache[doc_id];
-    if (!cache) return;
 
     const container = itemEl.querySelector('.file-thumb-container');
     if (!container) return;
 
-    // Clear placeholder
     container.innerHTML = '';
 
     if (type === 'photo') {
         const img = document.createElement('img');
         img.className = 'file-thumb';
-        img.src = cache.blobUrl;
+        img.src = url;
         container.appendChild(img);
     } else if (type === 'video') {
         const vid = document.createElement('video');
-        vid.src = cache.blobUrl;
+        vid.src = url;
         vid.muted = true;
         vid.loop = true;
         vid.playsInline = true;
@@ -936,7 +1032,7 @@ async function downloadSelectedBatch() {
     if (selectedDocIds.size === 0) return;
     for (const docId of selectedDocIds) {
         const fileObj = filesData.find(f => f.doc_id === docId);
-        if (fileObj) {
+        if (fileObj && !fileObj.corrupted) {
             const cached = decryptionCache[docId];
             if (cached) {
                 const a = document.createElement('a');
@@ -960,7 +1056,6 @@ async function deleteSelectedBatch() {
                 headers: {'Content-Type':'application/json'},
                 body: JSON.stringify({token, doc_id: docId})
             });
-            // Revoke blob memory
             if (decryptionCache[docId]) {
                 URL.revokeObjectURL(decryptionCache[docId].blobUrl);
                 delete decryptionCache[docId];
@@ -972,15 +1067,29 @@ async function deleteSelectedBatch() {
     hideToastProgress();
 }
 
+async function deleteCorruptedFile(docId) {
+    showToastProgress('Удаление повреждённого файла...', 50);
+    try {
+        await fetch('/cloud/api/delete', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({token, doc_id: docId})
+        });
+        await loadFiles();
+    } catch(e) {}
+    hideToastProgress();
+}
+
 // File Upload with Concurrency & Real Progress
 async function handleFiles(e) {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    // Check VK Document Size Limit (200MB)
+    // Check VK Document Size Limit (200MB) with strict alert
     for (const f of files) {
-        if (f.size > 200 * 1024 * 1024) {
-            alert(`Файл ${f.name} превышает лимит ВКонтакте (200 МБ)`);
+        if (f.size > MAX_FILE_SIZE) {
+            alert(`⚠️ Файл "${f.name}" превышает официальный лимит ВКонтакте (200 МБ). Загрузка невозможна.`);
+            e.target.value = '';
             return;
         }
     }
@@ -997,14 +1106,12 @@ async function handleFiles(e) {
             const encBuf = await encryptAESGCM(cloudKey, fileBuf);
             const encBlob = new Blob([encBuf], {type: 'application/octet-stream'});
 
-            // Determine file category type
             let fileType = 'doc';
             const lowerName = file.name.toLowerCase();
             if (lowerName.match(/\.(png|jpg|jpeg|gif|webp|bmp)$/)) fileType = 'photo';
             else if (lowerName.match(/\.(mp4|mov|avi|mkv|3gp)$/)) fileType = 'video';
             else if (lowerName.match(/\.(mp3|ogg|wav|m4a)$/)) fileType = 'audio';
 
-            // Fully encrypted filename generated directly on client side
             const encryptedTitle = await encryptFilename(file.name, fileType);
 
             const formData = new FormData();
@@ -1036,10 +1143,17 @@ async function handleFiles(e) {
 
 // Instant Preview / Playback
 function openFile(f) {
+    if (f.corrupted) {
+        alert("Этот файл поврежден или утерян ключ шифрования.");
+        return;
+    }
+
     const cached = decryptionCache[f.doc_id];
     if (!cached) {
-        alert("Расшифровка файла...");
-        lazyDecryptItem(f);
+        alert("Загрузка и расшифровка файла...");
+        lazyLoadThumbnail(f).then(() => {
+            if (decryptionCache[f.doc_id]) openFile(f);
+        });
         return;
     }
 
