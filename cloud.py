@@ -4,16 +4,32 @@ import json
 import random
 import requests
 import hashlib
+import base64
 from io import BytesIO
 from datetime import datetime
+from urllib.parse import urlparse
 from flask import Blueprint, render_template_string, request, jsonify, Response, session
 from werkzeug.utils import secure_filename
 
 cloud_bp = Blueprint('cloud', __name__)
 
-# === CONFIG ===
+# === CONFIG & CONSTANTS ===
 VK_API = "https://api.vk.com/method"
 API_VERSION = "5.199"
+MAX_FILE_SIZE = 200 * 1024 * 1024  # 200 MB limit for VK Documents
+
+# Kate Mobile Client Headers & Official UA to bypass VK blocks and restrictions
+KATE_HEADERS = {
+    'User-Agent': 'KateMobileAndroid/108 lite-armeabi-v7a (Android 13; SDK 33; arm64-v8a; Xiaomi Redmi Note 10; ru)',
+    'Accept-Language': 'ru,en',
+    'Connection': 'keep-alive'
+}
+
+# Whitelisted VK domains for SSRF prevention in /api/download proxy
+ALLOWED_VK_DOMAINS = (
+    'vk.com', 'vkuser.net', 'vk-cdn.net', 'userapi.com',
+    'vk-cdn.me', 'vk.me', 'userapi.me', 'vk.ru', 'vkuser.ru'
+)
 
 FIREBASE_DB_URL = os.environ.get('FIREBASE_DB_URL', 'https://meow-874ce-default-rtdb.europe-west1.firebasedatabase.app')
 FIREBASE_API_KEY = os.environ.get('FIREBASE_API_KEY', '')
@@ -69,7 +85,7 @@ def firebase_put(path, data):
         print("Firebase PUT error:", e)
     return False
 
-def get_cloud_key(vk_id):
+def get_cloud_key_data(vk_id):
     vk_id_str = str(vk_id)
     if FIREBASE_DB_URL:
         fb_data = firebase_get(f"cloud_keys/{vk_id_str}")
@@ -94,7 +110,7 @@ def vk_request(method, token, **params):
     params['access_token'] = token
     params['v'] = API_VERSION
     try:
-        resp = get_session().get(f"{VK_API}/{method}", params=params, timeout=10)
+        resp = get_session().get(f"{VK_API}/{method}", params=params, headers=KATE_HEADERS, timeout=10)
         data = resp.json()
         return data.get('response', data.get('error'))
     except Exception as e:
@@ -124,6 +140,41 @@ def b64_to_buf(b64):
     import base64
     return base64.b64decode(b64)
 
+# --- CLOUD TITLE OBFUSCATION HELPERS ---
+def encode_cloud_title(orig_name, file_type):
+    type_map = {'photo': 'p', 'video': 'v', 'audio': 'a', 'doc': 'd'}
+    t_char = type_map.get(file_type, 'd')
+    b64_name = base64.urlsafe_b64encode(orig_name.encode('utf-8')).decode('utf-8').rstrip('=')
+    return f"cl_{t_char}_{b64_name}.doc"
+
+def decode_cloud_title(title):
+    if not (title.startswith('cl_') and title.endswith('.doc')):
+        return None
+    try:
+        parts = title[3:-4].split('_', 1)
+        if len(parts) != 2:
+            return None
+        t_char, b64_name = parts
+        type_map = {'p': 'photo', 'v': 'video', 'a': 'audio', 'd': 'doc'}
+        file_type = type_map.get(t_char, 'doc')
+        padding = '=' * (4 - len(b64_name) % 4)
+        orig_name = base64.urlsafe_b64decode(b64_name + padding).decode('utf-8')
+        return orig_name, file_type
+    except Exception:
+        return None
+
+def is_safe_vk_url(url):
+    """SSRF Prevention: Validates that URL belongs to official VK CDN hosts"""
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ('http', 'https'):
+            return False
+        hostname = parsed.hostname.lower() if parsed.hostname else ''
+        return any(hostname.endswith('.' + domain) or hostname == domain for domain in ALLOWED_VK_DOMAINS)
+    except Exception:
+        return False
+
+
 # === HTML TEMPLATE ===
 CLOUD_HTML = """
 <!DOCTYPE html>
@@ -131,190 +182,235 @@ CLOUD_HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>☁️ VK Tsuyu Cloud</title>
+<title>VK Tsuyu Cloud Professional</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#000;color:#fff;height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
-.app{height:100vh;display:flex;flex-direction:column;position:relative;overflow:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#000;color:#f2f2f7;height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
+.app{height:100vh;display:flex;flex-direction:column;position:relative;overflow:hidden;background:#000}
 
-/* Header */
-.header{height:56px;background:#0d0d0d;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #1c1c1c;flex-shrink:0;justify-content:space-between}
-.header-title{font-size:18px;font-weight:900;letter-spacing:0.8px;color:#fff}
-.header-subtitle{font-size:11px;color:#8e8e93}
-.header-back{width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;background:rgba(255,255,255,0.1);color:#fff;flex-shrink:0}
-.header-back svg{width:22px;height:22px;stroke:#fff;stroke-width:2.5px;fill:none}
-.header-back:active{background:rgba(255,255,255,0.25)}
+/* Top Navigation Bar */
+.header{height:60px;background:rgba(13,13,13,0.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);display:flex;align-items:center;padding:0 16px;border-bottom:1px solid #1c1c1e;flex-shrink:0;justify-content:space-between;z-index:100}
+.header-left{display:flex;align-items:center;gap:12px}
+.header-title{font-size:17px;font-weight:700;letter-spacing:-0.4px;color:#fff;display:flex;align-items:center;gap:8px}
+.header-subtitle{font-size:11px;color:#8e8e93;font-weight:500}
+.header-back{width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;background:rgba(255,255,255,0.08);color:#fff;flex-shrink:0;transition:all 0.15s ease}
+.header-back:active{background:rgba(255,255,255,0.2);transform:scale(0.95)}
 .header-actions{display:flex;gap:8px;align-items:center}
-.header-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;color:#fff;background:rgba(255,255,255,0.08);border:none;outline:none}
-.header-btn:active{background:rgba(255,255,255,0.2)}
+.header-btn{width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;color:#fff;background:rgba(255,255,255,0.08);border:none;outline:none;transition:all 0.15s ease}
+.header-btn:active{background:rgba(255,255,255,0.2);transform:scale(0.95)}
+.header-btn.active{background:#0a84ff;color:#fff}
 
-/* Storage bar */
-.storage-bar{padding:12px 16px;background:#0d0d0d;border-bottom:1px solid #1c1c1c}
-.storage-info{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.storage-label{font-size:13px;color:#8e8e93}
-.storage-used{font-size:13px;font-weight:600;color:#fff}
-.storage-track{height:6px;background:#1c1c1e;border-radius:3px;overflow:hidden}
-.storage-fill{height:100%;background:#0a84ff;border-radius:3px;transition:width 0.3s ease;width:0%}
+/* Storage Overview Bar */
+.storage-bar{padding:10px 16px;background:#0d0d0d;border-bottom:1px solid #1c1c1e;display:flex;flex-direction:column;gap:6px}
+.storage-info{display:flex;justify-content:space-between;align-items:center}
+.storage-label{font-size:12px;color:#8e8e93;font-weight:500;display:flex;align-items:center;gap:6px}
+.storage-used{font-size:12px;font-weight:600;color:#f2f2f7}
+.storage-track{height:4px;background:#1c1c1e;border-radius:2px;overflow:hidden;position:relative}
+.storage-fill{height:100%;background:linear-gradient(90deg,#0a84ff,#30b0c7);border-radius:2px;transition:width 0.4s cubic-bezier(0.16,1,0.3,1);width:100%}
 
-/* Category tabs */
-.category-tabs{display:flex;background:#0d0d0d;padding:8px 12px;gap:6px;border-bottom:1px solid #1c1c1c;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-shrink:0}
-.category-tab{flex:1;padding:10px 6px;background:#1c1c1e;border:1px solid #2c2c2e;color:#8e8e93;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;text-align:center;white-space:nowrap;transition:all 0.15s ease;display:flex;flex-direction:column;align-items:center;gap:4px}
-.category-tab.active{background:#0a84ff;color:#fff;border-color:#0a84ff;transform:scale(1.02)}
-.category-count{font-size:9px;opacity:0.7;font-weight:normal}
+/* Toolbar: Search, Sort & Multi-select */
+.toolbar{display:flex;align-items:center;gap:8px;padding:8px 16px;background:#0d0d0d;border-bottom:1px solid #1c1c1e;flex-shrink:0}
+.search-box{flex:1;position:relative;display:flex;align-items:center}
+.search-box svg{position:absolute;left:10px;width:16px;height:16px;color:#8e8e93;pointer-events:none}
+.search-input{width:100%;padding:8px 12px 8px 32px;border-radius:10px;background:#1c1c1e;border:1px solid transparent;color:#fff;font-size:13px;outline:none;transition:all 0.2s}
+.search-input:focus{border-color:#0a84ff;background:#2c2c2e}
+.search-input::placeholder{color:#636366}
 
-/* Upload zone */
-.upload-zone{margin:12px 16px;padding:20px;border:2px dashed #2c2c2e;border-radius:16px;text-align:center;cursor:pointer;transition:all 0.2s;background:#0d0d0d;flex-shrink:0}
-.upload-zone:active{background:#1c1c1e;border-color:#0a84ff}
-.upload-zone.dragover{background:#1c1c1e;border-color:#0a84ff}
-.upload-icon{width:40px;height:40px;margin:0 auto 8px;color:#8e8e93}
-.upload-text{font-size:13px;color:#8e8e93;line-height:1.4}
-.upload-text b{color:#fff}
+.sort-select{padding:7px 10px;border-radius:10px;background:#1c1c1e;border:none;color:#8e8e93;font-size:12px;font-weight:500;outline:none;cursor:pointer}
 
-/* File grid */
-.file-grid{flex:1;overflow-y:auto;padding:0 16px 20px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;-webkit-overflow-scrolling:touch}
-.file-item{position:relative;background:#141416;border-radius:14px;overflow:hidden;border:1px solid #1c1c1c;cursor:pointer;transition:transform 0.15s,opacity 0.15s;display:flex;flex-direction:column;justify-content:space-between;aspect-ratio:0.8}
-.file-thumb-container{position:relative;width:100%;aspect-ratio:1;background:#1c1c1e;overflow:hidden;display:flex;align-items:center;justify-content:center}
+/* Multi-select bar */
+.multiselect-bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(28,28,30,0.92);backdrop-filter:blur(20px);border:1px solid #3a3a3c;border-radius:20px;padding:8px 16px;display:flex;align-items:center;gap:16px;z-index:400;box-shadow:0 8px 32px rgba(0,0,0,0.6);transition:all 0.25s ease}
+.multiselect-bar.hidden{display:none}
+.multiselect-count{font-size:13px;font-weight:600;color:#fff}
+.multiselect-btn{background:none;border:none;color:#0a84ff;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px}
+.multiselect-btn.danger{color:#ff3b30}
+
+/* SVG Category Tabs */
+.tabs-container{display:flex;gap:6px;padding:10px 16px;background:#0d0d0d;border-bottom:1px solid #1c1c1e;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;flex-shrink:0}
+.tabs-container::-webkit-scrollbar{display:none}
+.tab-item{padding:8px 14px;border-radius:12px;background:#1c1c1e;color:#8e8e93;font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer;transition:all 0.2s ease;display:flex;align-items:center;gap:6px}
+.tab-item svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2}
+.tab-item.active{background:#0a84ff;color:#fff}
+
+/* Upload Drop Zone */
+.upload-zone{margin:10px 16px;padding:16px;border:1.5px dashed #2c2c2e;border-radius:14px;text-align:center;cursor:pointer;transition:all 0.2s;background:#0d0d0d;flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:12px}
+.upload-zone:active,.upload-zone.dragover{background:#1c1c1e;border-color:#0a84ff}
+.upload-icon{width:28px;height:28px;color:#0a84ff;flex-shrink:0}
+.upload-text{font-size:12px;color:#8e8e93;text-align:left;line-height:1.3}
+.upload-text b{color:#fff;font-weight:600}
+
+/* Professional File Grid */
+.file-grid{flex:1;overflow-y:auto;padding:12px 16px 80px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;-webkit-overflow-scrolling:touch}
+.file-item{position:relative;background:#141416;border-radius:12px;overflow:hidden;border:1px solid #1c1c1e;cursor:pointer;transition:transform 0.15s,box-shadow 0.15s,border-color 0.15s;display:flex;flex-direction:column;user-select:none}
+.file-item:active{transform:scale(0.97)}
+.file-item.selected{border-color:#0a84ff;box-shadow:0 0 0 2px rgba(10,132,255,0.4)}
+
+.file-thumb-container{width:100%;aspect-ratio:1;position:relative;background:#1a1a1c;display:flex;align-items:center;justify-content:center;overflow:hidden}
 .file-thumb{width:100%;height:100%;object-fit:cover;display:block}
-.file-thumb-video{width:100%;height:100%;object-fit:cover}
-.file-thumb svg{width:36px;height:36px;color:#8e8e93}
-.file-info{padding:6px 8px;background:#141416;flex-grow:1;display:flex;flex-direction:column;justify-content:center}
-.file-name{font-size:11px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;font-weight:500}
-.file-meta{font-size:9px;color:#666;display:flex;justify-content:space-between}
-.file-size{color:#8e8e93}
+.file-thumb svg{width:32px;height:32px;color:#48484a}
 
-/* Decryption Overlay loader inside grid item */
-.decrypted-badge{position:absolute;bottom:4px;right:4px;background:rgba(52,199,89,0.9);color:#fff;font-size:8px;font-weight:900;padding:2px 4px;border-radius:4px;text-transform:uppercase}
-.decrypting-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(1px)}
+/* Checkbox overlay */
+.file-checkbox{position:absolute;top:6px;left:6px;width:20px;height:20px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.5);background:rgba(0,0,0,0.4);display:none;align-items:center;justify-content:center;z-index:10;transition:all 0.15s ease}
+.file-item.selecting .file-checkbox{display:flex}
+.file-item.selected .file-checkbox{background:#0a84ff;border-color:#0a84ff}
+.file-checkbox svg{width:12px;height:12px;stroke:#fff;fill:none;stroke-width:3}
 
-/* File type badges */
-.file-badge{position:absolute;top:6px;left:6px;background:rgba(0,0,0,0.7);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:0.5px;z-index:2}
-.file-badge.photo{background:rgba(10,132,255,0.85)}
-.file-badge.video{background:rgba(255,59,48,0.85)}
-.file-badge.audio{background:rgba(52,199,89,0.85)}
-.file-badge.doc{background:rgba(175,82,222,0.85)}
+/* Decryption Micro Spinner */
+.file-item.decrypting .file-thumb-container::after{content:'';position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);backdrop-filter:blur(2px)}
+.file-item.decrypting .file-thumb-container::before{content:'';position:absolute;z-index:3;width:18px;height:18px;border:2px solid rgba(255,255,255,0.2);border-top-color:#0a84ff;border-radius:50%;animation:spin 0.6s linear infinite}
 
-/* Upload progress */
-.upload-toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(28,28,30,0.95);border:1px solid #3a3a3c;color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;z-index:900;display:flex;align-items:center;gap:10px;box-shadow:0 4px 16px rgba(0,0,0,0.5)}
+/* Minimal Info Card (NO BADGES OVERLAY) */
+.file-info{padding:8px;background:#141416;display:flex;flex-direction:column;gap:2px}
+.file-name{font-size:11px;font-weight:500;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file-meta{font-size:10px;color:#8e8e93;display:flex;justify-content:space-between;align-items:center}
+
+/* Upload Toast Progress Bar */
+.upload-toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:rgba(28,28,30,0.95);backdrop-filter:blur(20px);border:1px solid #3a3a3c;color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:500;z-index:900;display:flex;flex-direction:column;gap:6px;box-shadow:0 8px 32px rgba(0,0,0,0.6);min-width:240px}
 .upload-toast.hidden{display:none}
-.loader{border:2px solid #333;border-top:2px solid #fff;border-radius:50%;width:14px;height:14px;animation:spin 0.6s linear infinite;display:inline-block}
-@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+.upload-toast-header{display:flex;align-items:center;justify-content:space-between}
+.upload-progress-bar{height:4px;background:#2c2c2e;border-radius:2px;overflow:hidden}
+.upload-progress-fill{height:100%;background:#0a84ff;border-radius:2px;width:0%;transition:width 0.2s ease}
 
-/* Action sheet */
-.action-sheet{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:500;display:flex;flex-direction:column;justify-content:flex-end}
+/* Modals & Action Sheet */
+.action-sheet{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);backdrop-filter:blur(10px);z-index:500;display:flex;flex-direction:column;justify-content:flex-end}
 .action-sheet-content{background:#1c1c1e;border-top-left-radius:20px;border-top-right-radius:20px;padding:16px;display:flex;flex-direction:column;gap:8px}
 .action-sheet-item{padding:14px 16px;border-radius:12px;background:#2c2c2e;color:#fff;font-size:15px;font-weight:500;display:flex;align-items:center;gap:12px;cursor:pointer}
 .action-sheet-item.danger{color:#ff3b30}
 .action-sheet-item svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2}
 
-/* Modal */
-.modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:600;padding:20px}
-.modal-content{background:#161616;border-radius:20px;padding:24px;width:100%;max-width:380px;border:1px solid #282828}
-.modal-title{font-size:18px;font-weight:600;margin-bottom:10px;color:#fff}
-.modal-text{font-size:13px;color:#aaa;margin-bottom:20px;line-height:1.5}
-.btn{width:100%;padding:14px;border:none;border-radius:14px;background:#fff;color:#000;font-size:16px;font-weight:600;cursor:pointer;margin-bottom:8px}
+.modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);backdrop-filter:blur(15px);display:flex;align-items:center;justify-content:center;z-index:600;padding:20px}
+.modal-content{background:#1c1c1e;border-radius:20px;padding:24px;width:100%;max-width:380px;border:1px solid #2c2c2e}
+.modal-title{font-size:18px;font-weight:700;margin-bottom:8px;color:#fff;display:flex;align-items:center;gap:8px}
+.modal-text{font-size:13px;color:#8e8e93;margin-bottom:16px;line-height:1.5}
+.btn{width:100%;padding:14px;border:none;border-radius:12px;background:#fff;color:#000;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;transition:all 0.1s}
 .btn:active{transform:scale(0.97);opacity:.85}
-.btn-secondary{background:transparent;color:#fff;border:1px solid #333}
+.btn-secondary{background:#2c2c2e;color:#fff;border:1px solid #3a3a3c}
 .btn-danger{background:#ff3b30;color:#fff}
 
-.key-box{background:#0a0a0a;border:1px solid #222;padding:10px;border-radius:10px;font-family:monospace;font-size:11px;color:#34c759;word-break:break-all;max-height:80px;overflow-y:auto}
+/* Key box */
+.key-box{background:#0a0a0a;border:1px solid #2c2c2e;padding:12px;border-radius:10px;font-family:monospace;font-size:11px;color:#30d158;word-break:break-all;max-height:80px;overflow-y:auto;margin-top:4px}
+.warning-box{background:rgba(255,59,48,0.1);border:1px solid rgba(255,59,48,0.3);color:#ff453a;padding:12px;border-radius:10px;font-size:12px;margin-bottom:14px;line-height:1.4}
 
-/* Empty state */
-.empty-state{text-align:center;padding:40px 20px;color:#666;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.empty-state svg{width:64px;height:64px;color:#333;margin-bottom:16px}
-.empty-title{font-size:16px;font-weight:600;color:#8e8e93;margin-bottom:8px}
-.empty-text{font-size:13px;color:#666;line-height:1.5}
+/* Empty State */
+.empty-state{text-align:center;padding:60px 20px;color:#8e8e93;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.empty-state svg{width:56px;height:56px;color:#3a3a3c;margin-bottom:12px}
+.empty-title{font-size:16px;font-weight:600;color:#f2f2f7;margin-bottom:6px}
+.empty-text{font-size:13px;color:#8e8e93;line-height:1.4}
 
-/* Preview modal */
-.preview-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:700;display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity 0.2s ease}
+/* Preview Modal */
+.preview-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);backdrop-filter:blur(20px);z-index:700;display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity 0.2s ease}
 .preview-modal.active{opacity:1;pointer-events:auto}
-.preview-header{height:56px;background:#0d0d0d;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #1c1c1c;flex-shrink:0;justify-content:space-between}
+.preview-header{height:60px;background:#0d0d0d;display:flex;align-items:center;padding:0 16px;border-bottom:1px solid #1c1c1e;flex-shrink:0;justify-content:space-between}
 .preview-body{flex:1;display:flex;align-items:center;justify-content:center;padding:20px;overflow:hidden}
 .preview-body img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px}
 .preview-body video{max-width:100%;max-height:100%;border-radius:8px}
 .preview-body audio{width:100%;max-width:400px}
 .preview-filename{color:#fff;font-size:14px;font-weight:600;flex:1;text-align:center;padding:0 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-/* Context menu */
-.context-menu{position:fixed;background:#1c1c1e;border-radius:12px;padding:6px 0;min-width:180px;box-shadow:0 8px 32px rgba(0,0,0,0.6);z-index:800;border:1px solid #2c2c2e;opacity:0;pointer-events:none;transform:scale(0.95);transition:all 0.15s ease}
-.context-menu.active{opacity:1;pointer-events:auto;transform:scale(1)}
-.context-menu-item{padding:10px 16px;font-size:14px;color:#ddd;cursor:pointer;display:flex;align-items:center;gap:10px}
-.context-menu-item:hover{background:rgba(255,255,255,0.08)}
-.context-menu-item.danger{color:#ff3b30}
-.context-menu-divider{height:1px;background:#2c2c2e;margin:4px 0}
-
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 .hidden{display:none!important}
 </style>
 </head>
 <body>
 <div class="app">
 
-<!-- Upload Toast -->
+<!-- Upload Progress Toast -->
 <div class="upload-toast hidden" id="uploadToast">
-<span class="loader"></span>
-<span id="uploadToastText">Загрузка...</span>
+  <div class="upload-toast-header">
+    <span id="uploadToastText" style="font-size:12px;font-weight:600">Загрузка...</span>
+    <span id="uploadToastPercent" style="font-size:11px;color:#8e8e93">0%</span>
+  </div>
+  <div class="upload-progress-bar">
+    <div class="upload-progress-fill" id="uploadProgressFill"></div>
+  </div>
 </div>
 
-<!-- Header -->
+<!-- Navigation Header -->
 <div class="header">
-<div style="display:flex;align-items:center;gap:10px">
-<div class="header-back" onclick="goBack()">
-<svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-</div>
-<div>
-<div class="header-title">☁️ VK Tsuyu Cloud</div>
-<div class="header-subtitle" id="storageSubtitle">Бесконечное облачное хранилище</div>
-</div>
-</div>
-<div class="header-actions">
-<button class="header-btn" onclick="openKeyModal()" title="Ключ шифрования">
-<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-</button>
-<button class="header-btn" onclick="document.getElementById('fileInput').click()" title="Загрузить">
-<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-</button>
-</div>
+  <div class="header-left">
+    <div class="header-back" onclick="goBack()" title="Назад">
+      <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    </div>
+    <div>
+      <div class="header-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2.5"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+        VK Cloud
+      </div>
+      <div class="header-subtitle" id="storageSubtitle">Зашифрованное хранилище</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="header-btn" id="multiSelectToggleBtn" onclick="toggleMultiSelectMode()" title="Выбрать файлы">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    </button>
+    <button class="header-btn" onclick="openKeyModal()" title="Ключ шифрования">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    </button>
+    <button class="header-btn" onclick="document.getElementById('fileInput').click()" title="Загрузить">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+    </button>
+  </div>
 </div>
 
 <!-- Storage Bar -->
 <div class="storage-bar">
-<div class="storage-info">
-<div class="storage-label">Использовано</div>
-<div class="storage-used" id="storageUsed">0 файлов</div>
-</div>
-<div class="storage-track">
-<div class="storage-fill" id="storageFill" style="width: 100%"></div>
-</div>
+  <div class="storage-info">
+    <div class="storage-label">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+      Объём хранилища
+    </div>
+    <div class="storage-used" id="storageUsed">0 файлов</div>
+  </div>
+  <div class="storage-track">
+    <div class="storage-fill" id="storageFill"></div>
+  </div>
 </div>
 
-<!-- Category Tabs -->
-<div class="category-tabs">
-<button class="category-tab active" id="tab-photo" onclick="switchCategory('photo')">
-<span>🖼️ Фото</span>
-<span class="category-count" id="count-photo">0</span>
-</button>
-<button class="category-tab" id="tab-video" onclick="switchCategory('video')">
-<span>🎥 Видео</span>
-<span class="category-count" id="count-video">0</span>
-</button>
-<button class="category-tab" id="tab-audio" onclick="switchCategory('audio')">
-<span>🎵 Музыка</span>
-<span class="category-count" id="count-audio">0</span>
-</button>
-<button class="category-tab" id="tab-doc" onclick="switchCategory('doc')">
-<span>📁 Файлы</span>
-<span class="category-count" id="count-doc">0</span>
-</button>
+<!-- Toolbar: Search & Sort -->
+<div class="toolbar">
+  <div class="search-box">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="search" class="search-input" id="searchInput" placeholder="Поиск по файлам..." oninput="filterAndRenderFiles()">
+  </div>
+  <select class="sort-select" id="sortSelect" onchange="filterAndRenderFiles()">
+    <option value="date-desc">Сначала новые</option>
+    <option value="date-asc">Сначала старые</option>
+    <option value="name-asc">Имя (А - Я)</option>
+    <option value="name-desc">Имя (Я - А)</option>
+    <option value="size-desc">Размер (большие)</option>
+    <option value="size-asc">Размер (маленькие)</option>
+  </select>
+</div>
+
+<!-- Professional SVG Category Tabs -->
+<div class="tabs-container" id="categoryTabs">
+  <div class="tab-item active" data-category="photo" onclick="switchCategory('photo')">
+    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+    Фото
+  </div>
+  <div class="tab-item" data-category="video" onclick="switchCategory('video')">
+    <svg viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+    Видео
+  </div>
+  <div class="tab-item" data-category="audio" onclick="switchCategory('audio')">
+    <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+    Музыка
+  </div>
+  <div class="tab-item" data-category="doc" onclick="switchCategory('doc')">
+    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    Файлы
+  </div>
 </div>
 
 <!-- Upload Zone -->
 <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
-<div class="upload-icon">
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-</div>
-<div class="upload-text">
-<b>Нажмите или перетащите файлы</b><br>
-Всё шифруется локально на устройстве
-</div>
+  <div class="upload-icon">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+  </div>
+  <div class="upload-text">
+    <b>Загрузить файлы в Облако</b><br>
+    Нажмите или перетащите. Файлы шифруются на вашем устройстве.
+  </div>
 </div>
 
 <input type="file" class="hidden" id="fileInput" multiple accept="image/*,video/*,audio/*,*/*" onchange="handleFiles(event)">
@@ -322,56 +418,82 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <!-- File Grid -->
 <div class="file-grid" id="fileGrid"></div>
 
-<!-- Empty State -->
-<div class="empty-state hidden" id="emptyState">
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
-<div class="empty-title">В этой категории пусто</div>
-<div class="empty-text">Загрузите файлы, и они автоматически появятся здесь</div>
+<!-- Multi-select Bottom Action Bar -->
+<div class="multiselect-bar hidden" id="multiSelectBar">
+  <span class="multiselect-count" id="multiSelectCount">Выбрано: 0</span>
+  <button class="multiselect-btn" onclick="downloadSelectedBatch()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Скачать
+  </button>
+  <button class="multiselect-btn danger" onclick="deleteSelectedBatch()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+    Удалить
+  </button>
+  <button class="multiselect-btn" style="color:#8e8e93" onclick="exitMultiSelectMode()">Отмена</button>
 </div>
 
+<!-- Empty State -->
+<div class="empty-state hidden" id="emptyState">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+  <div class="empty-title">Файлов пока нет</div>
+  <div class="empty-text">Загрузите файлы — они зашифруются и будут сохранены в облаке</div>
 </div>
 
 <!-- Preview Modal -->
 <div class="preview-modal" id="previewModal" onclick="closePreview(event)">
-<div class="preview-header" onclick="event.stopPropagation()">
-<div class="header-back" onclick="closePreview()">
-<svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-</div>
-<div class="preview-filename" id="previewFilename">Файл</div>
-<button class="header-btn" onclick="downloadCurrentFile()" title="Скачать">
-<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-</button>
-</div>
-<div class="preview-body" id="previewBody" onclick="event.stopPropagation()"></div>
+  <div class="preview-header" onclick="event.stopPropagation()">
+    <div class="header-back" onclick="closePreview()">
+      <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    </div>
+    <div class="preview-filename" id="previewFilename">Файл</div>
+    <button class="header-btn" onclick="downloadCurrentFile()" title="Скачать">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    </button>
+  </div>
+  <div class="preview-body" id="previewBody" onclick="event.stopPropagation()"></div>
 </div>
 
 <!-- Action Sheet -->
 <div class="action-sheet hidden" id="actionSheet" onclick="closeActionSheet(event)">
-<div class="action-sheet-content" onclick="event.stopPropagation()">
-<div class="action-sheet-item" onclick="previewSelectedFile()">
-<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-Открыть / Проиграть
-</div>
-<div class="action-sheet-item" onclick="downloadSelectedFile()">
-<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-Скачать оригинал
-</div>
-<div class="action-sheet-item danger" onclick="deleteSelectedFile()">
-<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-Удалить (может быть заблокировано ВК)
-</div>
-<div class="action-sheet-item" style="justify-content:center;color:#888" onclick="closeActionSheet()">Отмена</div>
-</div>
+  <div class="action-sheet-content" onclick="event.stopPropagation()">
+    <div class="action-sheet-item" onclick="previewSelectedFile()">
+      <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      Открыть
+    </div>
+    <div class="action-sheet-item" onclick="downloadSelectedFile()">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Скачать
+    </div>
+    <div class="action-sheet-item danger" onclick="deleteSelectedFile()">
+      <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+      Удалить
+    </div>
+    <div class="action-sheet-item" style="justify-content:center;color:#8e8e93" onclick="closeActionSheet()">Отмена</div>
+  </div>
 </div>
 
-<!-- Key Modal -->
+<!-- Encryption Key Settings Modal -->
 <div class="modal hidden" id="keyModal">
-<div class="modal-content">
-<div class="modal-title">🔐 Ключ шифрования</div>
-<div class="key-box" id="keyBox">Загрузка...</div>
-<button class="btn btn-secondary" style="margin-top:16px" onclick="exportCloudKey()">Экспорт ключа</button>
-<button class="btn" style="margin-top:10px" onclick="closeKeyModal()">Закрыть</button>
+  <div class="modal-content">
+    <div class="modal-title">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Ключ шифрования
+    </div>
+    <div class="warning-box">
+      Ключ шифрует медиафайлы прямо в вашем браузере с помощью WebCrypto (AES-GCM 256). Сохраните его для использования на других устройствах!
+    </div>
+    <div class="modal-text" style="margin-bottom:4px">Зашифрованный JWK-ключ:</div>
+    <div class="key-box" id="keyBox">Загрузка...</div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-secondary" style="flex:1;font-size:13px;padding:10px" onclick="exportCloudKey()">📤 Экспорт</button>
+      <button class="btn btn-secondary" style="flex:1;font-size:13px;padding:10px" onclick="document.getElementById('importKeyInput').click()">📥 Импорт</button>
+    </div>
+    <input type="file" class="hidden" id="importKeyInput" accept=".json" onchange="importCloudKey(event)">
+    <button class="btn btn-danger" style="margin-top:10px;font-size:13px;padding:10px" onclick="regenerateCloudKey()">🔄 Сгенерировать новый</button>
+    <button class="btn" style="margin-top:10px" onclick="closeKeyModal()">Закрыть</button>
+  </div>
 </div>
+
 </div>
 
 <script>
@@ -383,33 +505,30 @@ let currentCategory = 'photo';
 let selectedFile = null;
 let currentPreviewFile = null;
 
-// Background auto-decryption worker variables
-let decryptQueue = [];
-let isDecryptingQueue = false;
+// Multi-selection state
+let isMultiSelectMode = false;
+let selectedDocIds = new Set();
 
-// Helpers for Base64 with support for UTF-8 russian characters
-function utob(str) {
-    return btoa(unescape(encodeURIComponent(str)));
-}
-function btou(str) {
-    try {
-        return decodeURIComponent(escape(atob(str)));
-    } catch(e) {
-        return atob(str);
-    }
-}
+// Memory leak protection cache & abort controllers
+const decryptionCache = {}; // doc_id -> { blobUrl, blob }
+let activeAbortController = null;
+let intersectionObserver = null;
 
-function showToast(text) {
+function showToastProgress(text, percent) {
     const t = document.getElementById('uploadToast');
     document.getElementById('uploadToastText').textContent = text;
+    document.getElementById('uploadToastPercent').textContent = percent + '%';
+    document.getElementById('uploadProgressFill').style.width = percent + '%';
     t.classList.remove('hidden');
 }
-function hideToast() { document.getElementById('uploadToast').classList.add('hidden'); }
+function hideToastProgress() {
+    document.getElementById('uploadToast').classList.add('hidden');
+}
 
 function goBack() { window.location.href = '/'; }
 
 async function initCloud() {
-    if (!token) { alert('Пожалуйста, войдите в аккаунт!'); goBack(); return; }
+    if (!token) { alert('Сначала войдите в аккаунт'); goBack(); return; }
 
     try {
         const res = await fetch('/cloud/api/init', {
@@ -423,15 +542,12 @@ async function initCloud() {
 
         await initCloudKey();
         await loadFiles();
-    } catch(e) { 
-        console.error(e); 
-        showToast('Ошибка инициализации!');
-    }
+    } catch(e) { console.error(e); }
 }
 
 async function initCloudKey() {
     const storedKey = localStorage.getItem('vk_cloud_key_' + myVkId);
-    const storedPass = localStorage.getItem('vk_pass') || 'default_pass_123';
+    const storedPass = localStorage.getItem('vk_pass');
 
     if (storedKey) {
         try {
@@ -443,7 +559,7 @@ async function initCloudKey() {
     try {
         const res = await fetch('/cloud/api/key/' + myVkId);
         const data = await res.json();
-        if (data.cloud_key_enc) {
+        if (data.cloud_key_enc && storedPass) {
             const masterKey = await deriveCloudKey(storedPass, myVkId + "_cloud_salt");
             const decBuf = await decryptAESGCM(masterKey, b64ToBuf(data.cloud_key_enc));
             const keyJwk = JSON.parse(new TextDecoder().decode(decBuf));
@@ -457,20 +573,22 @@ async function initCloudKey() {
     const keyJwk = await crypto.subtle.exportKey("jwk", cloudKey);
     localStorage.setItem('vk_cloud_key_' + myVkId, JSON.stringify(keyJwk));
 
-    const masterKey = await deriveCloudKey(storedPass, myVkId + "_cloud_salt");
-    const encBuf = await encryptAESGCM(masterKey, new TextEncoder().encode(JSON.stringify(keyJwk)));
-    await fetch('/cloud/api/key/' + myVkId, {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({cloud_key_enc: bufToB64(encBuf)})
-    });
+    if (storedPass) {
+        const masterKey = await deriveCloudKey(storedPass, myVkId + "_cloud_salt");
+        const encBuf = await encryptAESGCM(masterKey, new TextEncoder().encode(JSON.stringify(keyJwk)));
+        await fetch('/cloud/api/key/' + myVkId, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({cloud_key_enc: bufToB64(encBuf)})
+        });
+    }
 }
 
 async function deriveCloudKey(pass, saltStr) {
     const enc = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(pass), "PBKDF2", false, ["deriveKey"]);
     return await crypto.subtle.deriveKey(
-        {name:"PBKDF2", salt:enc.encode(saltStr), iterations:100000, hash:"SHA-256"},
+        {name:"PBKDF2", salt:enc.encode(saltStr), iterations:600000, hash:"SHA-256"},
         keyMaterial,
         {name:"AES-GCM", length:256},
         false,
@@ -513,41 +631,8 @@ async function importCloudCryptoKey(jwkStr) {
     return await crypto.subtle.importKey("jwk", jwk, {name:"AES-GCM", length:256}, true, ["encrypt","decrypt"]);
 }
 
-function getFileType(filename, mime) {
-    const f = filename.toLowerCase();
-    const m = (mime || '').toLowerCase();
-    
-    // Check custom extensions
-    if (f.includes('.cimg') || m.startsWith('image/')) return 'photo';
-    if (f.includes('.cvid') || m.startsWith('video/')) return 'video';
-    if (f.includes('.caud') || m.startsWith('audio/')) return 'audio';
-    return 'doc';
-}
-
-function getOriginalName(title) {
-    let clean = title;
-    if (clean.endsWith('.doc')) clean = clean.substring(0, clean.length - 4);
-    
-    if (clean.startsWith('cloud_')) {
-        const parts = clean.split('.');
-        const payload = parts[0].substring(6); // remove 'cloud_'
-        try {
-            // Attempt Base64 decode
-            const decoded = btou(payload);
-            if (decoded && decoded.length > 0) return decoded;
-        } catch(e) {}
-    }
-    return clean;
-}
-
-function formatSize(bytes) {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
-    return (bytes/(1024*1024)).toFixed(1) + ' MB';
-}
-
 async function loadFiles() {
-    showToast('Синхронизация с ВК...');
+    showToastProgress('Синхронизация...', 20);
     try {
         const res = await fetch('/cloud/api/files', {
             method: 'POST',
@@ -556,333 +641,388 @@ async function loadFiles() {
         });
         const data = await res.json();
         filesData = data.files || [];
-        
-        updateCategoryCounters();
-        switchCategory(currentCategory);
-    } catch(e) { 
-        console.error(e); 
-    }
-    hideToast();
+        filterAndRenderFiles();
+    } catch(e) { console.error(e); }
+    hideToastProgress();
 }
 
-function updateCategoryCounters() {
-    const counts = {photo: 0, video: 0, audio: 0, doc: 0};
-    filesData.forEach(f => {
-        const type = getFileType(f.name, f.mime);
-        if (counts[type] !== undefined) counts[type]++;
-    });
-
-    document.getElementById('count-photo').textContent = counts.photo;
-    document.getElementById('count-video').textContent = counts.video;
-    document.getElementById('count-audio').textContent = counts.audio;
-    document.getElementById('count-doc').textContent = counts.doc;
+function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+    if (bytes < 1024*1024*1024) return (bytes/(1024*1024)).toFixed(1) + ' MB';
+    return (bytes/(1024*1024*1024)).toFixed(1) + ' GB';
 }
 
 function switchCategory(cat) {
     currentCategory = cat;
-    
-    // Update Active Tab UI
-    document.querySelectorAll('.category-tab').forEach(tab => {
-        tab.classList.remove('active');
+    document.querySelectorAll('.tab-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.category === cat);
     });
-    const activeTab = document.getElementById(`tab-${cat}`);
-    if (activeTab) activeTab.classList.add('active');
-
-    // Render active category
-    renderFiles();
-    
-    // Trigger Automatic Background Decryption for this category immediately!
-    startCategoryAutoDecryption(cat);
+    filterAndRenderFiles();
 }
 
-function renderFiles() {
+// Search, Sort & Render Files
+function filterAndRenderFiles() {
+    // Abort previous background decrypt requests
+    if (activeAbortController) {
+        activeAbortController.abort();
+    }
+    activeAbortController = new AbortController();
+
+    const searchQuery = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+    const sortValue = document.getElementById('sortSelect').value;
+
+    let filtered = filesData.filter(f => f.type === currentCategory);
+
+    if (searchQuery) {
+        filtered = filtered.filter(f => f.name.toLowerCase().includes(searchQuery));
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+        if (sortValue === 'date-desc') return (b.date || '').localeCompare(a.date || '');
+        if (sortValue === 'date-asc') return (a.date || '').localeCompare(b.date || '');
+        if (sortValue === 'name-asc') return a.name.localeCompare(b.name);
+        if (sortValue === 'name-desc') return b.name.localeCompare(a.name);
+        if (sortValue === 'size-desc') return b.size - a.size;
+        if (sortValue === 'size-asc') return a.size - b.size;
+        return 0;
+    });
+
+    renderGrid(filtered);
+}
+
+// Safe DOM Construction (Fixes XSS)
+function renderGrid(filteredFiles) {
     const grid = document.getElementById('fileGrid');
     const empty = document.getElementById('emptyState');
     const usedLabel = document.getElementById('storageUsed');
 
     grid.innerHTML = '';
-    
-    const filtered = filesData.filter(f => getFileType(f.name, f.mime) === currentCategory);
-    usedLabel.textContent = `${filtered.length} файлов в категории`;
+    usedLabel.textContent = filteredFiles.length + ' файлов';
 
-    if (filtered.length === 0) {
+    if (filteredFiles.length === 0) {
         empty.classList.remove('hidden');
         return;
     }
     empty.classList.add('hidden');
 
-    for (const f of filtered) {
-        const div = document.createElement('div');
-        div.className = 'file-item';
-        div.dataset.id = f.doc_id;
-        
-        const type = getFileType(f.name, f.mime);
-        const displayName = getOriginalName(f.name);
+    // Setup Lazy Decryption Observer
+    if (intersectionObserver) intersectionObserver.disconnect();
 
-        let previewMarkup = '';
-        if (f.decryptedBlobUrl) {
-            // Already decrypted - show fully decrypted content immediately!
-            if (type === 'photo') {
-                previewMarkup = `<img class="file-thumb" src="${f.decryptedBlobUrl}">`;
-            } else if (type === 'video') {
-                previewMarkup = `<video class="file-thumb-video" src="${f.decryptedBlobUrl}" muted loop autoplay playsinline></video>`;
-            } else if (type === 'audio') {
-                previewMarkup = `<svg viewBox="0 0 24 24" style="color:#34c759"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
-            } else {
-                previewMarkup = `<svg viewBox="0 0 24 24" style="color:#af52de"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+    intersectionObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const docId = entry.target.dataset.id;
+                const fileObj = filteredFiles.find(f => f.doc_id === docId);
+                if (fileObj) {
+                    lazyDecryptItem(fileObj);
+                    intersectionObserver.unobserve(entry.target);
+                }
             }
+        });
+    }, { root: grid, rootMargin: '100px' });
+
+    for (const f of filteredFiles) {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'file-item' + (isMultiSelectMode ? ' selecting' : '') + (selectedDocIds.has(f.doc_id) ? ' selected' : '');
+        itemDiv.id = `item_${f.doc_id}`;
+        itemDiv.dataset.id = f.doc_id;
+
+        // Checkbox overlay for multi-select
+        const checkDiv = document.createElement('div');
+        checkDiv.className = 'file-checkbox';
+        checkDiv.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`;
+        itemDiv.appendChild(checkDiv);
+
+        // Thumbnail Container (WITHOUT ANY TYPE BADGES OVERLAY AS REQUESTED)
+        const thumbContainer = document.createElement('div');
+        thumbContainer.className = 'file-thumb-container';
+
+        const placeholderIcon = document.createElement('div');
+        placeholderIcon.className = 'file-thumb';
+        placeholderIcon.style.cssText = 'display:flex;align-items:center;justify-content:center';
+        placeholderIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 15V3m0 12l-4-4m4 4l4-4M2 17l.621 2.485A2 2 0 004.561 21h14.878a2 2 0 001.94-1.515L22 17"/></svg>`;
+        thumbContainer.appendChild(placeholderIcon);
+        itemDiv.appendChild(thumbContainer);
+
+        // Card Info
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'file-info';
+
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'file-name';
+        nameDiv.textContent = f.name;
+
+        const metaDiv = document.createElement('div');
+        metaDiv.className = 'file-meta';
+        
+        const sizeSpan = document.createElement('span');
+        sizeSpan.textContent = formatSize(f.size);
+
+        metaDiv.appendChild(sizeSpan);
+        infoDiv.appendChild(nameDiv);
+        infoDiv.appendChild(metaDiv);
+
+        itemDiv.appendChild(infoDiv);
+
+        // Click / Select Handlers
+        itemDiv.onclick = (e) => {
+            if (isMultiSelectMode) {
+                toggleItemSelection(f.doc_id, itemDiv);
+            } else {
+                openFile(f);
+            }
+        };
+
+        itemDiv.oncontextmenu = (e) => {
+            e.preventDefault();
+            if (!isMultiSelectMode) showActionSheet(f);
+        };
+
+        grid.appendChild(itemDiv);
+
+        // Check cache or observe for lazy loading
+        if (decryptionCache[f.doc_id]) {
+            applyDecryptedPreview(f.doc_id, f.type);
         } else {
-            // Standard placeholder
-            let icon = '';
-            if (type === 'photo') icon = `<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`;
-            else if (type === 'video') icon = `<svg viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>`;
-            else if (type === 'audio') icon = `<svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
-            else icon = `<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
-            
-            previewMarkup = `
-                ${icon}
-                <div class="decrypting-overlay" id="overlay-${f.doc_id}">
-                    <span class="loader" style="width:18px;height:18px"></span>
-                </div>
-            `;
+            intersectionObserver.observe(itemDiv);
         }
-
-        const okBadge = f.decryptedBlobUrl ? `<span class="decrypted-badge">OK</span>` : '';
-
-        div.innerHTML = `
-            <div class="file-thumb-container" id="thumb-container-${f.doc_id}">
-                ${previewMarkup}
-                ${okBadge}
-            </div>
-            <div class="file-badge ${type}">${type === 'doc' ? 'ФАЙЛ' : type.toUpperCase()}</div>
-            <div class="file-info">
-                <div class="file-name" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</div>
-                <div class="file-meta">
-                    <span class="file-size">${formatSize(f.size)}</span>
-                </div>
-            </div>
-        `;
-
-        // Click actions
-        div.onclick = () => openFile(f);
-        div.oncontextmenu = (e) => { e.preventDefault(); showContextMenu(e, f); };
-
-        // Long press support
-        let longPressTimer;
-        div.addEventListener('touchstart', () => {
-            longPressTimer = setTimeout(() => { 
-                if(navigator.vibrate) navigator.vibrate(20); 
-                showActionSheet(f); 
-            }, 600);
-        }, {passive:true});
-        div.addEventListener('touchend', () => clearTimeout(longPressTimer));
-        div.addEventListener('touchmove', () => clearTimeout(longPressTimer));
-
-        grid.appendChild(div);
     }
 }
 
-function escapeHtml(t) { 
-    const d = document.createElement('div'); 
-    d.textContent = t; 
-    return d.innerHTML; 
-}
-
-// ==========================================
-// AUTOMATIC BACKGROUND DECRYPTION SYSTEM
-// ==========================================
-function startCategoryAutoDecryption(cat) {
-    // Empty active queue
-    decryptQueue = [];
-    
-    // Find all files in the active category that are not decrypted yet
-    const undecrypted = filesData.filter(f => getFileType(f.name, f.mime) === cat && !f.decryptedBlobUrl && !f.isDecrypting);
-    
-    if (undecrypted.length === 0) return;
-
-    // Enqueue undecrypted files
-    undecrypted.forEach(f => {
-        f.isDecrypting = true;
-        decryptQueue.push(f);
-    });
-
-    if (!isDecryptingQueue) {
-        processDecryptionQueue();
-    }
-}
-
-async function processDecryptionQueue() {
-    if (decryptQueue.length === 0) {
-        isDecryptingQueue = false;
+// On-the-fly Lazy Decryptor
+async function lazyDecryptItem(f) {
+    if (decryptionCache[f.doc_id]) {
+        applyDecryptedPreview(f.doc_id, f.type);
         return;
     }
 
-    isDecryptingQueue = true;
-    const currentFile = decryptQueue.shift();
+    const itemEl = document.getElementById(`item_${f.doc_id}`);
+    if (!itemEl) return;
+
+    itemEl.classList.add('decrypting');
 
     try {
-        await decryptSingleFile(currentFile);
-    } catch(e) {
-        console.error("Auto-decryption failed for file:", currentFile.name, e);
-        currentFile.isDecrypting = false;
-        // Remove overlay so we don't spin infinitely if error occurs
-        const overlay = document.getElementById(`overlay-${currentFile.doc_id}`);
-        if (overlay) overlay.classList.add('hidden');
-    }
-
-    // Process next item in queue
-    setTimeout(processDecryptionQueue, 50);
-}
-
-async function decryptSingleFile(f) {
-    const type = getFileType(f.name, f.mime);
-    
-    // Download encrypted data
-    const resp = await fetch('/cloud/api/download?url=' + encodeURIComponent(f.url));
-    if (!resp.ok) throw new Error('Download failed');
-    
-    const encBuf = await resp.arrayBuffer();
-    
-    // Decrypt data using the master cloudKey
-    const decBuf = await decryptAESGCM(cloudKey, encBuf);
-    
-    // Create decrypted object blob
-    const mimeType = f.mime || 'application/octet-stream';
-    const blob = new Blob([decBuf], {type: mimeType});
-    f.decryptedBlobUrl = URL.createObjectURL(blob);
-    f.isDecrypting = false;
-
-    // Instantly update UI element in the active grid if the category matches
-    if (currentCategory === type) {
-        const thumbContainer = document.getElementById(`thumb-container-${f.doc_id}`);
-        if (thumbContainer) {
-            let directMarkup = '';
-            if (type === 'photo') {
-                directMarkup = `<img class="file-thumb" src="${f.decryptedBlobUrl}">`;
-            } else if (type === 'video') {
-                directMarkup = `<video class="file-thumb-video" src="${f.decryptedBlobUrl}" muted loop autoplay playsinline></video>`;
-            } else if (type === 'audio') {
-                directMarkup = `<svg viewBox="0 0 24 24" style="color:#34c759"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
-            } else {
-                directMarkup = `<svg viewBox="0 0 24 24" style="color:#af52de"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
-            }
-            thumbContainer.innerHTML = `${directMarkup}<span class="decrypted-badge">OK</span>`;
-        }
-    }
-}
-
-// ==========================================
-// UPLOAD METHOD
-// ==========================================
-async function handleFiles(e) {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    for (const file of files) {
-        await uploadFile(file);
-    }
-    e.target.value = '';
-    await loadFiles();
-}
-
-async function uploadFile(file) {
-    showToast('Шифрование ' + file.name + '...');
-
-    try {
-        const fileBuf = await file.arrayBuffer();
-
-        // Encrypt data
-        const encBuf = await encryptAESGCM(cloudKey, fileBuf);
-        const encBlob = new Blob([encBuf], {type: 'application/octet-stream'});
-
-        // Get encrypted extension
-        let ext = 'cld';
-        const mime = file.type.toLowerCase();
-        if (mime.startsWith('image/')) ext = 'cimg';
-        else if (mime.startsWith('video/')) ext = 'cvid';
-        else if (mime.startsWith('audio/')) ext = 'caud';
-
-        // Pack safe base64 title
-        const base64Name = utob(file.name);
-        const encFilename = `cloud_${base64Name}.${ext}.doc`;
-
-        showToast('Загрузка в Облако...');
-
-        const formData = new FormData();
-        formData.append('token', token);
-        formData.append('file', encBlob, encFilename);
-        formData.append('original_name', file.name + '.doc');
-        formData.append('mime', mime || 'application/octet-stream');
-        formData.append('size', file.size);
-
-        const res = await fetch('/cloud/api/upload', {
-            method: 'POST',
-            body: formData
+        const resp = await fetch('/cloud/api/download?url=' + encodeURIComponent(f.url), {
+            signal: activeAbortController ? activeAbortController.signal : null
         });
+        if (!resp.ok) throw new Error("Download failed");
 
-        const data = await res.json();
-        if (data.error) {
-            alert('Ошибка VK API: ' + data.error);
+        const encBuf = await resp.arrayBuffer();
+        const decBuf = await decryptAESGCM(cloudKey, encBuf);
+        const blob = new Blob([decBuf], {type: f.mime || 'application/octet-stream'});
+        const blobUrl = URL.createObjectURL(blob);
+
+        decryptionCache[f.doc_id] = { blobUrl, blob };
+        applyDecryptedPreview(f.doc_id, f.type);
+    } catch (e) {
+        if (e.name !== 'AbortError') {
+            console.error("Decrypt error:", f.name, e);
         }
-    } catch(e) {
-        console.error('Upload error:', e);
-        alert('Критическая ошибка загрузки');
+    } finally {
+        itemEl.classList.remove('decrypting');
     }
 }
 
-// ==========================================
-// VIEW / PLAY / PREVIEW INTERFACE
-// ==========================================
-async function openFile(f) {
-    let blobUrl = f.decryptedBlobUrl;
+function applyDecryptedPreview(doc_id, type) {
+    const itemEl = document.getElementById(`item_${doc_id}`);
+    if (!itemEl) return;
 
-    // Fallback: if not decrypted yet (user clicked early), decrypt on demand
-    if (!blobUrl) {
-        showToast('Расшифровка на лету...');
+    const cache = decryptionCache[doc_id];
+    if (!cache) return;
+
+    const container = itemEl.querySelector('.file-thumb-container');
+    if (!container) return;
+
+    // Clear placeholder
+    container.innerHTML = '';
+
+    if (type === 'photo') {
+        const img = document.createElement('img');
+        img.className = 'file-thumb';
+        img.src = cache.blobUrl;
+        container.appendChild(img);
+    } else if (type === 'video') {
+        const vid = document.createElement('video');
+        vid.src = cache.blobUrl;
+        vid.muted = true;
+        vid.loop = true;
+        vid.playsInline = true;
+        vid.autoplay = true;
+        vid.style.cssText = 'width:100%;height:100%;object-fit:cover';
+        container.appendChild(vid);
+    } else if (type === 'audio') {
+        container.innerHTML = `<div class="file-thumb" style="display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="#30d158" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>`;
+    } else {
+        container.innerHTML = `<div class="file-thumb" style="display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="#af52de" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>`;
+    }
+}
+
+// Multi-Select Mode Operations
+function toggleMultiSelectMode() {
+    isMultiSelectMode = !isMultiSelectMode;
+    document.getElementById('multiSelectToggleBtn').classList.toggle('active', isMultiSelectMode);
+    document.getElementById('multiSelectBar').classList.toggle('hidden', !isMultiSelectMode);
+
+    if (!isMultiSelectMode) {
+        selectedDocIds.clear();
+    }
+    filterAndRenderFiles();
+}
+
+function toggleItemSelection(doc_id, itemEl) {
+    if (selectedDocIds.has(doc_id)) {
+        selectedDocIds.delete(doc_id);
+        itemEl.classList.remove('selected');
+    } else {
+        selectedDocIds.add(doc_id);
+        itemEl.classList.add('selected');
+    }
+    document.getElementById('multiSelectCount').textContent = `Выбрано: ${selectedDocIds.size}`;
+}
+
+function exitMultiSelectMode() {
+    isMultiSelectMode = false;
+    selectedDocIds.clear();
+    document.getElementById('multiSelectToggleBtn').classList.remove('active');
+    document.getElementById('multiSelectBar').classList.add('hidden');
+    filterAndRenderFiles();
+}
+
+async function downloadSelectedBatch() {
+    if (selectedDocIds.size === 0) return;
+    for (const docId of selectedDocIds) {
+        const fileObj = filesData.find(f => f.doc_id === docId);
+        if (fileObj) {
+            const cached = decryptionCache[docId];
+            if (cached) {
+                const a = document.createElement('a');
+                a.href = cached.blobUrl;
+                a.download = fileObj.name;
+                a.click();
+            }
+        }
+    }
+}
+
+async function deleteSelectedBatch() {
+    if (selectedDocIds.size === 0) return;
+    if (!confirm(`Удалить выбранные файлы (${selectedDocIds.size} шт.)?`)) return;
+
+    showToastProgress('Удаление...', 50);
+    for (const docId of selectedDocIds) {
         try {
-            await decryptSingleFile(f);
-            blobUrl = f.decryptedBlobUrl;
-        } catch(e) {
-            console.error(e);
-            alert('Ошибка расшифровки файла');
-            hideToast();
+            await fetch('/cloud/api/delete', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({token, doc_id: docId})
+            });
+            // Revoke blob memory
+            if (decryptionCache[docId]) {
+                URL.revokeObjectURL(decryptionCache[docId].blobUrl);
+                delete decryptionCache[docId];
+            }
+        } catch(e) {}
+    }
+    exitMultiSelectMode();
+    await loadFiles();
+    hideToastProgress();
+}
+
+// File Upload with Concurrency & Real Progress
+async function handleFiles(e) {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    // Check VK Document Size Limit (200MB)
+    for (const f of files) {
+        if (f.size > 200 * 1024 * 1024) {
+            alert(`Файл ${f.name} превышает лимит ВКонтакте (200 МБ)`);
             return;
         }
-        hideToast();
     }
 
-    currentPreviewFile = {...f, blobUrl};
+    let completed = 0;
+    const total = files.length;
+
+    for (const file of files) {
+        const percent = Math.round((completed / total) * 100);
+        showToastProgress(`Загрузка ${file.name}...`, percent);
+
+        try {
+            const fileBuf = await file.arrayBuffer();
+            const encBuf = await encryptAESGCM(cloudKey, fileBuf);
+            const encBlob = new Blob([encBuf], {type: 'application/octet-stream'});
+
+            const formData = new FormData();
+            formData.append('token', token);
+            formData.append('file', encBlob, 'encrypted_payload.bin');
+            formData.append('original_name', file.name);
+            formData.append('size', file.size);
+
+            const res = await fetch('/cloud/api/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await res.json();
+            if (data.error) {
+                alert('Ошибка загрузки: ' + data.error);
+            }
+        } catch(e) {
+            console.error('Upload error:', e);
+            alert('Ошибка при шифровании файла');
+        }
+        completed++;
+    }
+
+    showToastProgress('Завершение...', 100);
+    e.target.value = '';
+    await loadFiles();
+    hideToastProgress();
+}
+
+// Instant Preview / Playback
+function openFile(f) {
+    const cached = decryptionCache[f.doc_id];
+    if (!cached) {
+        alert("Расшифровка файла...");
+        lazyDecryptItem(f);
+        return;
+    }
+
+    currentPreviewFile = {...f, blobUrl: cached.blobUrl};
 
     const modal = document.getElementById('previewModal');
     const body = document.getElementById('previewBody');
     const filename = document.getElementById('previewFilename');
 
-    filename.textContent = getOriginalName(f.name);
+    filename.textContent = f.name;
     body.innerHTML = '';
 
-    const type = getFileType(f.name, f.mime);
-    if (type === 'photo') {
+    if (f.type === 'photo') {
         const img = document.createElement('img');
-        img.src = blobUrl;
+        img.src = cached.blobUrl;
         body.appendChild(img);
-    } else if (type === 'video') {
+    } else if (f.type === 'video') {
         const vid = document.createElement('video');
-        vid.src = blobUrl;
+        vid.src = cached.blobUrl;
         vid.controls = true;
         vid.autoplay = true;
         body.appendChild(vid);
-    } else if (type === 'audio') {
+    } else if (f.type === 'audio') {
         const aud = document.createElement('audio');
-        aud.src = blobUrl;
+        aud.src = cached.blobUrl;
         aud.controls = true;
         aud.autoplay = true;
         body.appendChild(aud);
     } else {
         const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = getOriginalName(f.name);
-        a.textContent = '📥 СКАЧАТЬ ФАЙЛ В ОРИГИНАЛЕ';
-        a.style.cssText = 'color:#0a84ff;font-size:16px;text-decoration:none;padding:20px;border:2px solid #0a84ff;border-radius:14px;font-weight:bold';
+        a.href = cached.blobUrl;
+        a.download = f.name;
+        a.textContent = 'Скачать файл';
+        a.style.cssText = 'color:#0a84ff;font-size:15px;text-decoration:none;padding:16px 24px;border:1.5px solid #0a84ff;border-radius:12px;font-weight:600';
         body.appendChild(a);
     }
 
@@ -899,11 +1039,10 @@ function downloadCurrentFile() {
     if (!currentPreviewFile || !currentPreviewFile.blobUrl) return;
     const a = document.createElement('a');
     a.href = currentPreviewFile.blobUrl;
-    a.download = getOriginalName(currentPreviewFile.name);
+    a.download = currentPreviewFile.name;
     a.click();
 }
 
-// Action Sheet controls
 function showActionSheet(f) {
     selectedFile = f;
     document.getElementById('actionSheet').classList.remove('hidden');
@@ -921,65 +1060,51 @@ function previewSelectedFile() {
 
 function downloadSelectedFile() {
     closeActionSheet();
-    if (selectedFile) openFile(selectedFile);
+    if (selectedFile) {
+        const cached = decryptionCache[selectedFile.doc_id];
+        if (cached) {
+            const a = document.createElement('a');
+            a.href = cached.blobUrl;
+            a.download = selectedFile.name;
+            a.click();
+        } else {
+            openFile(selectedFile);
+        }
+    }
 }
 
 async function deleteSelectedFile() {
     closeActionSheet();
     if (!selectedFile) return;
-    if (!confirm('Вы уверены, что хотите удалить этот файл? VK может ограничить это действие.')) return;
+    if (!confirm('Удалить файл из облака?')) return;
 
-    showToast('Удаление...');
+    showToastProgress('Удаление...', 50);
     try {
         const res = await fetch('/cloud/api/delete', {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
             body: JSON.stringify({token, doc_id: selectedFile.doc_id})
         });
-        const data = await res.json();
-        alert('Запрос отправлен. Обновление...');
-        await loadFiles();
+        const d = await res.json();
+        if (d.error) {
+            alert("Не удалось удалить из облака.");
+        } else {
+            if (decryptionCache[selectedFile.doc_id]) {
+                URL.revokeObjectURL(decryptionCache[selectedFile.doc_id].blobUrl);
+                delete decryptionCache[selectedFile.doc_id];
+            }
+            await loadFiles();
+        }
     } catch(e) {}
-    hideToast();
+    hideToastProgress();
 }
 
-// Context Menu controls
-let contextMenuFile = null;
-function showContextMenu(e, f) {
-    contextMenuFile = f;
-    let menu = document.getElementById('contextMenu');
-    if (!menu) {
-        menu = document.createElement('div');
-        menu.id = 'contextMenu';
-        menu.className = 'context-menu';
-        menu.innerHTML = `
-            <div class="context-menu-item" onclick="contextPreview()">Открыть / Воспроизвести</div>
-            <div class="context-menu-item" onclick="contextDownload()">Скачать файл</div>
-            <div class="context-menu-divider"></div>
-            <div class="context-menu-item danger" onclick="contextDelete()">Удалить файл</div>
-        `;
-        document.body.appendChild(menu);
-    }
-    menu.style.left = Math.min(e.clientX, window.innerWidth - 200) + 'px';
-    menu.style.top = Math.min(e.clientY, window.innerHeight - 200) + 'px';
-    menu.classList.add('active');
-}
-
-document.addEventListener('click', () => {
-    const menu = document.getElementById('contextMenu');
-    if (menu) menu.classList.remove('active');
-});
-
-function contextPreview() { if(contextMenuFile) openFile(contextMenuFile); }
-function contextDownload() { if(contextMenuFile) openFile(contextMenuFile); }
-function contextDelete() { selectedFile = contextMenuFile; deleteSelectedFile(); }
-
-// Key settings controls
+// Encryption keys
 function openKeyModal() {
     const keyBox = document.getElementById('keyBox');
     const storedKey = localStorage.getItem('vk_cloud_key_' + myVkId);
     if (storedKey) {
-        keyBox.textContent = storedKey;
+        keyBox.textContent = storedKey.substring(0, 60) + '...';
     } else {
         keyBox.textContent = 'Ключ не найден';
     }
@@ -997,11 +1122,52 @@ function exportCloudKey() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `vk_cloud_key_${myVkId}.json`;
+    a.download = `vk_tsuyu_cloud_key_${myVkId}.json`;
     a.click();
 }
 
-// Drag & Drop Upload
+async function importCloudKey(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+        try {
+            const keyData = JSON.parse(evt.target.result);
+            localStorage.setItem('vk_cloud_key_' + myVkId, JSON.stringify(keyData));
+            cloudKey = await importCloudCryptoKey(keyData);
+            alert('Ключ облака импортирован!');
+            location.reload();
+        } catch(err) {
+            alert('Неверный формат ключа');
+        }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+}
+
+async function regenerateCloudKey() {
+    if (!confirm('ВНИМАНИЕ: Новый ключ НЕ сможет расшифровать старые файлы! Старые файлы станут недоступны.')) return;
+
+    cloudKey = await crypto.subtle.generateKey({name:"AES-GCM", length:256}, true, ["encrypt","decrypt"]);
+    const keyJwk = await crypto.subtle.exportKey("jwk", cloudKey);
+    localStorage.setItem('vk_cloud_key_' + myVkId, JSON.stringify(keyJwk));
+
+    const storedPass = localStorage.getItem('vk_pass');
+    if (storedPass && myVkId) {
+        const masterKey = await deriveCloudKey(storedPass, myVkId + "_cloud_salt");
+        const encBuf = await encryptAESGCM(masterKey, new TextEncoder().encode(JSON.stringify(keyJwk)));
+        await fetch('/cloud/api/key/' + myVkId, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({cloud_key_enc: bufToB64(encBuf)})
+        });
+    }
+
+    alert('Новый ключ создан! Перезапуск...');
+    location.reload();
+}
+
+// Drag & drop
 const uploadZone = document.getElementById('uploadZone');
 uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('dragover'); });
 uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
@@ -1010,14 +1176,12 @@ uploadZone.addEventListener('drop', (e) => {
     uploadZone.classList.remove('dragover');
     const files = e.dataTransfer.files;
     if (files.length > 0) {
-        for (const file of files) uploadFile(file);
+        handleFiles({target: {files}});
     }
 });
 
-// Initialization call
 initCloud();
 </script>
-
 </body>
 </html>
 """
@@ -1034,10 +1198,9 @@ def cloud_init():
     if not token:
         return jsonify({'error': 'No token'}), 400
 
-    # Get authorized user ID
     params = {'access_token': token, 'v': API_VERSION}
     try:
-        resp = get_session().get(f"{VK_API}/users.get", params=params, timeout=10)
+        resp = get_session().get(f"{VK_API}/users.get", params=params, headers=KATE_HEADERS, timeout=10)
         data = resp.json()
         user = data.get('response', [{}])[0]
         vk_id = user.get('id')
@@ -1047,21 +1210,11 @@ def cloud_init():
 
 
 @cloud_bp.route('/api/key/<vk_id>', methods=['GET'])
-def get_cloud_key_endpoint(vk_id):
+def get_cloud_key(vk_id):
     stored = get_cloud_key_data(vk_id)
     if stored:
         return jsonify(stored)
     return jsonify({'error': 'Not found'}), 404
-
-
-def get_cloud_key_data(vk_id):
-    vk_id_str = str(vk_id)
-    if FIREBASE_DB_URL:
-        fb_data = firebase_get(f"cloud_keys/{vk_id_str}")
-        if fb_data and isinstance(fb_data, dict) and 'cloud_key_enc' in fb_data:
-            return fb_data
-    local_data = load_cloud_keys()
-    return local_data.get(f"cloud_{vk_id_str}")
 
 
 @cloud_bp.route('/api/key/<vk_id>', methods=['POST'])
@@ -1075,12 +1228,11 @@ def save_cloud_key(vk_id):
 
 @cloud_bp.route('/api/files', methods=['POST'])
 def cloud_files():
-    """Синхронизирует список зашифрованных cloud файлов из ВК"""
+    """Reads docs from VK via Kate Mobile API and decodes obfuscated names"""
     token = request.json.get('token')
     if not token:
         return jsonify({'error': 'No token'}), 400
 
-    # Запрашиваем документы пользователя
     result = vk_request('docs.get', token, count=2000, type=0)
 
     if isinstance(result, dict) and 'error' in result:
@@ -1089,16 +1241,40 @@ def cloud_files():
     files = []
     for item in result.get('items', []):
         title = item.get('title', '')
-        title_lower = title.lower()
 
-        # Фильтруем зашифрованные файлы облака по сигнатуре "cloud_"
+        # Decode obfuscated title metadata
+        decoded_meta = decode_cloud_title(title)
+        if decoded_meta:
+            orig_name, file_type = decoded_meta
+            files.append({
+                'doc_id': f"doc{item.get('owner_id')}_{item.get('id')}",
+                'name': orig_name,
+                'url': item.get('url', ''),
+                'size': item.get('size', 0),
+                'mime': item.get('type', 'application/octet-stream'),
+                'date': datetime.fromtimestamp(item.get('date', 0)).strftime('%Y-%m-%d') if item.get('date') else '',
+                'type': file_type
+            })
+            continue
+
+        # Backward compatibility fallback
+        title_lower = title.lower()
         is_cloud = (title_lower.startswith('cloud_') and title_lower.endswith('.doc')) or \
                    title_lower.endswith('.cimg.doc') or title_lower.endswith('.cvid.doc') or \
                    title_lower.endswith('.caud.doc') or title_lower.endswith('.cld.doc')
 
         if is_cloud:
-            # Убираем .doc суффикс из имени файла с помощью Python среза
-            orig_name = title[:-4] if title_lower.endswith('.doc') else title
+            orig_name = title
+            if orig_name.endswith('.doc'):
+                orig_name = orig_name[:-4]
+
+            file_type = 'doc'
+            if orig_name.endswith(('.cimg', '.png', '.jpg', '.jpeg', '.gif')):
+                file_type = 'photo'
+            elif orig_name.endswith(('.cvid', '.mp4', '.avi', '.mov')):
+                file_type = 'video'
+            elif orig_name.endswith(('.caud', '.mp3', '.ogg', '.wav')):
+                file_type = 'audio'
 
             files.append({
                 'doc_id': f"doc{item.get('owner_id')}_{item.get('id')}",
@@ -1106,8 +1282,8 @@ def cloud_files():
                 'url': item.get('url', ''),
                 'size': item.get('size', 0),
                 'mime': item.get('type', 'application/octet-stream'),
-                'date': datetime.fromtimestamp(item.get('date', 0)).strftime('%d.%m.%Y') if item.get('date') else '',
-                'thumb': item.get('preview', {}).get('photo', {}).get('sizes', [{}])[-1].get('src', '') if item.get('preview') else ''
+                'date': datetime.fromtimestamp(item.get('date', 0)).strftime('%Y-%m-%d') if item.get('date') else '',
+                'type': file_type
             })
 
     return jsonify({'files': files})
@@ -1115,30 +1291,40 @@ def cloud_files():
 
 @cloud_bp.route('/api/upload', methods=['POST'])
 def cloud_upload():
-    """Загружает файл в Документы. Использует getUploadServer для отображения в docs.get"""
+    """Uploads encrypted file using Kate Mobile signature with strict size validation"""
     token = request.form.get('token')
     file = request.files.get('file')
+    original_name = request.form.get('original_name', 'encrypted_file')
 
     if not file or not token:
         return jsonify({'error': 'Missing file or token'}), 400
 
-    # ПЫТАЕМСЯ ПОЛУЧИТЬ КЛАССИЧЕСКИЙ СЕРВЕР ДЛЯ docs.get (ЧТОБЫ ФАЙЛЫ ВИДЕЛИСЬ В ДОКУМЕНТАХ)
-    upload_server = vk_request('docs.getUploadServer', token)
-    
-    # Если токен ограничен (например, Kate Mobile в некоторых режимах), делаем резервный запрос к сообщениям
-    if isinstance(upload_server, dict) and ('error' in upload_server or 'upload_url' not in upload_server):
-        upload_server = vk_request('docs.getMessagesUploadServer', token, type='doc', peer_id=0)
+    file_bytes = file.read()
+    if len(file_bytes) > MAX_FILE_SIZE:
+        return jsonify({'error': 'File size exceeds VK 200MB limit'}), 400
 
+    # Get upload server
+    upload_server = vk_request('docs.getMessagesUploadServer', token, type='doc', peer_id=0)
     if isinstance(upload_server, dict) and 'error' in upload_server:
         return jsonify(upload_server), 400
 
     upload_url = upload_server.get('upload_url')
-    file_bytes = file.read()
-    files = {'file': (file.filename, BytesIO(file_bytes), 'application/octet-stream')}
-    upload_resp = get_session().post(upload_url, files=files, timeout=60).json()
+    files = {'file': (secure_filename(file.filename), BytesIO(file_bytes), 'application/octet-stream')}
+    
+    upload_resp = get_session().post(upload_url, files=files, headers=KATE_HEADERS, timeout=60).json()
 
-    # Сохраняем документ в ВК
-    safe_title = file.filename if file.filename.endswith('.doc') else f"{file.filename}.doc"
+    # Determine type of the file for category routing
+    file_type = 'doc'
+    original_name_lower = original_name.lower()
+    if original_name_lower.endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp')):
+        file_type = 'photo'
+    elif original_name_lower.endswith(('.mp4', '.mov', '.avi', '.mkv', '.3gp')):
+        file_type = 'video'
+    elif original_name_lower.endswith(('.mp3', '.ogg', '.wav', '.m4a')):
+        file_type = 'audio'
+
+    safe_title = encode_cloud_title(original_name, file_type)
+
     save_result = vk_request('docs.save', token, 
         file=upload_resp.get('file'), 
         title=safe_title
@@ -1148,17 +1334,21 @@ def cloud_upload():
     if attachment:
         return jsonify({'ok': True, 'attachment': attachment})
 
-    return jsonify({'error': 'Upload failed', 'vk_response': save_result}), 400
+    return jsonify({'error': 'Upload failed', 'details': save_result}), 400
 
 
 @cloud_bp.route('/api/download')
 def cloud_download():
-    """Потоковый прокси для скачивания бинарников с серверов ВК"""
+    """Proxy file downloading through Kate Mobile User Agent with SSRF host validation"""
     url = request.args.get('url')
     if not url:
         return jsonify({'error': 'No URL'}), 400
+
+    if not is_safe_vk_url(url):
+        return jsonify({'error': 'SSRF Protection: Invalid URL domain'}), 403
+
     try:
-        resp = get_session().get(url, timeout=30, allow_redirects=True)
+        resp = get_session().get(url, headers=KATE_HEADERS, timeout=30, allow_redirects=True)
         if resp.status_code != 200:
             return jsonify({'error': f'HTTP {resp.status_code}'}), resp.status_code
         return Response(resp.content, mimetype='application/octet-stream')
@@ -1168,7 +1358,6 @@ def cloud_download():
 
 @cloud_bp.route('/api/delete', methods=['POST'])
 def cloud_delete():
-    """Запрос на удаление документа"""
     token = request.json.get('token')
     doc_id = request.json.get('doc_id', '')
 
@@ -1183,6 +1372,9 @@ def cloud_delete():
     doc_id_num = match.group(2)
 
     result = vk_request('docs.delete', token, owner_id=owner_id, doc_id=doc_id_num)
+    if isinstance(result, dict) and 'error' in result:
+        return jsonify({'error': result.get('error_msg', 'VK Error')}), 400
+
     return jsonify({'result': result})
 
 
