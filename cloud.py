@@ -8,12 +8,12 @@ import base64
 from io import BytesIO
 from datetime import datetime
 from urllib.parse import urlparse
-from flask import Blueprint, render_template_string, request, jsonify, Response
+from flask import Blueprint, render_template_string, request, jsonify, Response, session
 from werkzeug.utils import secure_filename
 
 cloud_bp = Blueprint('cloud', __name__)
 
-# === CONFIG ===
+# === CONFIG & CONSTANTS ===
 VK_API = "https://api.vk.com/method"
 API_VERSION = "5.199"
 MAX_FILE_SIZE = 200 * 1024 * 1024  # 200 MB limit for VK Documents
@@ -139,33 +139,6 @@ def buf_to_b64(buf):
 def b64_to_buf(b64):
     import base64
     return base64.b64decode(b64)
-
-# --- CLOUD TITLE OBFUSCATION HELPERS ---
-def encode_cloud_title(orig_name, file_type):
-    # Шифруем ИМЯ файла в Base64, чтобы ВК видел только "cl_t_..."
-    type_map = {'photo': 'p', 'video': 'v', 'audio': 'a', 'doc': 'd'}
-    t_char = type_map.get(file_type, 'd')
-    # Добавляем случайную соль, чтобы однотипные файлы не имели похожих названий
-    salt = hashlib.md5(os.urandom(8)).hexdigest()[:6]
-    b64_name = base64.urlsafe_b64encode(orig_name.encode('utf-8')).decode('utf-8').rstrip('=')
-    return f"cl_{t_char}_{salt}_{b64_name}.doc"
-
-def decode_cloud_title(title):
-    if not (title.startswith('cl_') and title.endswith('.doc')):
-        return None
-    try:
-        parts = title[3:-4].split('_', 2)
-        if len(parts) < 3:
-            return None
-        t_char = parts[0]
-        b64_name = parts[2]
-        type_map = {'p': 'photo', 'v': 'video', 'a': 'audio', 'd': 'doc'}
-        file_type = type_map.get(t_char, 'doc')
-        padding = '=' * (4 - len(b64_name) % 4)
-        orig_name = base64.urlsafe_b64decode(b64_name + padding).decode('utf-8')
-        return orig_name, file_type
-    except Exception:
-        return None
 
 def is_safe_vk_url(url):
     """SSRF Prevention: Validates that URL belongs to official VK CDN hosts"""
@@ -635,6 +608,36 @@ async function importCloudCryptoKey(jwkStr) {
     return await crypto.subtle.importKey("jwk", jwk, {name:"AES-GCM", length:256}, true, ["encrypt","decrypt"]);
 }
 
+// Client-side Encrypted Title Helpers (AES-GCM filename encryption)
+async function encryptFilename(plainName, fileType) {
+    const enc = new TextEncoder();
+    const data = enc.encode(JSON.stringify({ n: plainName, t: fileType }));
+    const encryptedBuf = await encryptAESGCM(cloudKey, data);
+    // Base64url without padding so VK sees just a random string
+    const b64 = btoa(String.fromCharCode(...new Uint8Array(encryptedBuf)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    return `enc_${b64}.doc`;
+}
+
+async function decryptFilename(title) {
+    if (!title.startsWith('enc_') || !title.endsWith('.doc')) {
+        return null;
+    }
+    try {
+        const b64 = title.slice(4, -4).replace(/-/g, '+').replace(/_/g, '/');
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        
+        const decBuf = await decryptAESGCM(cloudKey, bytes.buffer);
+        const jsonStr = new TextDecoder().decode(decBuf);
+        const parsed = JSON.parse(jsonStr);
+        return { origName: parsed.n, fileType: parsed.t };
+    } catch (e) {
+        return null;
+    }
+}
+
 async function loadFiles() {
     showToastProgress('Синхронизация...', 20);
     try {
@@ -644,7 +647,42 @@ async function loadFiles() {
             body: JSON.stringify({token})
         });
         const data = await res.json();
-        filesData = data.files || [];
+        const rawItems = data.items || [];
+        
+        const decryptedFiles = [];
+        for (const item of rawItems) {
+            const title = item.title || '';
+            const meta = await decryptFilename(title);
+            if (meta) {
+                decryptedFiles.push({
+                    'doc_id': `doc${item.owner_id}_${item.id}`,
+                    'name': meta.origName,
+                    'url': item.url || '',
+                    'size': item.size || 0,
+                    'mime': item.type || 'application/octet-stream',
+                    'date': item.date ? new Date(item.date * 1000).toISOString().split('T')[0] : '',
+                    'type': meta.fileType
+                });
+            } else {
+                // Fallback for old/unencrypted titles
+                const titleLower = title.toLowerCase();
+                let fileType = 'doc';
+                if (titleLower.includes('photo') || titleLower.endsWith('.png') || titleLower.endsWith('.jpg')) fileType = 'photo';
+                else if (titleLower.includes('video') || titleLower.endsWith('.mp4')) fileType = 'video';
+                else if (titleLower.includes('audio') || titleLower.endsWith('.mp3')) fileType = 'audio';
+
+                decryptedFiles.push({
+                    'doc_id': `doc${item.owner_id}_${item.id}`,
+                    'name': title || 'unknown_file',
+                    'url': item.url || '',
+                    'size': item.size || 0,
+                    'mime': item.type || 'application/octet-stream',
+                    'date': item.date ? new Date(item.date * 1000).toISOString().split('T')[0] : '',
+                    'type': fileType
+                });
+            }
+        }
+        filesData = decryptedFiles;
         filterAndRenderFiles();
     } catch(e) { console.error(e); }
     hideToastProgress();
@@ -667,6 +705,7 @@ function switchCategory(cat) {
 
 // Search, Sort & Render Files
 function filterAndRenderFiles() {
+    // Abort previous background decrypt requests
     if (activeAbortController) {
         activeAbortController.abort();
     }
@@ -681,6 +720,7 @@ function filterAndRenderFiles() {
         filtered = filtered.filter(f => f.name.toLowerCase().includes(searchQuery));
     }
 
+    // Sort
     filtered.sort((a, b) => {
         if (sortValue === 'date-desc') return (b.date || '').localeCompare(a.date || '');
         if (sortValue === 'date-asc') return (a.date || '').localeCompare(b.date || '');
@@ -709,6 +749,7 @@ function renderGrid(filteredFiles) {
     }
     empty.classList.add('hidden');
 
+    // Setup Lazy Decryption Observer
     if (intersectionObserver) intersectionObserver.disconnect();
 
     intersectionObserver = new IntersectionObserver((entries) => {
@@ -767,6 +808,7 @@ function renderGrid(filteredFiles) {
 
         itemDiv.appendChild(infoDiv);
 
+        // Click / Select Handlers
         itemDiv.onclick = (e) => {
             if (isMultiSelectMode) {
                 toggleItemSelection(f.doc_id, itemDiv);
@@ -782,6 +824,7 @@ function renderGrid(filteredFiles) {
 
         grid.appendChild(itemDiv);
 
+        // Check cache or observe for lazy loading
         if (decryptionCache[f.doc_id]) {
             applyDecryptedPreview(f.doc_id, f.type);
         } else {
@@ -834,6 +877,7 @@ function applyDecryptedPreview(doc_id, type) {
     const container = itemEl.querySelector('.file-thumb-container');
     if (!container) return;
 
+    // Clear placeholder
     container.innerHTML = '';
 
     if (type === 'photo') {
@@ -916,6 +960,7 @@ async function deleteSelectedBatch() {
                 headers: {'Content-Type':'application/json'},
                 body: JSON.stringify({token, doc_id: docId})
             });
+            // Revoke blob memory
             if (decryptionCache[docId]) {
                 URL.revokeObjectURL(decryptionCache[docId].blobUrl);
                 delete decryptionCache[docId];
@@ -932,6 +977,7 @@ async function handleFiles(e) {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
+    // Check VK Document Size Limit (200MB)
     for (const f of files) {
         if (f.size > 200 * 1024 * 1024) {
             alert(`Файл ${f.name} превышает лимит ВКонтакте (200 МБ)`);
@@ -951,11 +997,20 @@ async function handleFiles(e) {
             const encBuf = await encryptAESGCM(cloudKey, fileBuf);
             const encBlob = new Blob([encBuf], {type: 'application/octet-stream'});
 
+            // Determine file category type
+            let fileType = 'doc';
+            const lowerName = file.name.toLowerCase();
+            if (lowerName.match(/\.(png|jpg|jpeg|gif|webp|bmp)$/)) fileType = 'photo';
+            else if (lowerName.match(/\.(mp4|mov|avi|mkv|3gp)$/)) fileType = 'video';
+            else if (lowerName.match(/\.(mp3|ogg|wav|m4a)$/)) fileType = 'audio';
+
+            // Fully encrypted filename generated directly on client side
+            const encryptedTitle = await encryptFilename(file.name, fileType);
+
             const formData = new FormData();
             formData.append('token', token);
             formData.append('file', encBlob, 'encrypted_payload.bin');
-            formData.append('original_name', file.name);
-            formData.append('size', file.size);
+            formData.append('encrypted_title', encryptedTitle);
 
             const res = await fetch('/cloud/api/upload', {
                 method: 'POST',
@@ -1224,7 +1279,7 @@ def save_cloud_key(vk_id):
 
 @cloud_bp.route('/api/files', methods=['POST'])
 def cloud_files():
-    """Reads docs from VK via Kate Mobile API and decodes obfuscated names"""
+    """Reads raw docs list from VK. Filename decryption is fully handled on the client side via WebCrypto."""
     token = request.json.get('token')
     if not token:
         return jsonify({'error': 'No token'}), 400
@@ -1234,66 +1289,30 @@ def cloud_files():
     if isinstance(result, dict) and 'error' in result:
         return jsonify(result), 400
 
-    files = []
+    items = []
     for item in result.get('items', []):
-        title = item.get('title', '')
+        items.append({
+            'owner_id': item.get('owner_id'),
+            'id': item.get('id'),
+            'title': item.get('title', ''),
+            'url': item.get('url', ''),
+            'size': item.get('size', 0),
+            'type': item.get('type', 'application/octet-stream'),
+            'date': item.get('date', 0)
+        })
 
-        # Decode obfuscated title metadata
-        decoded_meta = decode_cloud_title(title)
-        if decoded_meta:
-            orig_name, file_type = decoded_meta
-            files.append({
-                'doc_id': f"doc{item.get('owner_id')}_{item.get('id')}",
-                'name': orig_name,
-                'url': item.get('url', ''),
-                'size': item.get('size', 0),
-                'mime': item.get('type', 'application/octet-stream'),
-                'date': datetime.fromtimestamp(item.get('date', 0)).strftime('%Y-%m-%d') if item.get('date') else '',
-                'type': file_type
-            })
-            continue
-
-        # Backward compatibility fallback
-        title_lower = title.lower()
-        is_cloud = (title_lower.startswith('cloud_') and title_lower.endswith('.doc')) or \
-                   title_lower.endswith('.cimg.doc') or title_lower.endswith('.cvid.doc') or \
-                   title_lower.endswith('.caud.doc') or title_lower.endswith('.cld.doc')
-
-        if is_cloud:
-            orig_name = title
-            if orig_name.endswith('.doc'):
-                orig_name = orig_name[:-4]
-
-            file_type = 'doc'
-            if orig_name.endswith(('.cimg', '.png', '.jpg', '.jpeg', '.gif')):
-                file_type = 'photo'
-            elif orig_name.endswith(('.cvid', '.mp4', '.avi', '.mov')):
-                file_type = 'video'
-            elif orig_name.endswith(('.caud', '.mp3', '.ogg', '.wav')):
-                file_type = 'audio'
-
-            files.append({
-                'doc_id': f"doc{item.get('owner_id')}_{item.get('id')}",
-                'name': orig_name,
-                'url': item.get('url', ''),
-                'size': item.get('size', 0),
-                'mime': item.get('type', 'application/octet-stream'),
-                'date': datetime.fromtimestamp(item.get('date', 0)).strftime('%Y-%m-%d') if item.get('date') else '',
-                'type': file_type
-            })
-
-    return jsonify({'files': files})
+    return jsonify({'items': items})
 
 
 @cloud_bp.route('/api/upload', methods=['POST'])
 def cloud_upload():
-    """Uploads encrypted file using Kate Mobile signature with strict size validation"""
+    """Receives encrypted payload and fully encrypted random title from client. VK sees zero cleartext name metadata."""
     token = request.form.get('token')
     file = request.files.get('file')
-    original_name = request.form.get('original_name', 'encrypted_file')
+    encrypted_title = request.form.get('encrypted_title')
 
-    if not file or not token:
-        return jsonify({'error': 'Missing file or token'}), 400
+    if not file or not token or not encrypted_title:
+        return jsonify({'error': 'Missing file, token or encrypted title'}), 400
 
     file_bytes = file.read()
     if len(file_bytes) > MAX_FILE_SIZE:
@@ -1305,25 +1324,13 @@ def cloud_upload():
         return jsonify(upload_server), 400
 
     upload_url = upload_server.get('upload_url')
-    files = {'file': (secure_filename(file.filename), BytesIO(file_bytes), 'application/octet-stream')}
+    files = {'file': ('encrypted_payload.bin', BytesIO(file_bytes), 'application/octet-stream')}
     
     upload_resp = get_session().post(upload_url, files=files, headers=KATE_HEADERS, timeout=60).json()
 
-    # Determine type of the file for category routing
-    file_type = 'doc'
-    original_name_lower = original_name.lower()
-    if original_name_lower.endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp')):
-        file_type = 'photo'
-    elif original_name_lower.endswith(('.mp4', '.mov', '.avi', '.mkv', '.3gp')):
-        file_type = 'video'
-    elif original_name_lower.endswith(('.mp3', '.ogg', '.wav', '.m4a')):
-        file_type = 'audio'
-
-    safe_title = encode_cloud_title(original_name, file_type)
-
     save_result = vk_request('docs.save', token, 
         file=upload_resp.get('file'), 
-        title=safe_title
+        title=encrypted_title
     )
 
     attachment = extract_doc_attachment(save_result)
