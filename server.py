@@ -5773,6 +5773,8 @@ CALL_HTML = """
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#000000">
 <title>VK Tsuyu Call</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
 html,body{height:100%;overflow:hidden}
@@ -5883,7 +5885,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </head>
 <body>
 <div class="call-app">
-
 <div class="call-setup-screen hidden" id="setupScreen">
 <div class="call-setup-title">Входящий звонок</div>
 <div class="call-setup-text">Кто-то звонит вам через VK Tsuyu</div>
@@ -5943,9 +5944,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <span class="call-network-text" id="networkText">Отлично</span>
 </div>
 <div class="call-waveform hidden" id="waveform">
-<div class="call-network-text" id="networkText">Отлично</span>
-</div>
-<div class="call-waveform hidden" id="waveform">
 <div class="call-waveform-bar"></div>
 <div class="call-waveform-bar"></div>
 <div class="call-waveform-bar"></div>
@@ -5972,7 +5970,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </div>
 <div class="call-toast" id="callToast"></div>
 </div>
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
 const urlParams = new URLSearchParams(window.location.search);
 const peerId = urlParams.get('peer');
@@ -5982,11 +5979,35 @@ const myPhoto = localStorage.getItem('vk_my_photo') || '';
 const callType = urlParams.get('type') || 'audio';
 const isIncoming = urlParams.get('incoming') === '1';
 const roomIdFromUrl = urlParams.get('room') || '';
-let socket = null;
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBm0mIvHVznIeF2PoFk6dtdaiT5r877wyA",
+  authDomain: "meow-874ce.firebaseapp.com",
+  databaseURL: "https://meow-874ce-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "meow-874ce",
+  storageBucket: "meow-874ce.firebasestorage.app",
+  messagingSenderId: "471541334599",
+  appId: "1:471541334599:web:567af3e7dbe70a37572762"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const ICE_SERVERS = [
+  {"urls": "stun:stun.l.google.com:19302"},
+  {"urls": "stun:stun1.l.google.com:19302"},
+  {"urls": "stun:stun2.l.google.com:19302"},
+  {"urls": "stun:stun3.l.google.com:19302"},
+  {"urls": "stun:stun4.l.google.com:19302"},
+  {"urls": "turn:openrelay.metered.ca:80", "username": "openrelayproject", "credential": "openrelayproject"},
+  {"urls": "turn:openrelay.metered.ca:443", "username": "openrelayproject", "credential": "openrelayproject"},
+  {"urls": "turn:openrelay.metered.ca:443?transport=tcp", "username": "openrelayproject", "credential": "openrelayproject"}
+];
+
 let pc = null;
 let localStream = null;
 let remoteStream = null;
-let currentRoomId = roomIdFromUrl;
+let currentRoomId = roomIdFromUrl || generateRoomId();
 let callStartTime = null;
 let callTimerInterval = null;
 let isMuted = false;
@@ -5994,460 +6015,521 @@ let isSpeakerOn = false;
 let isVideoEnabled = callType === 'video';
 let isCallActive = false;
 let currentFacingMode = 'user';
-let iceServers = [];
-let reconnectAttempts = 0;
-let maxReconnectAttempts = 5;
 let pendingCandidates = [];
 let statsInterval = null;
-let audioContext = null;
-let audioAnalyser = null;
-let dataChannel = null;
 let networkQuality = 'good';
+let myRole = null;
+let rtdbUnsub = [];
+
+function generateRoomId() {
+  return Math.random().toString(36).substring(2, 14) + Date.now().toString(36);
+}
+
+function getRoomRef() {
+  return db.ref('calls/' + currentRoomId);
+}
+
+function getRoleRef() {
+  return myRole ? getRoomRef().child(myRole) : null;
+}
+
 async function init() {
-    const iceRes = await fetch('/api/ice_config');
-    const iceData = await iceRes.json();
-    iceServers = iceData.iceServers || [];
-    socket = io({transports: ['websocket', 'polling'], reconnection: true, reconnectionAttempts: maxReconnectAttempts, reconnectionDelay: 1000});
-    socket.on('connect', () => {
-        reconnectAttempts = 0;
-        socket.emit('register', {vk_id: myVkId, name: myName, photo: myPhoto});
-        if (isIncoming && roomIdFromUrl) {
-            socket.emit('join_room', {room_id: roomIdFromUrl});
-            showSetupScreen();
-        } else if (peerId && !isIncoming) {
-            setTimeout(() => startCallToPeer(), 500);
-        }
-    });
-    socket.on('disconnect', () => {
-        showToast('Соединение потеряно...');
-    });
-    socket.on('call_error', (data) => {
-        showToast(data.error || 'Ошибка звонка');
-        setTimeout(goBack, 2000);
-    });
-    socket.on('incoming_call', (data) => {
-        currentRoomId = data.room_id;
-        showSetupScreen(data);
-    });
-    socket.on('call_ringing', (data) => {
-        showOutgoingScreen(data);
-    });
-    socket.on('call_connected', (data) => {
-        showActiveScreen(data);
-    });
-    socket.on('call_ended', (data) => {
-        showToast('Звонок завершен' + (data.duration ? ' (' + formatDuration(data.duration) + ')' : ''));
-        cleanupAndExit();
-    });
-    socket.on('webrtc_offer', async (data) => {
-        await handleOffer(data.offer, data.from_id);
-    });
-    socket.on('webrtc_answer', async (data) => {
-        await handleAnswer(data.answer);
-    });
-    socket.on('webrtc_ice_candidate', async (data) => {
-        await handleIceCandidate(data.candidate);
-    });
+  if (isIncoming && roomIdFromUrl) {
+    myRole = 'answer';
+    listenForCaller();
+    showSetupScreen();
+  } else if (peerId && !isIncoming) {
+    myRole = 'offer';
+    await startCallToPeer();
+  }
 }
 
 async function startCallToPeer() {
-    if (!localStream) {
-        try {
-            const constraints = {
-                audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true},
-                video: isVideoEnabled ? {facingMode: 'user', width: {ideal: 640}, height: {ideal: 480}} : false
-            };
-            localStream = await navigator.mediaDevices.getUserMedia(constraints);
-        } catch(e) {
-            showToast('Не удалось получить доступ к микрофону');
-            return;
-        }
-    }
-    document.getElementById('outgoingName').textContent = 'Вызов...';
-    document.getElementById('outgoingAvatar').src = 'https://vk.com/images/camera_100.png';
-    document.getElementById('outgoingScreen').classList.remove('hidden');
+  if (!localStream) {
     try {
-        const res = await fetch('/api/peer_status', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({token: localStorage.getItem('vk_token'), peer_id: peerId})
-        });
-        const peerData = await res.json();
-        document.getElementById('outgoingName').textContent = peerData.name || 'Собеседник';
-        if (peerData.photo) {
-            document.getElementById('outgoingAvatar').src = peerData.photo;
-            document.getElementById('outgoingBg').style.backgroundImage = `url('${peerData.photo}')`;
-        }
-    } catch(e) {}
-    socket.emit('call_request', {caller_id: myVkId, target_id: peerId, call_type: callType});
+      const constraints = {
+        audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true},
+        video: isVideoEnabled ? {facingMode: 'user', width: {ideal: 640}, height: {ideal: 480}} : false
+      };
+      localStream = await navigator.mediaDevices.getUserMedia(constraints);
+    } catch(e) {
+      showToast('Не удалось получить доступ к микрофону');
+      return;
+    }
+  }
+
+  document.getElementById('outgoingName').textContent = 'Вызов...';
+  document.getElementById('outgoingAvatar').src = 'https://vk.com/images/camera_100.png';
+  document.getElementById('outgoingScreen').classList.remove('hidden');
+
+  try {
+    const res = await fetch('/api/peer_status', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({token: localStorage.getItem('vk_token'), peer_id: peerId})
+    });
+    const peerData = await res.json();
+    document.getElementById('outgoingName').textContent = peerData.name || 'Собеседник';
+    if (peerData.photo) {
+      document.getElementById('outgoingAvatar').src = peerData.photo;
+      document.getElementById('outgoingBg').style.backgroundImage = `url('${peerData.photo}')`;
+    }
+  } catch(e) {}
+
+  const roomRef = getRoomRef();
+  await roomRef.child('offer').set({
+    peer_id: peerId,
+    caller_id: myVkId,
+    caller_name: myName,
+    caller_photo: myPhoto,
+    call_type: callType,
+    status: 'ringing',
+    created_at: Date.now()
+  });
+
+  rtdbUnsub.push(roomRef.child('answer').on('value', async (snap) => {
+    const data = snap.val();
+    if (data && data.status === 'accepted') {
+      await showActiveScreen({peer_id: peerId, peer_name: data.answerer_name || 'Собеседник'});
+      await createAndSendOffer();
+    } else if (data && data.status === 'rejected') {
+      showToast('Звонок отклонен');
+      cleanupAndExit();
+    }
+  }));
 }
-function showSetupScreen(data) {
-    const screen = document.getElementById('setupScreen');
-    screen.classList.remove('hidden');
+
+function listenForCaller() {
+  const roomRef = getRoomRef();
+  rtdbUnsub.push(roomRef.child('offer').on('value', (snap) => {
+    const data = snap.val();
     if (data) {
-        document.getElementById('setupPeerName').textContent = data.caller_name || 'Неизвестно';
-        document.getElementById('setupPeerImg').src = data.caller_photo || 'https://vk.com/images/camera_100.png';
-        document.getElementById('setupPeerStatus').textContent = data.call_type === 'video' ? 'Видеозвонок' : 'Аудиозвонок';
+      document.getElementById('setupPeerName').textContent = data.caller_name || 'Неизвестно';
+      document.getElementById('setupPeerImg').src = data.caller_photo || 'https://vk.com/images/camera_100.png';
+      document.getElementById('setupPeerStatus').textContent = data.call_type === 'video' ? 'Видеозвонок' : 'Аудиозвонок';
     }
+  }));
 }
-function showOutgoingScreen(data) {
-    document.getElementById('setupScreen').classList.add('hidden');
-    document.getElementById('outgoingScreen').classList.remove('hidden');
-    if (data && data.target_name) {
-        document.getElementById('outgoingName').textContent = data.target_name;
-    }
+
+function showSetupScreen() {
+  document.getElementById('setupScreen').classList.remove('hidden');
 }
+
 async function acceptCall() {
-    if (!localStream) {
-        try {
-            const constraints = {
-                audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true},
-                video: isVideoEnabled ? {facingMode: 'user'} : false
-            };
-            localStream = await navigator.mediaDevices.getUserMedia(constraints);
-        } catch(e) {
-            showToast('Не удалось получить доступ к микрофону');
-            return;
-        }
+  if (!localStream) {
+    try {
+      const constraints = {
+        audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true},
+        video: isVideoEnabled ? {facingMode: 'user'} : false
+      };
+      localStream = await navigator.mediaDevices.getUserMedia(constraints);
+    } catch(e) {
+      showToast('Не удалось получить доступ к микрофону');
+      return;
     }
-    socket.emit('call_accept', {room_id: currentRoomId});
-    document.getElementById('setupScreen').classList.add('hidden');
+  }
+
+  document.getElementById('setupScreen').classList.add('hidden');
+
+  const peerName = document.getElementById('setupPeerName')?.textContent || 'Собеседник';
+  await showActiveScreen({peer_id: peerId, peer_name: peerName});
+
+  const roomRef = getRoomRef();
+  await roomRef.child('answer').set({
+    status: 'accepted',
+    answerer_id: myVkId,
+    answerer_name: myName,
+    accepted_at: Date.now()
+  });
+
+  listenForOffer();
 }
+
 function declineCall() {
-    socket.emit('call_reject', {room_id: currentRoomId, reason: 'rejected'});
-    goBack();
+  const roomRef = getRoomRef();
+  roomRef.child('answer').set({
+    status: 'rejected',
+    answerer_id: myVkId,
+    rejected_at: Date.now()
+  });
+  goBack();
 }
+
 async function showActiveScreen(data) {
-    isCallActive = true;
-    callStartTime = Date.now();
-    document.getElementById('outgoingScreen').classList.add('hidden');
-    document.getElementById('setupScreen').classList.add('hidden');
-    document.getElementById('activeScreen').classList.remove('hidden');
-    const grid = document.getElementById('videoGrid');
-    if (isVideoEnabled) {
-        grid.className = 'call-video-grid video';
-        document.getElementById('localVideo').srcObject = localStream;
-        document.getElementById('localVideo').classList.remove('hidden');
-    } else {
-        grid.className = 'call-video-grid audio';
-        document.getElementById('localVideo').classList.add('hidden');
+  if (isCallActive) return;
+  isCallActive = true;
+  callStartTime = Date.now();
+  document.getElementById('outgoingScreen').classList.add('hidden');
+  document.getElementById('setupScreen').classList.add('hidden');
+  document.getElementById('activeScreen').classList.remove('hidden');
+
+  const grid = document.getElementById('videoGrid');
+  if (isVideoEnabled) {
+    grid.className = 'call-video-grid video';
+    document.getElementById('localVideo').srcObject = localStream;
+    document.getElementById('localVideo').classList.remove('hidden');
+  } else {
+    grid.className = 'call-video-grid audio';
+    document.getElementById('localVideo').classList.add('hidden');
+  }
+
+  document.getElementById('activeName').textContent = data.peer_name || 'Собеседник';
+  startCallTimer();
+  startNetworkMonitoring();
+}
+
+async function createAndSendOffer() {
+  await createPeerConnection();
+  const offer = await pc.createOffer({offerToReceiveAudio: true, offerToReceiveVideo: isVideoEnabled});
+  await pc.setLocalDescription(offer);
+
+  const roomRef = getRoomRef();
+  await roomRef.child('offer').child('sdp').set({
+    type: offer.type,
+    sdp: offer.sdp,
+    timestamp: Date.now()
+  });
+
+  listenForAnswer();
+  listenForIceCandidates();
+}
+
+function listenForOffer() {
+  const roomRef = getRoomRef();
+  rtdbUnsub.push(roomRef.child('offer/sdp').on('value', async (snap) => {
+    const data = snap.val();
+    if (data && data.type === 'offer') {
+      await createPeerConnection();
+      await pc.setRemoteDescription(new RTCSessionDescription(data));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
+      await roomRef.child('answer').child('sdp').set({
+        type: answer.type,
+        sdp: answer.sdp,
+        timestamp: Date.now()
+      });
+
+      listenForIceCandidates();
     }
-    document.getElementById('activeName').textContent = data.peer_name || 'Собеседник';
-    startCallTimer();
-    await createPeerConnection(data.peer_id);
-    if (!isIncoming) {
-        const offer = await pc.createOffer({offerToReceiveAudio: true, offerToReceiveVideo: isVideoEnabled});
-        await pc.setLocalDescription(offer);
-        socket.emit('webrtc_offer', {room_id: currentRoomId, offer: offer, target_id: data.peer_id, from_id: myVkId});
+  }));
+}
+
+function listenForAnswer() {
+  const roomRef = getRoomRef();
+  rtdbUnsub.push(roomRef.child('answer/sdp').on('value', async (snap) => {
+    const data = snap.val();
+    if (data && data.type === 'answer' && pc && pc.signalingState !== 'stable') {
+      await pc.setRemoteDescription(new RTCSessionDescription(data));
     }
-    startNetworkMonitoring();
+  }));
 }
-async function createPeerConnection(targetId) {
-    const config = {iceServers: iceServers, iceCandidatePoolSize: 10};
-    pc = new RTCPeerConnection(config);
-    pc.onicecandidate = (e) => {
-        if (e.candidate) {
-            socket.emit('webrtc_ice_candidate', {
-                room_id: currentRoomId,
-                candidate: e.candidate,
-                target_id: targetId,
-                from_id: myVkId
-            });
-        }
-    };
-    pc.ontrack = (e) => {
-        remoteStream = e.streams[0];
-        const remoteVideo = document.getElementById('remoteVideo');
-        remoteVideo.srcObject = remoteStream;
-        remoteVideo.onloadedmetadata = () => {
-            remoteVideo.play().catch(()=>{});
-        };
-    };
-    pc.onconnectionstatechange = () => {
-        const state = pc.connectionState;
-        if (state === 'connected') {
-            showToast('Соединение установлено');
-            document.getElementById('outgoingStatus').textContent = 'В разговоре';
-            document.getElementById('outgoingStatus').className = 'call-status in-call';
-        } else if (state === 'failed' || state === 'disconnected') {
-            showToast('Соединение прервано');
-            setTimeout(() => { if (isCallActive) endCall(); }, 3000);
-        }
-    };
-    pc.oniceconnectionstatechange = () => {
-        const state = pc.iceConnectionState;
-        if (state === 'connected' || state === 'completed') {
-            document.getElementById('waveform').classList.remove('hidden');
-        } else if (state === 'failed') {
-            pc.restartIce();
-        }
-    };
-    localStream.getTracks().forEach(track => {
-        pc.addTrack(track, localStream);
-    });
-    try {
-        dataChannel = pc.createDataChannel('stats', {ordered: false, maxRetransmits: 0});
-        dataChannel.onmessage = (e) => {
-            try {
-                const stats = JSON.parse(e.data);
-                updateNetworkQuality(stats);
-            } catch(err) {}
-        };
-    } catch(e) {}
-}
-async function handleOffer(offer, fromId) {
-    if (!pc) await createPeerConnection(fromId);
-    await pc.setRemoteDescription(new RTCSessionDescription(offer));
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    socket.emit('webrtc_answer', {room_id: currentRoomId, answer: answer, target_id: fromId, from_id: myVkId});
-}
-async function handleAnswer(answer) {
-    await pc.setRemoteDescription(new RTCSessionDescription(answer));
-}
-async function handleIceCandidate(candidate) {
-    try {
+
+function listenForIceCandidates() {
+  const roomRef = getRoomRef();
+  const remoteRole = myRole === 'offer' ? 'answer' : 'offer';
+
+  rtdbUnsub.push(roomRef.child(remoteRole + '/ice').on('child_added', async (snap) => {
+    const candidate = snap.val();
+    if (candidate && pc) {
+      try {
         await pc.addIceCandidate(new RTCIceCandidate(candidate));
-    } catch(e) {
+      } catch(e) {
         pendingCandidates.push(candidate);
+      }
     }
+  }));
 }
+
+async function createPeerConnection() {
+  const config = {iceServers: ICE_SERVERS, iceCandidatePoolSize: 10};
+  pc = new RTCPeerConnection(config);
+
+  pc.onicecandidate = (e) => {
+    if (e.candidate) {
+      const roomRef = getRoomRef();
+      roomRef.child(myRole + '/ice').push({
+        candidate: e.candidate.candidate,
+        sdpMid: e.candidate.sdpMid,
+        sdpMLineIndex: e.candidate.sdpMLineIndex,
+        timestamp: Date.now()
+      });
+    }
+  };
+
+  pc.ontrack = (e) => {
+    remoteStream = e.streams[0];
+    const remoteVideo = document.getElementById('remoteVideo');
+    remoteVideo.srcObject = remoteStream;
+    remoteVideo.onloadedmetadata = () => {
+      remoteVideo.play().catch(()=>{});
+    };
+  };
+
+  pc.onconnectionstatechange = () => {
+    const state = pc.connectionState;
+    if (state === 'connected') {
+      showToast('Соединение установлено');
+      document.getElementById('outgoingStatus').textContent = 'В разговоре';
+      document.getElementById('outgoingStatus').className = 'call-status in-call';
+    } else if (state === 'failed' || state === 'disconnected') {
+      showToast('Соединение прервано');
+      setTimeout(() => { if (isCallActive) endCall(); }, 3000);
+    }
+  };
+
+  pc.oniceconnectionstatechange = () => {
+    const state = pc.iceConnectionState;
+    if (state === 'connected' || state === 'completed') {
+      document.getElementById('waveform').classList.remove('hidden');
+    } else if (state === 'failed') {
+      pc.restartIce();
+    }
+  };
+
+  if (localStream) {
+    localStream.getTracks().forEach(track => {
+      pc.addTrack(track, localStream);
+    });
+  }
+}
+
 function toggleMute() {
-    if (!localStream) return;
-    isMuted = !isMuted;
-    localStream.getAudioTracks().forEach(t => t.enabled = !isMuted);
-    document.querySelectorAll('.call-btn-mute').forEach(btn => {
-        btn.classList.toggle('active', isMuted);
-    });
-    showToast(isMuted ? 'Микрофон выключен' : 'Микрофон включен');
+  if (!localStream) return;
+  isMuted = !isMuted;
+  localStream.getAudioTracks().forEach(t => t.enabled = !isMuted);
+  document.querySelectorAll('.call-btn-mute').forEach(btn => {
+    btn.classList.toggle('active', isMuted);
+  });
+  showToast(isMuted ? 'Микрофон выключен' : 'Микрофон включен');
 }
+
 function toggleSpeaker() {
-    isSpeakerOn = !isSpeakerOn;
-    const audioElem = document.getElementById('remoteVideo');
-    if (audioElem && audioElem.setSinkId && typeof audioElem.setSinkId === 'function') {
-        navigator.mediaDevices.enumerateDevices().then(devices => {
-            const speaker = devices.find(d => d.kind === 'audiooutput' && d.label.toLowerCase().includes('speaker'));
-            if (speaker) {
-                audioElem.setSinkId(speaker.deviceId).catch(()=>{});
-            }
-        });
-    }
-    document.querySelectorAll('.call-btn-speaker').forEach(btn => {
-        btn.classList.toggle('active', isSpeakerOn);
+  isSpeakerOn = !isSpeakerOn;
+  const audioElem = document.getElementById('remoteVideo');
+  if (audioElem && audioElem.setSinkId && typeof audioElem.setSinkId === 'function') {
+    navigator.mediaDevices.enumerateDevices().then(devices => {
+      const speaker = devices.find(d => d.kind === 'audiooutput' && d.label.toLowerCase().includes('speaker'));
+      if (speaker) {
+        audioElem.setSinkId(speaker.deviceId).catch(()=>{});
+      }
     });
-    showToast(isSpeakerOn ? 'Громкая связь' : 'Тихий режим');
+  }
+  document.querySelectorAll('.call-btn-speaker').forEach(btn => {
+    btn.classList.toggle('active', isSpeakerOn);
+  });
+  showToast(isSpeakerOn ? 'Громкая связь' : 'Тихий режим');
 }
+
 async function toggleVideo() {
-    if (!localStream) return;
-    const videoTrack = localStream.getVideoTracks()[0];
-    if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        isVideoEnabled = videoTrack.enabled;
-    } else if (!isVideoEnabled) {
-        try {
-            const newStream = await navigator.mediaDevices.getUserMedia({video: {facingMode: currentFacingMode}});
-            const newTrack = newStream.getVideoTracks()[0];
-            localStream.addTrack(newTrack);
-            if (pc) {
-                const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
-                if (sender) sender.replaceTrack(newTrack);
-                else pc.addTrack(newTrack, localStream);
-            }
-            isVideoEnabled = true;
-        } catch(e) {
-            showToast('Камера недоступна');
-            return;
-        }
-    }
-    const grid = document.getElementById('videoGrid');
-    const localVideo = document.getElementById('localVideo');
-    if (isVideoEnabled) {
-        grid.className = 'call-video-grid video';
-        localVideo.classList.remove('hidden');
-        localVideo.srcObject = localStream;
-    } else {
-        grid.className = 'call-video-grid audio';
-        localVideo.classList.add('hidden');
-    }
-    document.getElementById('activeVideoBtn').classList.toggle('active', isVideoEnabled);
-}
-async function flipCamera() {
-    currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
-    if (!localStream) return;
-    const videoTrack = localStream.getVideoTracks()[0];
-    if (!videoTrack) return;
+  if (!localStream) return;
+  const videoTrack = localStream.getVideoTracks()[0];
+  if (videoTrack) {
+    videoTrack.enabled = !videoTrack.enabled;
+    isVideoEnabled = videoTrack.enabled;
+  } else if (!isVideoEnabled) {
     try {
-        const newStream = await navigator.mediaDevices.getUserMedia({video: {facingMode: currentFacingMode}});
-        const newTrack = newStream.getVideoTracks()[0];
-        if (pc) {
-            const sender = pc.getSenders().find(s => s.track === videoTrack);
-            if (sender) await sender.replaceTrack(newTrack);
-        }
-        localStream.removeTrack(videoTrack);
-        videoTrack.stop();
-        localStream.addTrack(newTrack);
-        const localVideo = document.getElementById('localVideo');
-        localVideo.srcObject = localStream;
-        localVideo.classList.toggle('mirror', currentFacingMode === 'user');
+      const newStream = await navigator.mediaDevices.getUserMedia({video: {facingMode: currentFacingMode}});
+      const newTrack = newStream.getVideoTracks()[0];
+      localStream.addTrack(newTrack);
+      if (pc) {
+        const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) sender.replaceTrack(newTrack);
+        else pc.addTrack(newTrack, localStream);
+      }
+      isVideoEnabled = true;
     } catch(e) {
-        showToast('Не удалось переключить камеру');
+      showToast('Камера недоступна');
+      return;
     }
+  }
+
+  const grid = document.getElementById('videoGrid');
+  const localVideo = document.getElementById('localVideo');
+  if (isVideoEnabled) {
+    grid.className = 'call-video-grid video';
+    localVideo.classList.remove('hidden');
+    localVideo.srcObject = localStream;
+  } else {
+    grid.className = 'call-video-grid audio';
+    localVideo.classList.add('hidden');
+  }
+  document.getElementById('activeVideoBtn').classList.toggle('active', isVideoEnabled);
 }
-function endCall() {
-    socket.emit('call_end', {room_id: currentRoomId, vk_id: myVkId});
-    cleanupAndExit();
-}
-function cleanupAndExit() {
-    isCallActive = false;
-    if (callTimerInterval) clearInterval(callTimerInterval);
-    if (statsInterval) clearInterval(statsInterval);
+
+async function flipCamera() {
+  currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+  if (!localStream) return;
+  const videoTrack = localStream.getVideoTracks()[0];
+  if (!videoTrack) return;
+  try {
+    const newStream = await navigator.mediaDevices.getUserMedia({video: {facingMode: currentFacingMode}});
+    const newTrack = newStream.getVideoTracks()[0];
     if (pc) {
-        pc.close();
-        pc = null;
+      const sender = pc.getSenders().find(s => s.track === videoTrack);
+      if (sender) await sender.replaceTrack(newTrack);
     }
-    if (localStream) {
-        localStream.getTracks().forEach(t => t.stop());
-        localStream = null;
-    }
-    if (audioContext) {
-        audioContext.close();
-        audioContext = null;
-    }
-    remoteStream = null;
-    pendingCandidates = [];
-    if (socket) {
-        socket.disconnect();
-    }
-    setTimeout(goBack, 1500);
+    localStream.removeTrack(videoTrack);
+    videoTrack.stop();
+    localStream.addTrack(newTrack);
+    const localVideo = document.getElementById('localVideo');
+    localVideo.srcObject = localStream;
+    localVideo.classList.toggle('mirror', currentFacingMode === 'user');
+  } catch(e) {
+    showToast('Не удалось переключить камеру');
+  }
 }
+
+function endCall() {
+  const roomRef = getRoomRef();
+  roomRef.child('status').set({
+    ended: true,
+    ended_by: myVkId,
+    ended_at: Date.now(),
+    duration: callStartTime ? Math.floor((Date.now() - callStartTime) / 1000) : 0
+  });
+  cleanupAndExit();
+}
+
+function cleanupAndExit() {
+  isCallActive = false;
+  if (callTimerInterval) clearInterval(callTimerInterval);
+  if (statsInterval) clearInterval(statsInterval);
+
+  rtdbUnsub.forEach(unsub => unsub && unsub());
+  rtdbUnsub = [];
+
+  if (pc) {
+    pc.close();
+    pc = null;
+  }
+  if (localStream) {
+    localStream.getTracks().forEach(t => t.stop());
+    localStream = null;
+  }
+  remoteStream = null;
+  pendingCandidates = [];
+
+  const roomRef = getRoomRef();
+  roomRef.remove().catch(()=>{});
+
+  setTimeout(goBack, 1500);
+}
+
 function goBack() {
-    window.location.href = '/';
+  window.location.href = '/';
 }
+
 function startCallTimer() {
-    callTimerInterval = setInterval(() => {
-        if (!callStartTime) return;
-        const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
-        document.getElementById('activeTimer').textContent = formatDuration(elapsed);
-    }, 1000);
+  callTimerInterval = setInterval(() => {
+    if (!callStartTime) return;
+    const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
+    document.getElementById('activeTimer').textContent = formatDuration(elapsed);
+  }, 1000);
 }
+
 function formatDuration(sec) {
-    const m = Math.floor(sec / 60);
-    const s = (sec % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
+  const m = Math.floor(sec / 60);
+  const s = (sec % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
 }
+
 function showToast(msg) {
-    const toast = document.getElementById('callToast');
-    toast.textContent = msg;
-    toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 3000);
+  const toast = document.getElementById('callToast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
 }
+
 function startNetworkMonitoring() {
-    statsInterval = setInterval(async () => {
-        if (!pc || pc.connectionState !== 'connected') return;
-        try {
-            const stats = await pc.getStats();
-            let packetsLost = 0;
-            let packetsReceived = 0;
-            let jitter = 0;
-            let rtt = 0;
-            stats.forEach(report => {
-                if (report.type === 'inbound-rtp' && report.kind === 'audio') {
-                    packetsLost = report.packetsLost || 0;
-                    packetsReceived = report.packetsReceived || 1;
-                    jitter = report.jitter || 0;
-                }
-                if (report.type === 'candidate-pair' && report.state === 'succeeded') {
-                    rtt = report.currentRoundTripTime || 0;
-                }
-            });
-            const lossRate = packetsReceived > 0 ? packetsLost / (packetsLost + packetsReceived) : 0;
-            updateSignalBars(lossRate, rtt, jitter);
-            if (dataChannel && dataChannel.readyState === 'open') {
-                dataChannel.send(JSON.stringify({lossRate, rtt, jitter}));
-            }
-        } catch(e) {}
-    }, 2000);
+  statsInterval = setInterval(async () => {
+    if (!pc || pc.connectionState !== 'connected') return;
+    try {
+      const stats = await pc.getStats();
+      let packetsLost = 0;
+      let packetsReceived = 0;
+      let jitter = 0;
+      let rtt = 0;
+
+      stats.forEach(report => {
+        if (report.type === 'inbound-rtp' && report.kind === 'audio') {
+          packetsLost = report.packetsLost || 0;
+          packetsReceived = report.packetsReceived || 1;
+          jitter = report.jitter || 0;
+        }
+        if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+          rtt = report.currentRoundTripTime || 0;
+        }
+      });
+
+      const lossRate = packetsReceived > 0 ? packetsLost / (packetsLost + packetsReceived) : 0;
+      updateSignalBars(lossRate, rtt, jitter);
+    } catch(e) {}
+  }, 2000);
 }
+
 function updateSignalBars(lossRate, rtt, jitter) {
-    const bars = document.querySelectorAll('#signalBars .call-signal-bar');
-    const text = document.getElementById('networkText');
-    const dot = document.querySelector('.call-network-dot');
-    let activeCount = 4;
-    let quality = 'Отлично';
-    if (lossRate > 0.05 || rtt > 0.3 || jitter > 0.1) {
-        activeCount = 2;
-        quality = 'Среднее';
-        networkQuality = 'weak';
-    }
-    if (lossRate > 0.15 || rtt > 0.6 || jitter > 0.2) {
-        activeCount = 1;
-        quality = 'Плохое';
-        networkQuality = 'bad';
-    }
-    if (lossRate > 0.3 || rtt > 1.0) {
-        activeCount = 0;
-        quality = 'Очень плохое';
-        networkQuality = 'bad';
-    }
-    bars.forEach((bar, i) => {
-        bar.classList.toggle('active', i < activeCount);
-        bar.classList.toggle('weak', networkQuality === 'weak' && i < activeCount);
-        bar.classList.toggle('bad', networkQuality === 'bad' && i < activeCount);
-    });
-    text.textContent = quality;
-    if (dot) {
-        dot.className = 'call-network-dot';
-        if (networkQuality === 'weak') dot.classList.add('weak');
-        if (networkQuality === 'bad') dot.classList.add('bad');
-    }
+  const bars = document.querySelectorAll('#signalBars .call-signal-bar');
+  const text = document.getElementById('networkText');
+  const dot = document.querySelector('.call-network-dot');
+
+  let activeCount = 4;
+  let quality = 'Отлично';
+
+  if (lossRate > 0.05 || rtt > 0.3 || jitter > 0.1) {
+    activeCount = 2;
+    quality = 'Среднее';
+    networkQuality = 'weak';
+  }
+  if (lossRate > 0.15 || rtt > 0.6 || jitter > 0.2) {
+    activeCount = 1;
+    quality = 'Плохое';
+    networkQuality = 'bad';
+  }
+  if (lossRate > 0.3 || rtt > 1.0) {
+    activeCount = 0;
+    quality = 'Очень плохое';
+    networkQuality = 'bad';
+  }
+
+  bars.forEach((bar, i) => {
+    bar.classList.toggle('active', i < activeCount);
+    bar.classList.toggle('weak', networkQuality === 'weak' && i < activeCount);
+    bar.classList.toggle('bad', networkQuality === 'bad' && i < activeCount);
+  });
+
+  text.textContent = quality;
+  if (dot) {
+    dot.className = 'call-network-dot';
+    if (networkQuality === 'weak') dot.classList.add('weak');
+    if (networkQuality === 'bad') dot.classList.add('bad');
+  }
 }
-function updateNetworkQuality(peerStats) {
-    const combinedLoss = (peerStats.lossRate || 0);
-    const combinedRtt = (peerStats.rtt || 0);
-    updateSignalBars(combinedLoss, combinedRtt, 0);
-}
+
 window.onbeforeunload = () => {
-    if (isCallActive) {
-        socket.emit('call_end', {room_id: currentRoomId, vk_id: myVkId});
-    }
+  if (isCallActive) {
+    const roomRef = getRoomRef();
+    roomRef.child('status').set({
+      ended: true,
+      ended_by: myVkId,
+      ended_at: Date.now()
+    });
+  }
 };
+
 document.addEventListener('visibilitychange', () => {
-    if (document.hidden && isCallActive && localStream) {
-        localStream.getAudioTracks().forEach(t => t.enabled = false);
-    } else if (!document.hidden && isCallActive && localStream && !isMuted) {
-        localStream.getAudioTracks().forEach(t => t.enabled = true);
-    }
+  if (document.hidden && isCallActive && localStream) {
+    localStream.getAudioTracks().forEach(t => t.enabled = false);
+  } else if (!document.hidden && isCallActive && localStream && !isMuted) {
+    localStream.getAudioTracks().forEach(t => t.enabled = true);
+  }
 });
+
 init();
 </script>
 </body>
 </html>
 """
-
-@app.route('/api/ice_config')
-def get_ice_config():
-    return jsonify({"iceServers": [
-        {"urls": "stun:stun.l.google.com:19302"},
-        {"urls": "stun:stun1.l.google.com:19302"},
-        {"urls": "stun:stun2.l.google.com:19302"},
-        {"urls": "stun:stun3.l.google.com:19302"},
-        {"urls": "stun:stun4.l.google.com:19302"},
-        {"urls": "stun:stun.ekiga.net"},
-        {"urls": "stun:stun.ideasip.com"},
-        {"urls": "stun:stun.schlund.de"},
-        {"urls": "stun:stun.voiparound.com"},
-        {"urls": "stun:stun.voipbuster.com"},
-        {"urls": "stun:stun.voipstunt.com"},
-        {"urls": "stun:stun.voxgratia.org"},
-        {"urls": "stun:stun.xten.com"},
-        {"urls": "stun:openrelay.metered.ca:80"},
-        {"urls": "turn:openrelay.metered.ca:80", "username": "openrelayproject", "credential": "openrelayproject"},
-        {"urls": "turn:openrelay.metered.ca:443", "username": "openrelayproject", "credential": "openrelayproject"},
-        {"urls": "turn:openrelay.metered.ca:443?transport=tcp", "username": "openrelayproject", "credential": "openrelayproject"},
-        {"urls": "turn:global.relay.metered.ca:80", "username": "openrelayproject", "credential": "openrelayproject"},
-        {"urls": "turn:global.relay.metered.ca:443", "username": "openrelayproject", "credential": "openrelayproject"},
-        {"urls": "turn:global.relay.metered.ca:443?transport=tcp", "username": "openrelayproject", "credential": "openrelayproject"},
-    ]})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
