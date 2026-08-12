@@ -123,7 +123,7 @@ def extract_doc_attachment(save_result):
         if 'doc' in save_result:
             d = save_result['doc']
             if isinstance(d, dict) and 'owner_id' in d and 'id' in d:
-                return f"doc{d['owner_id']}_{d['id']}"
+                return f"doc{save_result['owner_id']}_{save_result['id']}"
         if 'owner_id' in save_result and 'id' in save_result:
             return f"doc{save_result['owner_id']}_{save_result['id']}"
     return None
@@ -294,9 +294,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Ro
     </div>
   </div>
   <div class="header-actions">
-    <button class="header-btn" id="trafficSaverBtn" onclick="toggleTrafficSaver()" title="Экономия трафика">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-    </button>
     <button class="header-btn" id="multiSelectToggleBtn" onclick="toggleMultiSelectMode()" title="Выбрать файлы">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
     </button>
@@ -315,7 +312,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Ro
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
       Объём хранилища
     </div>
-    <div class="storage-used" id="storageUsed">0 файлов</div>
+    <div class="storage-used" id="storageUsed">0 B / ∞</div>
   </div>
   <div class="storage-track">
     <div class="storage-fill" id="storageFill"></div>
@@ -455,10 +452,7 @@ let currentPreviewFile = null;
 let isMultiSelectMode = false;
 let selectedDocIds = new Set();
 
-let trafficSaverEnabled = localStorage.getItem('vk_traffic_saver') === 'true';
-
 const decryptionCache = {};
-const thumbnailCache = {};
 let activeAbortController = null;
 let intersectionObserver = null;
 
@@ -477,8 +471,6 @@ function goBack() { window.location.href = '/'; }
 
 async function initCloud() {
     if (!token) { alert('Сначала войдите в аккаунт'); goBack(); return; }
-
-    updateTrafficSaverUI();
 
     try {
         const res = await fetch('/cloud/api/init', {
@@ -609,18 +601,9 @@ async function decryptFilename(title) {
     }
 }
 
-function toggleTrafficSaver() {
-    trafficSaverEnabled = !trafficSaverEnabled;
-    localStorage.setItem('vk_traffic_saver', trafficSaverEnabled);
-    updateTrafficSaverUI();
-    filterAndRenderFiles();
-}
-
-function updateTrafficSaverUI() {
-    const btn = document.getElementById('trafficSaverBtn');
-    if (btn) {
-        btn.classList.toggle('active', trafficSaverEnabled);
-    }
+function calculateTotalStorageSize() {
+    let totalBytes = filesData.reduce((acc, f) => acc + (f.size || 0), 0);
+    return formatSize(totalBytes) + ' / ∞';
 }
 
 async function loadFiles() {
@@ -709,7 +692,7 @@ function renderGrid(filteredFiles) {
     if (!grid || !empty || !usedLabel) return;
 
     grid.innerHTML = '';
-    usedLabel.textContent = filteredFiles.length + ' файлов';
+    usedLabel.textContent = calculateTotalStorageSize();
 
     if (filteredFiles.length === 0) {
         empty.classList.remove('hidden');
@@ -795,10 +778,6 @@ function renderGrid(filteredFiles) {
         };
 
         grid.appendChild(itemDiv);
-
-        if (trafficSaverEnabled && f.type === 'audio') {
-            continue;
-        }
 
         if (decryptionCache[f.doc_id]) {
             applyDecryptedPreview(f.doc_id, f.type);
