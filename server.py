@@ -6171,7 +6171,11 @@ function declineCall() {
     answerer_id: myVkId,
     rejected_at: Date.now()
   });
-  goBack();
+  // Скрываем setupScreen без перезагрузки
+  document.getElementById('setupScreen').classList.add('hidden');
+  if (window.history.length > 1) {
+    window.history.back();
+  }
 }
 
 async function showActiveScreen(data) {
@@ -6443,11 +6447,31 @@ function cleanupAndExit() {
   const roomRef = getRoomRef();
   roomRef.remove().catch(()=>{});
 
-  setTimeout(goBack, 1500);
+  // Просто скрываем экран звонка без перезагрузки страницы
+  setTimeout(() => {
+    document.getElementById('activeScreen').classList.add('hidden');
+    document.getElementById('outgoingScreen').classList.add('hidden');
+    document.getElementById('setupScreen').classList.add('hidden');
+    // Возвращаемся назад в истории браузера (без перезагрузки)
+    if (window.history.length > 1) {
+      window.history.back();
+    }
+  }, 1500);
 }
 
 function goBack() {
-  window.location.href = '/';
+  // Вместо полной перезагрузки используем history.back()
+  // Если некуда назад — просто скрываем экран звонка
+  if (window.history.length > 1) {
+    window.history.back();
+  } else {
+    // Fallback: скрываем все экраны звонка
+    document.getElementById('activeScreen').classList.add('hidden');
+    document.getElementById('outgoingScreen').classList.add('hidden');
+    document.getElementById('setupScreen').classList.add('hidden');
+    // Перезагружаем страницу только если совсем некуда назад
+    window.location.reload();
+  }
 }
 
 function startCallTimer() {
@@ -6545,6 +6569,7 @@ window.onbeforeunload = () => {
       ended_at: Date.now()
     });
   }
+  // Не блокируем закрытие страницы
 };
 
 document.addEventListener('visibilitychange', () => {
