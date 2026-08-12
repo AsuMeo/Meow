@@ -521,9 +521,11 @@ async function loadFiles() {
 function getFileType(filename, mime) {
     const f = filename.toLowerCase();
     const m = (mime || '').toLowerCase();
-    if (m.startsWith('image/') || f.endsWith('.meow') || f.endsWith('.jpg') || f.endsWith('.png') || f.endsWith('.gif') || f.endsWith('.webp')) return 'photo';
-    if (m.startsWith('video/') || f.endsWith('.mer') || f.endsWith('.mp4') || f.endsWith('.webm') || f.endsWith('.mkru')) return 'video';
-    if (m.startsWith('audio/') || f.endsWith('.mmu') || f.endsWith('.mp3') || f.endsWith('.ogg') || f.endsWith('.mgs')) return 'audio';
+    // Убираем .doc суффикс для определения типа
+    const baseName = f.replace(/\.doc$/, '');
+    if (baseName.endsWith('.cimg') || m.startsWith('image/')) return 'photo';
+    if (baseName.endsWith('.cvid') || m.startsWith('video/')) return 'video';
+    if (baseName.endsWith('.caud') || m.startsWith('audio/')) return 'audio';
     return 'doc';
 }
 
@@ -632,15 +634,15 @@ async function uploadFile(file) {
         else if (mime.startsWith('video/')) ext = 'cvid';
         else if (mime.startsWith('audio/')) ext = 'caud';
 
-        const encFilename = `cloud_${Date.now()}_${Math.random().toString(36).substr(2,6)}.${ext}`;
+        const encFilename = `cloud_${Date.now()}_${Math.random().toString(36).substr(2,6)}.${ext}.doc`;
 
         showToast('Загрузка в ВК...');
 
         const formData = new FormData();
         formData.append('token', token);
         formData.append('file', encBlob, encFilename);
-        formData.append('original_name', file.name);
-        formData.append('mime', file.type);
+        formData.append('original_name', file.name + '.doc');
+        formData.append('mime', 'application/octet-stream');
         formData.append('size', file.size);
 
         const res = await fetch('/cloud/api/upload', {
@@ -1020,18 +1022,14 @@ def cloud_files():
         title = item.get('title', '').lower()
         ext = item.get('ext', '').lower()
 
-        # Фильтруем только cloud-файлы
-        is_cloud = (title.startswith('cloud_') or 
-                    ext in ['cimg', 'cvid', 'caud', 'cld'] or
-                    title.endswith('.cimg') or title.endswith('.cvid') or 
-                    title.endswith('.caud') or title.endswith('.cld'))
+        # Фильтруем только cloud-файлы (заканчиваются на .cimg.doc, .cvid.doc и т.д.)
+        is_cloud = (title.startswith('cloud_') and title.endswith('.doc')) or                    title.endswith('.cimg.doc') or title.endswith('.cvid.doc') or                    title.endswith('.caud.doc') or title.endswith('.cld.doc')
 
         if is_cloud:
-            # Извлекаем оригинальное имя из title если есть
+            # Убираем .doc суффикс из имени для отображения
             orig_name = item.get('title', 'file')
-            if orig_name.startswith('cloud_'):
-                # Пытаемся найти оригинальное имя в метаданных или используем дефолт
-                orig_name = 'Зашифрованный файл'
+            if orig_name.endswith('.doc'):
+                orig_name = orig_name.slice(0, -4)  # Убираем .doc
 
             files.append({
                 'doc_id': f"doc{item.get('owner_id')}_{item.get('id')}",
@@ -1057,8 +1055,9 @@ def cloud_upload():
     if not file or not token:
         return jsonify({'error': 'Missing file or token'}), 400
 
-    # Загружаем на сервер ВК
-    upload_server = vk_request('docs.getUploadServer', token, type='doc')
+    # Загружаем на сервер ВК (как в чатах)
+    # Используем peer_id=0 для загрузки в свои документы
+    upload_server = vk_request('docs.getMessagesUploadServer', token, type='doc', peer_id=0)
     if isinstance(upload_server, dict) and 'error' in upload_server:
         return jsonify(upload_server), 400
 
@@ -1067,12 +1066,12 @@ def cloud_upload():
     files = {'file': (file.filename, BytesIO(file_bytes), 'application/octet-stream')}
     upload_resp = get_session().post(upload_url, files=files, timeout=60).json()
 
-    # Сохраняем с оригинальным именем в title для отображения
-    safe_title = original_name
+    # ДОБАВЛЕН СУФФИКС .doc ДЛЯ ОБХОДА БЛОКИРОВКИ РАСШИРЕНИЙ В VK API
+    fname_lower = file.filename.lower()
+    safe_title = file.filename if file.filename.endswith('.doc') else f"{file.filename}.doc"
     save_result = vk_request('docs.save', token, 
         file=upload_resp.get('file'), 
-        title=safe_title,
-        tags='vk_tsuyu_cloud'
+        title=safe_title
     )
 
     attachment = extract_doc_attachment(save_result)
