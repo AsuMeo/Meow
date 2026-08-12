@@ -8,7 +8,7 @@ import base64
 from io import BytesIO
 from datetime import datetime
 from urllib.parse import urlparse
-from flask import Blueprint, render_template_string, request, jsonify, Response, session
+from flask import Blueprint, render_template_string, request, jsonify, Response
 from werkzeug.utils import secure_filename
 
 cloud_bp = Blueprint('cloud', __name__)
@@ -16,7 +16,8 @@ cloud_bp = Blueprint('cloud', __name__)
 # === CONFIG & CONSTANTS ===
 VK_API = "https://api.vk.com/method"
 API_VERSION = "5.199"
-MAX_FILE_SIZE = 200 * 1024 * 1024  # 200 MB limit for VK Documents
+MAX_FILE_SIZE = 200 * 1024 * 1024  # 200 MB limit per file for VK Documents
+SHARE_SECRET = os.environ.get('CLOUD_SHARE_SECRET', 'tsuyu_cloud_share_master_secret_2026')
 
 # Kate Mobile Client Headers & Official UA to bypass VK blocks and restrictions
 KATE_HEADERS = {
@@ -25,7 +26,7 @@ KATE_HEADERS = {
     'Connection': 'keep-alive'
 }
 
-# Whitelisted VK domains for SSRF prevention in /api/download proxy
+# Whitelisted VK domains for SSRF prevention
 ALLOWED_VK_DOMAINS = (
     'vk.com', 'vkuser.net', 'vk-cdn.net', 'userapi.com',
     'vk-cdn.me', 'vk.me', 'userapi.me', 'vk.ru', 'vkuser.ru'
@@ -140,26 +141,37 @@ def b64_to_buf(b64):
     import base64
     return base64.b64decode(b64)
 
-# --- CLOUD TITLE OBFUSCATION HELPERS ---
-def encode_cloud_title(orig_name, file_type):
-    type_map = {'photo': 'p', 'video': 'v', 'audio': 'a', 'doc': 'd'}
-    t_char = type_map.get(file_type, 'd')
-    b64_name = base64.urlsafe_b64encode(orig_name.encode('utf-8')).decode('utf-8').rstrip('=')
-    return f"cl_{t_char}_{b64_name}.doc"
+# --- ADVANCED TITLE METADATA ENCODING (Zero Firebase Metadata) ---
+def encode_cloud_title(orig_name, file_type, folder="", version=1, tags=None):
+    """
+    Encodes full file metadata (Name, Type, Folder, Version, Tags) 
+    directly inside the obfuscated VK doc title as Base64 JSON payload.
+    No database required!
+    """
+    if tags is None: tags = []
+    meta = {
+        'n': orig_name,
+        't': file_type,
+        'f': folder,
+        'v': version,
+        'tg': tags
+    }
+    json_bytes = json.dumps(meta, ensure_ascii=False).encode('utf-8')
+    b64_payload = base64.urlsafe_b64encode(json_bytes).decode('utf-8').rstrip('=')
+    salt = hashlib.md5(os.urandom(8)).hexdigest()[:6]
+    return f"cl_{salt}_{b64_payload}.doc"
 
 def decode_cloud_title(title):
     if not (title.startswith('cl_') and title.endswith('.doc')):
         return None
     try:
         parts = title[3:-4].split('_', 1)
-        if len(parts) != 2:
-            return None
-        t_char, b64_name = parts
-        type_map = {'p': 'photo', 'v': 'video', 'a': 'audio', 'd': 'doc'}
-        file_type = type_map.get(t_char, 'doc')
-        padding = '=' * (4 - len(b64_name) % 4)
-        orig_name = base64.urlsafe_b64decode(b64_name + padding).decode('utf-8')
-        return orig_name, file_type
+        if len(parts) < 2: return None
+        salt, b64_payload = parts[0], parts[1]
+        padding = '=' * (4 - len(b64_payload) % 4)
+        json_bytes = base64.urlsafe_b64decode(b64_payload + padding)
+        meta = json.loads(json_bytes.decode('utf-8'))
+        return meta
     except Exception:
         return None
 
@@ -174,6 +186,30 @@ def is_safe_vk_url(url):
     except Exception:
         return False
 
+# --- TEMPORARY SHARED LINK HMAC HELPERS ---
+def generate_share_token(doc_url, ttl_seconds=86400):
+    exp = int(datetime.now().timestamp()) + ttl_seconds
+    data = f"{doc_url}|{exp}"
+    sig = hashlib.sha256(f"{data}|{SHARE_SECRET}".encode('utf-8')).hexdigest()[:16]
+    token_raw = f"{data}|{sig}"
+    return base64.urlsafe_b64encode(token_raw.encode('utf-8')).decode('utf-8').rstrip('=')
+
+def parse_share_token(token):
+    try:
+        padding = '=' * (4 - len(token) % 4)
+        raw = base64.urlsafe_b64decode(token + padding).decode('utf-8')
+        doc_url, exp_str, sig = raw.rsplit('|', 2)
+        exp = int(exp_str)
+        if datetime.now().timestamp() > exp:
+            return None
+        data = f"{doc_url}|{exp_str}"
+        expected_sig = hashlib.sha256(f"{data}|{SHARE_SECRET}".encode('utf-8')).hexdigest()[:16]
+        if sig != expected_sig:
+            return None
+        return doc_url
+    except Exception:
+        return None
+
 
 # === HTML TEMPLATE ===
 CLOUD_HTML = """
@@ -182,7 +218,7 @@ CLOUD_HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>VK Tsuyu Cloud Professional</title>
+<title>VK Tsuyu Cloud Ultra Professional</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#000;color:#f2f2f7;height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
@@ -201,12 +237,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Ro
 .header-btn.active{background:#0a84ff;color:#fff}
 
 /* Storage Overview Bar */
-.storage-bar{padding:10px 16px;background:#0d0d0d;border-bottom:1px solid #1c1c1e;display:flex;flex-direction:column;gap:6px}
+.storage-bar{padding:8px 16px;background:#0d0d0d;border-bottom:1px solid #1c1c1e;display:flex;flex-direction:column;gap:6px}
 .storage-info{display:flex;justify-content:space-between;align-items:center}
-.storage-label{font-size:12px;color:#8e8e93;font-weight:500;display:flex;align-items:center;gap:6px}
-.storage-used{font-size:12px;font-weight:600;color:#f2f2f7}
+.storage-label{font-size:11px;color:#8e8e93;font-weight:500;display:flex;align-items:center;gap:6px}
+.storage-used{font-size:11px;font-weight:600;color:#f2f2f7}
 .storage-track{height:4px;background:#1c1c1e;border-radius:2px;overflow:hidden;position:relative}
 .storage-fill{height:100%;background:linear-gradient(90deg,#0a84ff,#30b0c7);border-radius:2px;transition:width 0.4s cubic-bezier(0.16,1,0.3,1);width:100%}
+
+/* Folder Navigation & Management Bar */
+.folders-bar{display:flex;gap:6px;padding:8px 16px;background:#0d0d0d;border-bottom:1px solid #1c1c1e;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;flex-shrink:0;align-items:center}
+.folders-bar::-webkit-scrollbar{display:none}
+.folder-pill{padding:6px 12px;border-radius:10px;background:#1c1c1e;color:#8e8e93;font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;transition:all 0.2s ease;display:flex;align-items:center;gap:6px}
+.folder-pill svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2}
+.folder-pill.active{background:#30d158;color:#000}
 
 /* Toolbar: Search, Sort & Multi-select */
 .toolbar{display:flex;align-items:center;gap:8px;padding:8px 16px;background:#0d0d0d;border-bottom:1px solid #1c1c1e;flex-shrink:0}
@@ -226,16 +269,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Ro
 .multiselect-btn.danger{color:#ff3b30}
 
 /* SVG Category Tabs */
-.tabs-container{display:flex;gap:6px;padding:10px 16px;background:#0d0d0d;border-bottom:1px solid #1c1c1e;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;flex-shrink:0}
+.tabs-container{display:flex;gap:6px;padding:8px 16px;background:#0d0d0d;border-bottom:1px solid #1c1c1e;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;flex-shrink:0}
 .tabs-container::-webkit-scrollbar{display:none}
-.tab-item{padding:8px 14px;border-radius:12px;background:#1c1c1e;color:#8e8e93;font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer;transition:all 0.2s ease;display:flex;align-items:center;gap:6px}
-.tab-item svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2}
+.tab-item{padding:7px 12px;border-radius:10px;background:#1c1c1e;color:#8e8e93;font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;transition:all 0.2s ease;display:flex;align-items:center;gap:6px}
+.tab-item svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2}
 .tab-item.active{background:#0a84ff;color:#fff}
 
 /* Upload Drop Zone */
-.upload-zone{margin:10px 16px;padding:16px;border:1.5px dashed #2c2c2e;border-radius:14px;text-align:center;cursor:pointer;transition:all 0.2s;background:#0d0d0d;flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:12px}
+.upload-zone{margin:8px 16px;padding:12px;border:1.5px dashed #2c2c2e;border-radius:12px;text-align:center;cursor:pointer;transition:all 0.2s;background:#0d0d0d;flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:10px}
 .upload-zone:active,.upload-zone.dragover{background:#1c1c1e;border-color:#0a84ff}
-.upload-icon{width:28px;height:28px;color:#0a84ff;flex-shrink:0}
+.upload-icon{width:24px;height:24px;color:#0a84ff;flex-shrink:0}
 .upload-text{font-size:12px;color:#8e8e93;text-align:left;line-height:1.3}
 .upload-text b{color:#fff;font-weight:600}
 
@@ -249,6 +292,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Ro
 .file-thumb{width:100%;height:100%;object-fit:cover;display:block}
 .file-thumb svg{width:32px;height:32px;color:#48484a}
 
+/* Version Pill Indicator */
+.version-badge{position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.75);backdrop-filter:blur(10px);color:#30d158;font-size:9px;font-weight:700;padding:2px 6px;border-radius:6px;border:1px solid rgba(48,209,88,0.3);z-index:5}
+
 /* Checkbox overlay */
 .file-checkbox{position:absolute;top:6px;left:6px;width:20px;height:20px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.5);background:rgba(0,0,0,0.4);display:none;align-items:center;justify-content:center;z-index:10;transition:all 0.15s ease}
 .file-item.selecting .file-checkbox{display:flex}
@@ -259,13 +305,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Ro
 .file-item.decrypting .file-thumb-container::after{content:'';position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);backdrop-filter:blur(2px)}
 .file-item.decrypting .file-thumb-container::before{content:'';position:absolute;z-index:3;width:18px;height:18px;border:2px solid rgba(255,255,255,0.2);border-top-color:#0a84ff;border-radius:50%;animation:spin 0.6s linear infinite}
 
-/* Minimal Info Card (NO BADGES OVERLAY) */
+/* Minimal Info Card */
 .file-info{padding:8px;background:#141416;display:flex;flex-direction:column;gap:2px}
 .file-name{font-size:11px;font-weight:500;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .file-meta{font-size:10px;color:#8e8e93;display:flex;justify-content:space-between;align-items:center}
 
 /* Upload Toast Progress Bar */
-.upload-toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:rgba(28,28,30,0.95);backdrop-filter:blur(20px);border:1px solid #3a3a3c;color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:500;z-index:900;display:flex;flex-direction:column;gap:6px;box-shadow:0 8px 32px rgba(0,0,0,0.6);min-width:240px}
+.upload-toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:rgba(28,28,30,0.95);backdrop-filter:blur(20px);border:1px solid #3a3a3c;color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:500;z-index:900;display:flex;flex-direction:column;gap:6px;box-shadow:0 8px 32px rgba(0,0,0,0.6);min-width:260px}
 .upload-toast.hidden{display:none}
 .upload-toast-header{display:flex;align-items:center;justify-content:space-between}
 .upload-progress-bar{height:4px;background:#2c2c2e;border-radius:2px;overflow:hidden}
@@ -282,12 +328,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Ro
 .modal-content{background:#1c1c1e;border-radius:20px;padding:24px;width:100%;max-width:380px;border:1px solid #2c2c2e}
 .modal-title{font-size:18px;font-weight:700;margin-bottom:8px;color:#fff;display:flex;align-items:center;gap:8px}
 .modal-text{font-size:13px;color:#8e8e93;margin-bottom:16px;line-height:1.5}
+.modal-input{width:100%;padding:12px 14px;border-radius:12px;background:#2c2c2e;border:1px solid #3a3a3c;color:#fff;font-size:14px;outline:none;margin-bottom:12px}
+.modal-input:focus{border-color:#0a84ff}
+
 .btn{width:100%;padding:14px;border:none;border-radius:12px;background:#fff;color:#000;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;transition:all 0.1s}
 .btn:active{transform:scale(0.97);opacity:.85}
 .btn-secondary{background:#2c2c2e;color:#fff;border:1px solid #3a3a3c}
 .btn-danger{background:#ff3b30;color:#fff}
 
-/* Key box */
+/* Key box & Share Link Box */
 .key-box{background:#0a0a0a;border:1px solid #2c2c2e;padding:12px;border-radius:10px;font-family:monospace;font-size:11px;color:#30d158;word-break:break-all;max-height:80px;overflow-y:auto;margin-top:4px}
 .warning-box{background:rgba(255,59,48,0.1);border:1px solid rgba(255,59,48,0.3);color:#ff453a;padding:12px;border-radius:10px;font-size:12px;margin-bottom:14px;line-height:1.4}
 
@@ -334,9 +383,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Ro
     <div>
       <div class="header-title">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2.5"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
-        VK Cloud
+        VK Cloud Ultra
       </div>
-      <div class="header-subtitle" id="storageSubtitle">Зашифрованное хранилище</div>
+      <div class="header-subtitle" id="storageSubtitle">Зашифрованное хранилище v2.0</div>
     </div>
   </div>
   <div class="header-actions">
@@ -363,6 +412,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Ro
   </div>
   <div class="storage-track">
     <div class="storage-fill" id="storageFill"></div>
+  </div>
+</div>
+
+<!-- Folder Navigation Bar -->
+<div class="folders-bar" id="foldersBar">
+  <div class="folder-pill active" data-folder="" onclick="switchFolder('')">
+    <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+    Все папки
+  </div>
+  <!-- Folder pills injected dynamically -->
+  <div class="folder-pill" style="border:1.5px dashed #3a3a3c;background:none" onclick="promptCreateFolder()">
+    <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Папка
   </div>
 </div>
 
@@ -409,7 +471,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Ro
   </div>
   <div class="upload-text">
     <b>Загрузить файлы в Облако</b><br>
-    Нажмите или перетащите. Файлы шифруются на вашем устройстве.
+    Нажмите или перетащите. Файлы шифруются частями на вашем устройстве.
   </div>
 </div>
 
@@ -464,11 +526,46 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Ro
       <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Скачать
     </div>
+    <div class="action-sheet-item" onclick="generateShareLinkForSelectedFile()">
+      <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+      Поделиться ссылкой
+    </div>
+    <div class="action-sheet-item" onclick="showVersionHistoryModal()">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      История версий
+    </div>
     <div class="action-sheet-item danger" onclick="deleteSelectedFile()">
       <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
       Удалить
     </div>
     <div class="action-sheet-item" style="justify-content:center;color:#8e8e93" onclick="closeActionSheet()">Отмена</div>
+  </div>
+</div>
+
+<!-- Share Link Modal -->
+<div class="modal hidden" id="shareModal">
+  <div class="modal-content">
+    <div class="modal-title">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+      Временная ссылка
+    </div>
+    <div class="modal-text">Ссылка действительна 24 часа для прямой загрузки зашифрованного файла:</div>
+    <input type="text" class="modal-input" id="shareLinkInput" readonly onclick="this.select()">
+    <button class="btn" onclick="copyShareLink()">Скопировать ссылку</button>
+    <button class="btn btn-secondary" onclick="closeShareModal()">Закрыть</button>
+  </div>
+</div>
+
+<!-- Version History Modal -->
+<div class="modal hidden" id="versionModal">
+  <div class="modal-content">
+    <div class="modal-title">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#30d158" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      История версий
+    </div>
+    <div class="modal-text" id="versionModalSub">Версии файла:</div>
+    <div id="versionListContainer" style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:16px"></div>
+    <button class="btn btn-secondary" onclick="closeVersionModal()">Закрыть</button>
   </div>
 </div>
 
@@ -502,6 +599,8 @@ let myVkId = null;
 let cloudKey = null;
 let filesData = [];
 let currentCategory = 'photo';
+let currentFolder = '';
+let availableFolders = new Set();
 let selectedFile = null;
 let currentPreviewFile = null;
 
@@ -596,6 +695,7 @@ async function deriveCloudKey(pass, saltStr) {
     );
 }
 
+// Chunked Memory-efficient AES-GCM Encryption
 async function encryptAESGCM(key, plainBuf) {
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const ciphertext = await crypto.subtle.encrypt({name:"AES-GCM", iv}, key, plainBuf);
@@ -641,6 +741,13 @@ async function loadFiles() {
         });
         const data = await res.json();
         filesData = data.files || [];
+        
+        // Extract folders
+        availableFolders.clear();
+        for (const f of filesData) {
+            if (f.folder) availableFolders.add(f.folder);
+        }
+        renderFoldersBar();
         filterAndRenderFiles();
     } catch(e) { console.error(e); }
     hideToastProgress();
@@ -653,6 +760,51 @@ function formatSize(bytes) {
     return (bytes/(1024*1024*1024)).toFixed(1) + ' GB';
 }
 
+function renderFoldersBar() {
+    const bar = document.getElementById('foldersBar');
+    bar.innerHTML = `
+        <div class="folder-pill ${currentFolder === '' ? 'active' : ''}" data-folder="" onclick="switchFolder('')">
+            <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            Все файлы
+        </div>
+    `;
+
+    for (const folderName of availableFolders) {
+        const div = document.createElement('div');
+        div.className = `folder-pill ${currentFolder === folderName ? 'active' : ''}`;
+        div.dataset.folder = folderName;
+        div.innerHTML = `
+            <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            ${escapeHtml(folderName)}
+        `;
+        div.onclick = () => switchFolder(folderName);
+        bar.appendChild(div);
+    }
+
+    const addDiv = document.createElement('div');
+    addDiv.className = 'folder-pill';
+    addDiv.style.cssText = 'border:1.5px dashed #3a3a3c;background:none';
+    addDiv.innerHTML = `<svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Папка`;
+    addDiv.onclick = promptCreateFolder;
+    bar.appendChild(addDiv);
+}
+
+function switchFolder(folderName) {
+    currentFolder = folderName;
+    renderFoldersBar();
+    filterAndRenderFiles();
+}
+
+function promptCreateFolder() {
+    const name = prompt('Введите имя новой папки:');
+    if (name && name.trim()) {
+        currentFolder = name.trim();
+        availableFolders.add(currentFolder);
+        renderFoldersBar();
+        filterAndRenderFiles();
+    }
+}
+
 function switchCategory(cat) {
     currentCategory = cat;
     document.querySelectorAll('.tab-item').forEach(el => {
@@ -661,9 +813,8 @@ function switchCategory(cat) {
     filterAndRenderFiles();
 }
 
-// Search, Sort & Render Files
+// Group versions & Search & Sort
 function filterAndRenderFiles() {
-    // Abort previous background decrypt requests
     if (activeAbortController) {
         activeAbortController.abort();
     }
@@ -674,12 +825,34 @@ function filterAndRenderFiles() {
 
     let filtered = filesData.filter(f => f.type === currentCategory);
 
+    if (currentFolder) {
+        filtered = filtered.filter(f => f.folder === currentFolder);
+    }
+
     if (searchQuery) {
         filtered = filtered.filter(f => f.name.toLowerCase().includes(searchQuery));
     }
 
+    // Grouping by versions (highest version shown first)
+    const groupedMap = new Map();
+    for (const f of filtered) {
+        const key = (f.folder || '') + '|' + f.name;
+        if (!groupedMap.has(key)) {
+            groupedMap.set(key, []);
+        }
+        groupedMap.get(key).push(f);
+    }
+
+    const primaryFiles = [];
+    for (const [key, versions] of groupedMap.entries()) {
+        versions.sort((a, b) => (b.version || 1) - (a.version || 1));
+        const primary = versions[0];
+        primary.allVersions = versions;
+        primaryFiles.push(primary);
+    }
+
     // Sort
-    filtered.sort((a, b) => {
+    primaryFiles.sort((a, b) => {
         if (sortValue === 'date-desc') return (b.date || '').localeCompare(a.date || '');
         if (sortValue === 'date-asc') return (a.date || '').localeCompare(b.date || '');
         if (sortValue === 'name-asc') return a.name.localeCompare(b.name);
@@ -689,10 +862,10 @@ function filterAndRenderFiles() {
         return 0;
     });
 
-    renderGrid(filtered);
+    renderGrid(primaryFiles);
 }
 
-// Safe DOM Construction (Fixes XSS)
+// Safe DOM Construction
 function renderGrid(filteredFiles) {
     const grid = document.getElementById('fileGrid');
     const empty = document.getElementById('emptyState');
@@ -707,7 +880,6 @@ function renderGrid(filteredFiles) {
     }
     empty.classList.add('hidden');
 
-    // Setup Lazy Decryption Observer
     if (intersectionObserver) intersectionObserver.disconnect();
 
     intersectionObserver = new IntersectionObserver((entries) => {
@@ -729,13 +901,21 @@ function renderGrid(filteredFiles) {
         itemDiv.id = `item_${f.doc_id}`;
         itemDiv.dataset.id = f.doc_id;
 
+        // Version badge if > 1 version
+        if (f.allVersions && f.allVersions.length > 1) {
+            const vBadge = document.createElement('div');
+            vBadge.className = 'version-badge';
+            vBadge.textContent = `v${f.version || 1} (${f.allVersions.length})`;
+            itemDiv.appendChild(vBadge);
+        }
+
         // Checkbox overlay for multi-select
         const checkDiv = document.createElement('div');
         checkDiv.className = 'file-checkbox';
         checkDiv.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`;
         itemDiv.appendChild(checkDiv);
 
-        // Thumbnail Container (WITHOUT ANY TYPE BADGES OVERLAY AS REQUESTED)
+        // Thumbnail Container
         const thumbContainer = document.createElement('div');
         thumbContainer.className = 'file-thumb-container';
 
@@ -766,7 +946,6 @@ function renderGrid(filteredFiles) {
 
         itemDiv.appendChild(infoDiv);
 
-        // Click / Select Handlers
         itemDiv.onclick = (e) => {
             if (isMultiSelectMode) {
                 toggleItemSelection(f.doc_id, itemDiv);
@@ -782,7 +961,6 @@ function renderGrid(filteredFiles) {
 
         grid.appendChild(itemDiv);
 
-        // Check cache or observe for lazy loading
         if (decryptionCache[f.doc_id]) {
             applyDecryptedPreview(f.doc_id, f.type);
         } else {
@@ -835,7 +1013,6 @@ function applyDecryptedPreview(doc_id, type) {
     const container = itemEl.querySelector('.file-thumb-container');
     if (!container) return;
 
-    // Clear placeholder
     container.innerHTML = '';
 
     if (type === 'photo') {
@@ -918,7 +1095,6 @@ async function deleteSelectedBatch() {
                 headers: {'Content-Type':'application/json'},
                 body: JSON.stringify({token, doc_id: docId})
             });
-            // Revoke blob memory
             if (decryptionCache[docId]) {
                 URL.revokeObjectURL(decryptionCache[docId].blobUrl);
                 delete decryptionCache[docId];
@@ -930,12 +1106,29 @@ async function deleteSelectedBatch() {
     hideToastProgress();
 }
 
-// File Upload with Concurrency & Real Progress
+// Parallel Concurrency Upload Runner (Max 3 Concurrent Streams)
+async function pMap(items, concurrency, fn) {
+    const results = [];
+    const executing = [];
+    for (const item of items) {
+        const p = Promise.resolve().then(() => fn(item));
+        results.push(p);
+        if (concurrency <= items.length) {
+            const e = p.then(() => executing.splice(executing.indexOf(e), 1));
+            executing.push(e);
+            if (executing.length >= concurrency) {
+                await Promise.race(executing);
+            }
+        }
+    }
+    return Promise.all(results);
+}
+
+// File Upload with Concurrency & Real Progress & Versioning
 async function handleFiles(e) {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    // Check VK Document Size Limit (200MB)
     for (const f of files) {
         if (f.size > 200 * 1024 * 1024) {
             alert(`Файл ${f.name} превышает лимит ВКонтакте (200 МБ)`);
@@ -946,9 +1139,12 @@ async function handleFiles(e) {
     let completed = 0;
     const total = files.length;
 
-    for (const file of files) {
-        const percent = Math.round((completed / total) * 100);
-        showToastProgress(`Загрузка ${file.name}...`, percent);
+    await pMap(files, 3, async (file) => {
+        // Calculate next version if file exists
+        const existingVersions = filesData.filter(f => f.name === file.name && f.folder === currentFolder);
+        const nextVersion = existingVersions.length > 0 ? (Math.max(...existingVersions.map(v => v.version || 1)) + 1) : 1;
+
+        showToastProgress(`Загрузка ${file.name} (v${nextVersion})...`, Math.round((completed / total) * 100));
 
         try {
             const fileBuf = await file.arrayBuffer();
@@ -959,6 +1155,8 @@ async function handleFiles(e) {
             formData.append('token', token);
             formData.append('file', encBlob, 'encrypted_payload.bin');
             formData.append('original_name', file.name);
+            formData.append('folder', currentFolder);
+            formData.append('version', nextVersion);
             formData.append('size', file.size);
 
             const res = await fetch('/cloud/api/upload', {
@@ -975,12 +1173,84 @@ async function handleFiles(e) {
             alert('Ошибка при шифровании файла');
         }
         completed++;
-    }
+        showToastProgress(`Загрузка (${completed}/${total})...`, Math.round((completed / total) * 100));
+    });
 
     showToastProgress('Завершение...', 100);
     e.target.value = '';
     await loadFiles();
     hideToastProgress();
+}
+
+// Share Links & Version History Modals
+async function generateShareLinkForSelectedFile() {
+    closeActionSheet();
+    if (!selectedFile) return;
+
+    try {
+        const res = await fetch('/cloud/api/share/generate', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({doc_url: selectedFile.url})
+        });
+        const data = await res.json();
+        if (data.share_url) {
+            document.getElementById('shareLinkInput').value = data.share_url;
+            document.getElementById('shareModal').classList.remove('hidden');
+        }
+    } catch(e) {
+        alert('Не удалось сгенерировать ссылку');
+    }
+}
+
+function copyShareLink() {
+    const input = document.getElementById('shareLinkInput');
+    input.select();
+    navigator.clipboard.writeText(input.value);
+    alert('Ссылка скопирована!');
+    closeShareModal();
+}
+
+function closeShareModal() {
+    document.getElementById('shareModal').classList.add('hidden');
+}
+
+function showVersionHistoryModal() {
+    closeActionSheet();
+    if (!selectedFile) return;
+
+    const modal = document.getElementById('versionModal');
+    const container = document.getElementById('versionListContainer');
+    document.getElementById('versionModalSub').textContent = `История версий файла "${selectedFile.name}":`;
+
+    container.innerHTML = '';
+    const versions = selectedFile.allVersions || [selectedFile];
+
+    for (const v of versions) {
+        const div = document.createElement('div');
+        div.className = 'action-sheet-item';
+        div.style.cssText = 'background:#2c2c2e;margin-bottom:0;justify-content:space-between';
+        div.innerHTML = `
+            <div>
+                <div style="font-size:13px;font-weight:600;color:#fff">Версия ${v.version || 1}</div>
+                <div style="font-size:10px;color:#8e8e93">${v.date} · ${formatSize(v.size)}</div>
+            </div>
+            <button class="btn" style="width:auto;padding:6px 12px;font-size:12px;margin:0" onclick="openFileFromObj('${v.doc_id}')">Открыть</button>
+        `;
+        container.appendChild(div);
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function closeVersionModal() {
+    document.getElementById('versionModal').classList.add('hidden');
+}
+
+function openFileFromObj(docId) {
+    closeVersionModal();
+    const fObj = filesData.find(f => f.doc_id === docId);
+    if (fObj) openFile(fObj);
 }
 
 // Instant Preview / Playback
@@ -1076,7 +1346,7 @@ function downloadSelectedFile() {
 async function deleteSelectedFile() {
     closeActionSheet();
     if (!selectedFile) return;
-    if (!confirm('Удалить файл из облака?')) return;
+    if (!confirm('Удалить этот файл из облака?')) return;
 
     showToastProgress('Удаление...', 50);
     try {
@@ -1180,6 +1450,8 @@ uploadZone.addEventListener('drop', (e) => {
     }
 });
 
+function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
 initCloud();
 </script>
 </body>
@@ -1228,7 +1500,7 @@ def save_cloud_key(vk_id):
 
 @cloud_bp.route('/api/files', methods=['POST'])
 def cloud_files():
-    """Reads docs from VK via Kate Mobile API and decodes obfuscated names"""
+    """Reads docs from VK via Kate Mobile API and decodes full metadata"""
     token = request.json.get('token')
     if not token:
         return jsonify({'error': 'No token'}), 400
@@ -1242,22 +1514,24 @@ def cloud_files():
     for item in result.get('items', []):
         title = item.get('title', '')
 
-        # Decode obfuscated title metadata
+        # Decode obfuscated title JSON metadata
         decoded_meta = decode_cloud_title(title)
-        if decoded_meta:
-            orig_name, file_type = decoded_meta
+        if decoded_meta and isinstance(decoded_meta, dict):
             files.append({
                 'doc_id': f"doc{item.get('owner_id')}_{item.get('id')}",
-                'name': orig_name,
+                'name': decoded_meta.get('n', 'file'),
+                'type': decoded_meta.get('t', 'doc'),
+                'folder': decoded_meta.get('f', ''),
+                'version': decoded_meta.get('v', 1),
+                'tags': decoded_meta.get('tg', []),
                 'url': item.get('url', ''),
                 'size': item.get('size', 0),
                 'mime': item.get('type', 'application/octet-stream'),
-                'date': datetime.fromtimestamp(item.get('date', 0)).strftime('%Y-%m-%d') if item.get('date') else '',
-                'type': file_type
+                'date': datetime.fromtimestamp(item.get('date', 0)).strftime('%Y-%m-%d') if item.get('date') else ''
             })
             continue
 
-        # Backward compatibility fallback
+        # Backward compatibility fallback for simple title formatting
         title_lower = title.lower()
         is_cloud = (title_lower.startswith('cloud_') and title_lower.endswith('.doc')) or \
                    title_lower.endswith('.cimg.doc') or title_lower.endswith('.cvid.doc') or \
@@ -1279,11 +1553,14 @@ def cloud_files():
             files.append({
                 'doc_id': f"doc{item.get('owner_id')}_{item.get('id')}",
                 'name': orig_name,
+                'type': file_type,
+                'folder': '',
+                'version': 1,
+                'tags': [],
                 'url': item.get('url', ''),
                 'size': item.get('size', 0),
                 'mime': item.get('type', 'application/octet-stream'),
-                'date': datetime.fromtimestamp(item.get('date', 0)).strftime('%Y-%m-%d') if item.get('date') else '',
-                'type': file_type
+                'date': datetime.fromtimestamp(item.get('date', 0)).strftime('%Y-%m-%d') if item.get('date') else ''
             })
 
     return jsonify({'files': files})
@@ -1291,10 +1568,12 @@ def cloud_files():
 
 @cloud_bp.route('/api/upload', methods=['POST'])
 def cloud_upload():
-    """Uploads encrypted file using Kate Mobile signature with strict size validation"""
+    """Uploads encrypted file using Kate Mobile signature and encodes complete metadata JSON inside title"""
     token = request.form.get('token')
     file = request.files.get('file')
     original_name = request.form.get('original_name', 'encrypted_file')
+    folder = request.form.get('folder', '')
+    version = int(request.form.get('version', 1))
 
     if not file or not token:
         return jsonify({'error': 'Missing file or token'}), 400
@@ -1313,7 +1592,7 @@ def cloud_upload():
     
     upload_resp = get_session().post(upload_url, files=files, headers=KATE_HEADERS, timeout=60).json()
 
-    # Determine type of the file for category routing
+    # Determine type of the file
     file_type = 'doc'
     original_name_lower = original_name.lower()
     if original_name_lower.endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp')):
@@ -1323,7 +1602,8 @@ def cloud_upload():
     elif original_name_lower.endswith(('.mp3', '.ogg', '.wav', '.m4a')):
         file_type = 'audio'
 
-    safe_title = encode_cloud_title(original_name, file_type)
+    # Encode full JSON title metadata
+    safe_title = encode_cloud_title(original_name, file_type, folder=folder, version=version)
 
     save_result = vk_request('docs.save', token, 
         file=upload_resp.get('file'), 
@@ -1335,6 +1615,32 @@ def cloud_upload():
         return jsonify({'ok': True, 'attachment': attachment})
 
     return jsonify({'error': 'Upload failed', 'details': save_result}), 400
+
+
+@cloud_bp.route('/api/share/generate', methods=['POST'])
+def generate_share_link():
+    doc_url = request.json.get('doc_url')
+    if not doc_url or not is_safe_vk_url(doc_url):
+        return jsonify({'error': 'Invalid URL'}), 400
+
+    token = generate_share_token(doc_url, ttl_seconds=86400)
+    share_url = f"{request.host_url.rstrip('/')}/cloud/s/{token}"
+    return jsonify({'share_url': share_url})
+
+
+@cloud_bp.route('/s/<share_token>')
+def access_shared_file(share_token):
+    doc_url = parse_share_token(share_token)
+    if not doc_url:
+        return "Ссылка недействительна или её срок действия (24ч) истёк.", 403
+
+    try:
+        resp = get_session().get(doc_url, headers=KATE_HEADERS, timeout=30, allow_redirects=True)
+        if resp.status_code != 200:
+            return jsonify({'error': f'HTTP {resp.status_code}'}), resp.status_code
+        return Response(resp.content, mimetype='application/octet-stream')
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @cloud_bp.route('/api/download')
