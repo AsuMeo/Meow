@@ -4,7 +4,6 @@ import json
 import random
 import requests
 import hashlib
-import base64
 from io import BytesIO
 from datetime import datetime
 from flask import Blueprint, render_template_string, request, jsonify, Response, session
@@ -15,13 +14,6 @@ cloud_bp = Blueprint('cloud', __name__)
 # === CONFIG ===
 VK_API = "https://api.vk.com/method"
 API_VERSION = "5.199"
-
-# Kate Mobile Client Headers & Official UA to bypass VK blocks and restrictions
-KATE_HEADERS = {
-    'User-Agent': 'KateMobileAndroid/108 lite-armeabi-v7a (Android 13; SDK 33; arm64-v8a; Xiaomi Redmi Note 10; ru)',
-    'Accept-Language': 'ru,en',
-    'Connection': 'keep-alive'
-}
 
 FIREBASE_DB_URL = os.environ.get('FIREBASE_DB_URL', 'https://meow-874ce-default-rtdb.europe-west1.firebasedatabase.app')
 FIREBASE_API_KEY = os.environ.get('FIREBASE_API_KEY', '')
@@ -102,7 +94,7 @@ def vk_request(method, token, **params):
     params['access_token'] = token
     params['v'] = API_VERSION
     try:
-        resp = get_session().get(f"{VK_API}/{method}", params=params, headers=KATE_HEADERS, timeout=10)
+        resp = get_session().get(f"{VK_API}/{method}", params=params, timeout=10)
         data = resp.json()
         return data.get('response', data.get('error'))
     except Exception as e:
@@ -131,32 +123,6 @@ def buf_to_b64(buf):
 def b64_to_buf(b64):
     import base64
     return base64.b64decode(b64)
-
-# --- CLOUD TITLE OBFUSCATION HELPERS ---
-def encode_cloud_title(orig_name, file_type):
-    # Map types to short markers: photo -> p, video -> v, audio -> a, doc -> d
-    type_map = {'photo': 'p', 'video': 'v', 'audio': 'a', 'doc': 'd'}
-    t_char = type_map.get(file_type, 'd')
-    b64_name = base64.urlsafe_b64encode(orig_name.encode('utf-8')).decode('utf-8').rstrip('=')
-    return f"cl_{t_char}_{b64_name}.doc"
-
-def decode_cloud_title(title):
-    if not (title.startswith('cl_') and title.endswith('.doc')):
-        return None
-    try:
-        parts = title[3:-4].split('_', 1)
-        if len(parts) != 2:
-            return None
-        t_char, b64_name = parts
-        type_map = {'p': 'photo', 'v': 'video', 'a': 'audio', 'd': 'doc'}
-        file_type = type_map.get(t_char, 'doc')
-        # Add padding back
-        padding = '=' * (4 - len(b64_name) % 4)
-        orig_name = base64.urlsafe_b64decode(b64_name + padding).decode('utf-8')
-        return orig_name, file_type
-    except Exception:
-        return None
-
 
 # === HTML TEMPLATE ===
 CLOUD_HTML = """
@@ -190,11 +156,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .storage-track{height:6px;background:#1c1c1e;border-radius:3px;overflow:hidden}
 .storage-fill{height:100%;background:#0a84ff;border-radius:3px;transition:width 0.3s ease;width:0%}
 
-/* Horizontal Category Tabs */
-.tabs-container{display:flex;gap:8px;padding:10px 16px;background:#0d0d0d;border-bottom:1px solid #1c1c1c;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;flex-shrink:0}
-.tabs-container::-webkit-scrollbar{display:none}
-.tab-item{padding:8px 16px;border-radius:20px;background:#1c1c1e;color:#8e8e93;font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer;transition:all 0.2s ease}
-.tab-item.active{background:#0a84ff;color:#fff}
+/* Category tabs */
+.category-tabs{display:flex;background:#0d0d0d;padding:8px 12px;gap:6px;border-bottom:1px solid #1c1c1c;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-shrink:0}
+.category-tab{flex:1;padding:10px 6px;background:#1c1c1e;border:1px solid #2c2c2e;color:#8e8e93;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;text-align:center;white-space:nowrap;transition:all 0.15s ease;display:flex;flex-direction:column;align-items:center;gap:4px}
+.category-tab.active{background:#0a84ff;color:#fff;border-color:#0a84ff;transform:scale(1.02)}
+.category-count{font-size:9px;opacity:0.7;font-weight:normal}
 
 /* Upload zone */
 .upload-zone{margin:12px 16px;padding:20px;border:2px dashed #2c2c2e;border-radius:16px;text-align:center;cursor:pointer;transition:all 0.2s;background:#0d0d0d;flex-shrink:0}
@@ -205,33 +171,32 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .upload-text b{color:#fff}
 
 /* File grid */
-.file-grid{flex:1;overflow-y:auto;padding:12px 16px 20px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;-webkit-overflow-scrolling:touch}
-.file-item{position:relative;background:#141416;border-radius:14px;overflow:hidden;border:1px solid #1c1c1c;cursor:pointer;transition:transform 0.15s,opacity 0.15s;display:flex;flex-direction:column}
-.file-item:active{transform:scale(0.95);opacity:0.8}
-.file-thumb-container{width:100%;aspect-ratio:1;position:relative;background:#1c1c1e;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.file-grid{flex:1;overflow-y:auto;padding:0 16px 20px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;-webkit-overflow-scrolling:touch}
+.file-item{position:relative;background:#141416;border-radius:14px;overflow:hidden;border:1px solid #1c1c1c;cursor:pointer;transition:transform 0.15s,opacity 0.15s;display:flex;flex-direction:column;justify-content:space-between;aspect-ratio:0.8}
+.file-thumb-container{position:relative;width:100%;aspect-ratio:1;background:#1c1c1e;overflow:hidden;display:flex;align-items:center;justify-content:center}
 .file-thumb{width:100%;height:100%;object-fit:cover;display:block}
-
-/* Micro decryption loading state inside item */
-.file-item.decrypting .file-thumb-container::after{content:'';position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center}
-.file-item.decrypting .file-thumb-container::before{content:'';position:absolute;z-index:2;width:20px;height:20px;border:2px solid #333;border-top-color:#0a84ff;border-radius:50%;animation:spin 0.6s linear infinite}
-
-.file-thumb svg{width:32px;height:32px;color:#8e8e93}
-.file-info{padding:8px 10px;background:#141416}
-.file-name{font-size:11px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
-.file-meta{font-size:10px;color:#666;display:flex;justify-content:space-between}
+.file-thumb-video{width:100%;height:100%;object-fit:cover}
+.file-thumb svg{width:36px;height:36px;color:#8e8e93}
+.file-info{padding:6px 8px;background:#141416;flex-grow:1;display:flex;flex-direction:column;justify-content:center}
+.file-name{font-size:11px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;font-weight:500}
+.file-meta{font-size:9px;color:#666;display:flex;justify-content:space-between}
 .file-size{color:#8e8e93}
 
-/* Badges */
-.file-badge{position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.75);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:0.5px;z-index:5}
+/* Decryption Overlay loader inside grid item */
+.decrypted-badge{position:absolute;bottom:4px;right:4px;background:rgba(52,199,89,0.9);color:#fff;font-size:8px;font-weight:900;padding:2px 4px;border-radius:4px;text-transform:uppercase}
+.decrypting-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(1px)}
+
+/* File type badges */
+.file-badge{position:absolute;top:6px;left:6px;background:rgba(0,0,0,0.7);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:0.5px;z-index:2}
 .file-badge.photo{background:rgba(10,132,255,0.85)}
 .file-badge.video{background:rgba(255,59,48,0.85)}
 .file-badge.audio{background:rgba(52,199,89,0.85)}
 .file-badge.doc{background:rgba(175,82,222,0.85)}
 
-/* Upload progress toast */
+/* Upload progress */
 .upload-toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(28,28,30,0.95);border:1px solid #3a3a3c;color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;z-index:900;display:flex;align-items:center;gap:10px;box-shadow:0 4px 16px rgba(0,0,0,0.5)}
 .upload-toast.hidden{display:none}
-.loader{border:2px solid #333;border-top:2px solid #fff;border-radius:50%;width:14px;height:14px;animation:spin 0.6s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
+.loader{border:2px solid #333;border-top:2px solid #fff;border-radius:50%;width:14px;height:14px;animation:spin 0.6s linear infinite;display:inline-block}
 @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 
 /* Action sheet */
@@ -246,14 +211,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .modal-content{background:#161616;border-radius:20px;padding:24px;width:100%;max-width:380px;border:1px solid #282828}
 .modal-title{font-size:18px;font-weight:600;margin-bottom:10px;color:#fff}
 .modal-text{font-size:13px;color:#aaa;margin-bottom:20px;line-height:1.5}
-.btn{width:100%;padding:14px;border:none;border-radius:14px;background:#fff;color:#000;font-size:16px;font-weight:600;cursor:pointer;margin-bottom:8px;transition:all 0.1s}
+.btn{width:100%;padding:14px;border:none;border-radius:14px;background:#fff;color:#000;font-size:16px;font-weight:600;cursor:pointer;margin-bottom:8px}
 .btn:active{transform:scale(0.97);opacity:.85}
 .btn-secondary{background:transparent;color:#fff;border:1px solid #333}
 .btn-danger{background:#ff3b30;color:#fff}
 
+.key-box{background:#0a0a0a;border:1px solid #222;padding:10px;border-radius:10px;font-family:monospace;font-size:11px;color:#34c759;word-break:break-all;max-height:80px;overflow-y:auto}
+
 /* Empty state */
-.empty-state{text-align:center;padding:60px 20px;color:#666;width:100%}
-.empty-state svg{width:64px;height:64px;color:#333;margin-bottom:16px;display:block;margin-left:auto;margin-right:auto}
+.empty-state{text-align:center;padding:40px 20px;color:#666;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.empty-state svg{width:64px;height:64px;color:#333;margin-bottom:16px}
 .empty-title{font-size:16px;font-weight:600;color:#8e8e93;margin-bottom:8px}
 .empty-text{font-size:13px;color:#666;line-height:1.5}
 
@@ -267,9 +234,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .preview-body audio{width:100%;max-width:400px}
 .preview-filename{color:#fff;font-size:14px;font-weight:600;flex:1;text-align:center;padding:0 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-/* Key box */
-.key-box{background:#0a0a0a;border:1px solid #222;padding:10px;border-radius:10px;font-family:monospace;font-size:11px;color:#34c759;word-break:break-all;max-height:80px;overflow-y:auto;margin-top:4px}
-.warning-box{background:rgba(255,59,48,0.1);border:1px solid rgba(255,59,48,0.3);color:#ff3b30;padding:10px;border-radius:10px;font-size:12px;margin-bottom:14px;line-height:1.4}
+/* Context menu */
+.context-menu{position:fixed;background:#1c1c1e;border-radius:12px;padding:6px 0;min-width:180px;box-shadow:0 8px 32px rgba(0,0,0,0.6);z-index:800;border:1px solid #2c2c2e;opacity:0;pointer-events:none;transform:scale(0.95);transition:all 0.15s ease}
+.context-menu.active{opacity:1;pointer-events:auto;transform:scale(1)}
+.context-menu-item{padding:10px 16px;font-size:14px;color:#ddd;cursor:pointer;display:flex;align-items:center;gap:10px}
+.context-menu-item:hover{background:rgba(255,255,255,0.08)}
+.context-menu-item.danger{color:#ff3b30}
+.context-menu-divider{height:1px;background:#2c2c2e;margin:4px 0}
 
 .hidden{display:none!important}
 </style>
@@ -311,16 +282,28 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <div class="storage-used" id="storageUsed">0 файлов</div>
 </div>
 <div class="storage-track">
-<div class="storage-fill" id="storageFill" style="width:100%"></div>
+<div class="storage-fill" id="storageFill" style="width: 100%"></div>
 </div>
 </div>
 
-<!-- Navigation tabs for Categories -->
-<div class="tabs-container" id="categoryTabs">
-<div class="tab-item active" data-category="photo" onclick="switchCategory('photo')">📸 Фото</div>
-<div class="tab-item" data-category="video" onclick="switchCategory('video')">🎬 Видео</div>
-<div class="tab-item" data-category="audio" onclick="switchCategory('audio')">🎵 Музыка</div>
-<div class="tab-item" data-category="doc" onclick="switchCategory('doc')">📁 Файлы</div>
+<!-- Category Tabs -->
+<div class="category-tabs">
+<button class="category-tab active" id="tab-photo" onclick="switchCategory('photo')">
+<span>🖼️ Фото</span>
+<span class="category-count" id="count-photo">0</span>
+</button>
+<button class="category-tab" id="tab-video" onclick="switchCategory('video')">
+<span>🎥 Видео</span>
+<span class="category-count" id="count-video">0</span>
+</button>
+<button class="category-tab" id="tab-audio" onclick="switchCategory('audio')">
+<span>🎵 Музыка</span>
+<span class="category-count" id="count-audio">0</span>
+</button>
+<button class="category-tab" id="tab-doc" onclick="switchCategory('doc')">
+<span>📁 Файлы</span>
+<span class="category-count" id="count-doc">0</span>
+</button>
 </div>
 
 <!-- Upload Zone -->
@@ -330,7 +313,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </div>
 <div class="upload-text">
 <b>Нажмите или перетащите файлы</b><br>
-Все загружаемые файлы автоматически шифруются
+Всё шифруется локально на устройстве
 </div>
 </div>
 
@@ -343,7 +326,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <div class="empty-state hidden" id="emptyState">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
 <div class="empty-title">В этой категории пусто</div>
-<div class="empty-text">Загрузите файлы, и они появятся здесь</div>
+<div class="empty-text">Загрузите файлы, и они автоматически появятся здесь</div>
+</div>
+
 </div>
 
 <!-- Preview Modal -->
@@ -360,20 +345,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <div class="preview-body" id="previewBody" onclick="event.stopPropagation()"></div>
 </div>
 
-<!-- Action Sheet (Context actions) -->
+<!-- Action Sheet -->
 <div class="action-sheet hidden" id="actionSheet" onclick="closeActionSheet(event)">
 <div class="action-sheet-content" onclick="event.stopPropagation()">
 <div class="action-sheet-item" onclick="previewSelectedFile()">
 <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-Открыть
+Открыть / Проиграть
 </div>
 <div class="action-sheet-item" onclick="downloadSelectedFile()">
 <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-Скачать
+Скачать оригинал
 </div>
 <div class="action-sheet-item danger" onclick="deleteSelectedFile()">
 <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-Удалить
+Удалить (может быть заблокировано ВК)
 </div>
 <div class="action-sheet-item" style="justify-content:center;color:#888" onclick="closeActionSheet()">Отмена</div>
 </div>
@@ -382,22 +367,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <!-- Key Modal -->
 <div class="modal hidden" id="keyModal">
 <div class="modal-content">
-<div class="modal-title">🔐 Ключ облака</div>
-<div class="warning-box">
-Этот ключ шифрования используется для безопасной расшифровки ваших медиафайлов прямо в браузере.
-</div>
-<div class="modal-text" style="margin-bottom:4px">Ваш зашифрованный ключ:</div>
+<div class="modal-title">🔐 Ключ шифрования</div>
 <div class="key-box" id="keyBox">Загрузка...</div>
-<div style="display:flex;gap:8px;margin-top:16px">
-<button class="btn btn-secondary" style="flex:1;font-size:13px;padding:10px" onclick="exportCloudKey()">📤 Экспорт</button>
-<button class="btn btn-secondary" style="flex:1;font-size:13px;padding:10px" onclick="document.getElementById('importKeyInput').click()">📥 Импорт</button>
-</div>
-<input type="file" class="hidden" id="importKeyInput" accept=".json" onchange="importCloudKey(event)">
-<button class="btn btn-danger" style="margin-top:10px;font-size:13px;padding:10px" onclick="regenerateCloudKey()">🔄 Сгенерировать новый</button>
+<button class="btn btn-secondary" style="margin-top:16px" onclick="exportCloudKey()">Экспорт ключа</button>
 <button class="btn" style="margin-top:10px" onclick="closeKeyModal()">Закрыть</button>
 </div>
-</div>
-
 </div>
 
 <script>
@@ -405,14 +379,25 @@ let token = localStorage.getItem('vk_token');
 let myVkId = null;
 let cloudKey = null;
 let filesData = [];
-let currentCategory = 'photo'; 
+let currentCategory = 'photo';
 let selectedFile = null;
 let currentPreviewFile = null;
 
-// Decryption cache storage
-const decryptionCache = {}; // doc_id -> { blobUrl, blob }
-let decryptingQueue = [];
-let isDecrypting = false;
+// Background auto-decryption worker variables
+let decryptQueue = [];
+let isDecryptingQueue = false;
+
+// Helpers for Base64 with support for UTF-8 russian characters
+function utob(str) {
+    return btoa(unescape(encodeURIComponent(str)));
+}
+function btou(str) {
+    try {
+        return decodeURIComponent(escape(atob(str)));
+    } catch(e) {
+        return atob(str);
+    }
+}
 
 function showToast(text) {
     const t = document.getElementById('uploadToast');
@@ -424,7 +409,7 @@ function hideToast() { document.getElementById('uploadToast').classList.add('hid
 function goBack() { window.location.href = '/'; }
 
 async function initCloud() {
-    if (!token) { alert('Сначала войдите в систему'); goBack(); return; }
+    if (!token) { alert('Пожалуйста, войдите в аккаунт!'); goBack(); return; }
 
     try {
         const res = await fetch('/cloud/api/init', {
@@ -438,12 +423,15 @@ async function initCloud() {
 
         await initCloudKey();
         await loadFiles();
-    } catch(e) { console.error(e); }
+    } catch(e) { 
+        console.error(e); 
+        showToast('Ошибка инициализации!');
+    }
 }
 
 async function initCloudKey() {
     const storedKey = localStorage.getItem('vk_cloud_key_' + myVkId);
-    const storedPass = localStorage.getItem('vk_pass');
+    const storedPass = localStorage.getItem('vk_pass') || 'default_pass_123';
 
     if (storedKey) {
         try {
@@ -455,7 +443,7 @@ async function initCloudKey() {
     try {
         const res = await fetch('/cloud/api/key/' + myVkId);
         const data = await res.json();
-        if (data.cloud_key_enc && storedPass) {
+        if (data.cloud_key_enc) {
             const masterKey = await deriveCloudKey(storedPass, myVkId + "_cloud_salt");
             const decBuf = await decryptAESGCM(masterKey, b64ToBuf(data.cloud_key_enc));
             const keyJwk = JSON.parse(new TextDecoder().decode(decBuf));
@@ -469,22 +457,20 @@ async function initCloudKey() {
     const keyJwk = await crypto.subtle.exportKey("jwk", cloudKey);
     localStorage.setItem('vk_cloud_key_' + myVkId, JSON.stringify(keyJwk));
 
-    if (storedPass) {
-        const masterKey = await deriveCloudKey(storedPass, myVkId + "_cloud_salt");
-        const encBuf = await encryptAESGCM(masterKey, new TextEncoder().encode(JSON.stringify(keyJwk)));
-        await fetch('/cloud/api/key/' + myVkId, {
-            method: 'POST',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({cloud_key_enc: bufToB64(encBuf)})
-        });
-    }
+    const masterKey = await deriveCloudKey(storedPass, myVkId + "_cloud_salt");
+    const encBuf = await encryptAESGCM(masterKey, new TextEncoder().encode(JSON.stringify(keyJwk)));
+    await fetch('/cloud/api/key/' + myVkId, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({cloud_key_enc: bufToB64(encBuf)})
+    });
 }
 
 async function deriveCloudKey(pass, saltStr) {
     const enc = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(pass), "PBKDF2", false, ["deriveKey"]);
     return await crypto.subtle.deriveKey(
-        {name:"PBKDF2", salt:enc.encode(saltStr), iterations:600000, hash:"SHA-256"},
+        {name:"PBKDF2", salt:enc.encode(saltStr), iterations:100000, hash:"SHA-256"},
         keyMaterial,
         {name:"AES-GCM", length:256},
         false,
@@ -527,8 +513,41 @@ async function importCloudCryptoKey(jwkStr) {
     return await crypto.subtle.importKey("jwk", jwk, {name:"AES-GCM", length:256}, true, ["encrypt","decrypt"]);
 }
 
+function getFileType(filename, mime) {
+    const f = filename.toLowerCase();
+    const m = (mime || '').toLowerCase();
+    
+    // Check custom extensions
+    if (f.includes('.cimg') || m.startsWith('image/')) return 'photo';
+    if (f.includes('.cvid') || m.startsWith('video/')) return 'video';
+    if (f.includes('.caud') || m.startsWith('audio/')) return 'audio';
+    return 'doc';
+}
+
+function getOriginalName(title) {
+    let clean = title;
+    if (clean.endsWith('.doc')) clean = clean.substring(0, clean.length - 4);
+    
+    if (clean.startsWith('cloud_')) {
+        const parts = clean.split('.');
+        const payload = parts[0].substring(6); // remove 'cloud_'
+        try {
+            // Attempt Base64 decode
+            const decoded = btou(payload);
+            if (decoded && decoded.length > 0) return decoded;
+        } catch(e) {}
+    }
+    return clean;
+}
+
+function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+    return (bytes/(1024*1024)).toFixed(1) + ' MB';
+}
+
 async function loadFiles() {
-    showToast('Синхронизация с облаком...');
+    showToast('Синхронизация с ВК...');
     try {
         const res = await fetch('/cloud/api/files', {
             method: 'POST',
@@ -537,165 +556,224 @@ async function loadFiles() {
         });
         const data = await res.json();
         filesData = data.files || [];
-        renderFiles();
-    } catch(e) { console.error(e); }
+        
+        updateCategoryCounters();
+        switchCategory(currentCategory);
+    } catch(e) { 
+        console.error(e); 
+    }
     hideToast();
 }
 
-function formatSize(bytes) {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
-    if (bytes < 1024*1024*1024) return (bytes/(1024*1024)).toFixed(1) + ' MB';
-    return (bytes/(1024*1024*1024)).toFixed(1) + ' GB';
+function updateCategoryCounters() {
+    const counts = {photo: 0, video: 0, audio: 0, doc: 0};
+    filesData.forEach(f => {
+        const type = getFileType(f.name, f.mime);
+        if (counts[type] !== undefined) counts[type]++;
+    });
+
+    document.getElementById('count-photo').textContent = counts.photo;
+    document.getElementById('count-video').textContent = counts.video;
+    document.getElementById('count-audio').textContent = counts.audio;
+    document.getElementById('count-doc').textContent = counts.doc;
 }
 
 function switchCategory(cat) {
     currentCategory = cat;
-    document.querySelectorAll('.tab-item').forEach(el => {
-        el.classList.toggle('active', el.dataset.category === cat);
+    
+    // Update Active Tab UI
+    document.querySelectorAll('.category-tab').forEach(tab => {
+        tab.classList.remove('active');
     });
+    const activeTab = document.getElementById(`tab-${cat}`);
+    if (activeTab) activeTab.classList.add('active');
+
+    // Render active category
     renderFiles();
+    
+    // Trigger Automatic Background Decryption for this category immediately!
+    startCategoryAutoDecryption(cat);
 }
 
-// RENDER FILES AND TRIGGER AUTO DECRYPTION
 function renderFiles() {
     const grid = document.getElementById('fileGrid');
     const empty = document.getElementById('emptyState');
     const usedLabel = document.getElementById('storageUsed');
 
     grid.innerHTML = '';
-
-    // Filter current category
-    const filtered = filesData.filter(f => f.type === currentCategory);
-
-    usedLabel.textContent = filtered.length + ' файлов';
+    
+    const filtered = filesData.filter(f => getFileType(f.name, f.mime) === currentCategory);
+    usedLabel.textContent = `${filtered.length} файлов в категории`;
 
     if (filtered.length === 0) {
         empty.classList.remove('hidden');
         return;
     }
-
     empty.classList.add('hidden');
-
-    // Reset decryption queue
-    decryptingQueue = [];
 
     for (const f of filtered) {
         const div = document.createElement('div');
         div.className = 'file-item';
-        div.id = `item_${f.doc_id}`;
         div.dataset.id = f.doc_id;
+        
+        const type = getFileType(f.name, f.mime);
+        const displayName = getOriginalName(f.name);
 
-        // Visual placeholder structure
-        div.innerHTML = `
-            <div class="file-thumb-container">
-                <div class="file-thumb">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M12 15V3m0 12l-4-4m4 4l4-4M2 17l.621 2.485A2 2 0 004.561 21h14.878a2 2 0 001.94-1.515L22 17"/>
-                    </svg>
+        let previewMarkup = '';
+        if (f.decryptedBlobUrl) {
+            // Already decrypted - show fully decrypted content immediately!
+            if (type === 'photo') {
+                previewMarkup = `<img class="file-thumb" src="${f.decryptedBlobUrl}">`;
+            } else if (type === 'video') {
+                previewMarkup = `<video class="file-thumb-video" src="${f.decryptedBlobUrl}" muted loop autoplay playsinline></video>`;
+            } else if (type === 'audio') {
+                previewMarkup = `<svg viewBox="0 0 24 24" style="color:#34c759"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+            } else {
+                previewMarkup = `<svg viewBox="0 0 24 24" style="color:#af52de"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+            }
+        } else {
+            // Standard placeholder
+            let icon = '';
+            if (type === 'photo') icon = `<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`;
+            else if (type === 'video') icon = `<svg viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>`;
+            else if (type === 'audio') icon = `<svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+            else icon = `<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+            
+            previewMarkup = `
+                ${icon}
+                <div class="decrypting-overlay" id="overlay-${f.doc_id}">
+                    <span class="loader" style="width:18px;height:18px"></span>
                 </div>
+            `;
+        }
+
+        const okBadge = f.decryptedBlobUrl ? `<span class="decrypted-badge">OK</span>` : '';
+
+        div.innerHTML = `
+            <div class="file-thumb-container" id="thumb-container-${f.doc_id}">
+                ${previewMarkup}
+                ${okBadge}
             </div>
-            <div class="file-badge ${f.type}">${f.type}</div>
+            <div class="file-badge ${type}">${type === 'doc' ? 'ФАЙЛ' : type.toUpperCase()}</div>
             <div class="file-info">
-                <div class="file-name">${escapeHtml(f.name)}</div>
+                <div class="file-name" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</div>
                 <div class="file-meta">
                     <span class="file-size">${formatSize(f.size)}</span>
                 </div>
             </div>
         `;
 
-        // Interaction handlers
+        // Click actions
         div.onclick = () => openFile(f);
-        div.oncontextmenu = (e) => { e.preventDefault(); showActionSheet(f); };
+        div.oncontextmenu = (e) => { e.preventDefault(); showContextMenu(e, f); };
+
+        // Long press support
+        let longPressTimer;
+        div.addEventListener('touchstart', () => {
+            longPressTimer = setTimeout(() => { 
+                if(navigator.vibrate) navigator.vibrate(20); 
+                showActionSheet(f); 
+            }, 600);
+        }, {passive:true});
+        div.addEventListener('touchend', () => clearTimeout(longPressTimer));
+        div.addEventListener('touchmove', () => clearTimeout(longPressTimer));
 
         grid.appendChild(div);
+    }
+}
 
-        // Check if item decryption is cached, otherwise add to background decryption queue
-        if (decryptionCache[f.doc_id]) {
-            applyDecryptedPreview(f.doc_id, f.type);
-        } else {
-            decryptingQueue.push({
-                doc_id: f.doc_id,
-                url: f.url,
-                mime: f.mime,
-                type: f.type,
-                name: f.name
-            });
+function escapeHtml(t) { 
+    const d = document.createElement('div'); 
+    d.textContent = t; 
+    return d.innerHTML; 
+}
+
+// ==========================================
+// AUTOMATIC BACKGROUND DECRYPTION SYSTEM
+// ==========================================
+function startCategoryAutoDecryption(cat) {
+    // Empty active queue
+    decryptQueue = [];
+    
+    // Find all files in the active category that are not decrypted yet
+    const undecrypted = filesData.filter(f => getFileType(f.name, f.mime) === cat && !f.decryptedBlobUrl && !f.isDecrypting);
+    
+    if (undecrypted.length === 0) return;
+
+    // Enqueue undecrypted files
+    undecrypted.forEach(f => {
+        f.isDecrypting = true;
+        decryptQueue.push(f);
+    });
+
+    if (!isDecryptingQueue) {
+        processDecryptionQueue();
+    }
+}
+
+async function processDecryptionQueue() {
+    if (decryptQueue.length === 0) {
+        isDecryptingQueue = false;
+        return;
+    }
+
+    isDecryptingQueue = true;
+    const currentFile = decryptQueue.shift();
+
+    try {
+        await decryptSingleFile(currentFile);
+    } catch(e) {
+        console.error("Auto-decryption failed for file:", currentFile.name, e);
+        currentFile.isDecrypting = false;
+        // Remove overlay so we don't spin infinitely if error occurs
+        const overlay = document.getElementById(`overlay-${currentFile.doc_id}`);
+        if (overlay) overlay.classList.add('hidden');
+    }
+
+    // Process next item in queue
+    setTimeout(processDecryptionQueue, 50);
+}
+
+async function decryptSingleFile(f) {
+    const type = getFileType(f.name, f.mime);
+    
+    // Download encrypted data
+    const resp = await fetch('/cloud/api/download?url=' + encodeURIComponent(f.url));
+    if (!resp.ok) throw new Error('Download failed');
+    
+    const encBuf = await resp.arrayBuffer();
+    
+    // Decrypt data using the master cloudKey
+    const decBuf = await decryptAESGCM(cloudKey, encBuf);
+    
+    // Create decrypted object blob
+    const mimeType = f.mime || 'application/octet-stream';
+    const blob = new Blob([decBuf], {type: mimeType});
+    f.decryptedBlobUrl = URL.createObjectURL(blob);
+    f.isDecrypting = false;
+
+    // Instantly update UI element in the active grid if the category matches
+    if (currentCategory === type) {
+        const thumbContainer = document.getElementById(`thumb-container-${f.doc_id}`);
+        if (thumbContainer) {
+            let directMarkup = '';
+            if (type === 'photo') {
+                directMarkup = `<img class="file-thumb" src="${f.decryptedBlobUrl}">`;
+            } else if (type === 'video') {
+                directMarkup = `<video class="file-thumb-video" src="${f.decryptedBlobUrl}" muted loop autoplay playsinline></video>`;
+            } else if (type === 'audio') {
+                directMarkup = `<svg viewBox="0 0 24 24" style="color:#34c759"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+            } else {
+                directMarkup = `<svg viewBox="0 0 24 24" style="color:#af52de"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+            }
+            thumbContainer.innerHTML = `${directMarkup}<span class="decrypted-badge">OK</span>`;
         }
     }
-
-    // Process immediate auto-decryption on-the-fly!
-    if (decryptingQueue.length > 0) {
-        startBackgroundDecryption();
-    }
 }
 
-// Background Decryptor Loop
-async function startBackgroundDecryption() {
-    if (isDecrypting) return;
-    isDecrypting = true;
-
-    while (decryptingQueue.length > 0) {
-        const task = decryptingQueue.shift();
-        const itemEl = document.getElementById(`item_${task.doc_id}`);
-        if (!itemEl) continue; // Category might have switched
-
-        itemEl.classList.add('decrypting');
-
-        try {
-            const resp = await fetch('/cloud/api/download?url=' + encodeURIComponent(task.url));
-            if (!resp.ok) throw new Error("Load failed");
-            const encBuf = await resp.arrayBuffer();
-            const decBuf = await decryptAESGCM(cloudKey, encBuf);
-            const blob = new Blob([decBuf], {type: task.mime || 'application/octet-stream'});
-            const blobUrl = URL.createObjectURL(blob);
-
-            decryptionCache[task.doc_id] = { blobUrl, blob };
-            applyDecryptedPreview(task.doc_id, task.type);
-        } catch (e) {
-            console.error("Auto decrypt error for:", task.name, e);
-        } finally {
-            itemEl.classList.remove('decrypting');
-        }
-    }
-    isDecrypting = false;
-}
-
-function applyDecryptedPreview(doc_id, type) {
-    const itemEl = document.getElementById(`item_${doc_id}`);
-    if (!itemEl) return;
-
-    const cache = decryptionCache[doc_id];
-    if (!cache) return;
-
-    const container = itemEl.querySelector('.file-thumb-container');
-    if (!container) return;
-
-    if (type === 'photo') {
-        container.innerHTML = `<img class="file-thumb" src="${cache.blobUrl}">`;
-    } else if (type === 'video') {
-        container.innerHTML = `
-            <div class="file-thumb video" style="position:relative;width:100%;height:100%">
-                <video src="${cache.blobUrl}" muted loop playsinline autoplay style="width:100%;height:100%;object-fit:cover"></video>
-            </div>
-        `;
-    } else if (type === 'audio') {
-        container.innerHTML = `
-            <div class="file-thumb audio">
-                <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-            </div>
-        `;
-    } else {
-        container.innerHTML = `
-            <div class="file-thumb doc">
-                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            </div>
-        `;
-    }
-}
-
-function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
-
+// ==========================================
+// UPLOAD METHOD
+// ==========================================
 async function handleFiles(e) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -712,15 +790,29 @@ async function uploadFile(file) {
 
     try {
         const fileBuf = await file.arrayBuffer();
+
+        // Encrypt data
         const encBuf = await encryptAESGCM(cloudKey, fileBuf);
         const encBlob = new Blob([encBuf], {type: 'application/octet-stream'});
 
-        showToast('Загрузка в ВК...');
+        // Get encrypted extension
+        let ext = 'cld';
+        const mime = file.type.toLowerCase();
+        if (mime.startsWith('image/')) ext = 'cimg';
+        else if (mime.startsWith('video/')) ext = 'cvid';
+        else if (mime.startsWith('audio/')) ext = 'caud';
+
+        // Pack safe base64 title
+        const base64Name = utob(file.name);
+        const encFilename = `cloud_${base64Name}.${ext}.doc`;
+
+        showToast('Загрузка в Облако...');
 
         const formData = new FormData();
         formData.append('token', token);
-        formData.append('file', encBlob, 'encrypted_payload.bin');
-        formData.append('original_name', file.name);
+        formData.append('file', encBlob, encFilename);
+        formData.append('original_name', file.name + '.doc');
+        formData.append('mime', mime || 'application/octet-stream');
         formData.append('size', file.size);
 
         const res = await fetch('/cloud/api/upload', {
@@ -730,53 +822,67 @@ async function uploadFile(file) {
 
         const data = await res.json();
         if (data.error) {
-            alert('Ошибка загрузки: ' + data.error);
+            alert('Ошибка VK API: ' + data.error);
         }
     } catch(e) {
         console.error('Upload error:', e);
-        alert('Ошибка при шифровании или загрузке файла');
+        alert('Критическая ошибка загрузки');
     }
 }
 
-// Click to Open (Instant playback/view using auto-decrypted cache)
-function openFile(f) {
-    const cached = decryptionCache[f.doc_id];
-    if (!cached) {
-        alert("Подождите, файл еще расшифровывается...");
-        return;
+// ==========================================
+// VIEW / PLAY / PREVIEW INTERFACE
+// ==========================================
+async function openFile(f) {
+    let blobUrl = f.decryptedBlobUrl;
+
+    // Fallback: if not decrypted yet (user clicked early), decrypt on demand
+    if (!blobUrl) {
+        showToast('Расшифровка на лету...');
+        try {
+            await decryptSingleFile(f);
+            blobUrl = f.decryptedBlobUrl;
+        } catch(e) {
+            console.error(e);
+            alert('Ошибка расшифровки файла');
+            hideToast();
+            return;
+        }
+        hideToast();
     }
 
-    currentPreviewFile = {...f, blobUrl: cached.blobUrl};
+    currentPreviewFile = {...f, blobUrl};
 
     const modal = document.getElementById('previewModal');
     const body = document.getElementById('previewBody');
     const filename = document.getElementById('previewFilename');
 
-    filename.textContent = f.name;
+    filename.textContent = getOriginalName(f.name);
     body.innerHTML = '';
 
-    if (f.type === 'photo') {
+    const type = getFileType(f.name, f.mime);
+    if (type === 'photo') {
         const img = document.createElement('img');
-        img.src = cached.blobUrl;
+        img.src = blobUrl;
         body.appendChild(img);
-    } else if (f.type === 'video') {
+    } else if (type === 'video') {
         const vid = document.createElement('video');
-        vid.src = cached.blobUrl;
+        vid.src = blobUrl;
         vid.controls = true;
         vid.autoplay = true;
         body.appendChild(vid);
-    } else if (f.type === 'audio') {
+    } else if (type === 'audio') {
         const aud = document.createElement('audio');
-        aud.src = cached.blobUrl;
+        aud.src = blobUrl;
         aud.controls = true;
         aud.autoplay = true;
         body.appendChild(aud);
     } else {
         const a = document.createElement('a');
-        a.href = cached.blobUrl;
-        a.download = f.name;
-        a.textContent = 'Скачать файл';
-        a.style.cssText = 'color:#0a84ff;font-size:16px;text-decoration:none;padding:20px;border:2px solid #0a84ff;border-radius:14px';
+        a.href = blobUrl;
+        a.download = getOriginalName(f.name);
+        a.textContent = '📥 СКАЧАТЬ ФАЙЛ В ОРИГИНАЛЕ';
+        a.style.cssText = 'color:#0a84ff;font-size:16px;text-decoration:none;padding:20px;border:2px solid #0a84ff;border-radius:14px;font-weight:bold';
         body.appendChild(a);
     }
 
@@ -793,10 +899,11 @@ function downloadCurrentFile() {
     if (!currentPreviewFile || !currentPreviewFile.blobUrl) return;
     const a = document.createElement('a');
     a.href = currentPreviewFile.blobUrl;
-    a.download = currentPreviewFile.name;
+    a.download = getOriginalName(currentPreviewFile.name);
     a.click();
 }
 
+// Action Sheet controls
 function showActionSheet(f) {
     selectedFile = f;
     document.getElementById('actionSheet').classList.remove('hidden');
@@ -814,23 +921,13 @@ function previewSelectedFile() {
 
 function downloadSelectedFile() {
     closeActionSheet();
-    if (selectedFile) {
-        const cached = decryptionCache[selectedFile.doc_id];
-        if (cached) {
-            const a = document.createElement('a');
-            a.href = cached.blobUrl;
-            a.download = selectedFile.name;
-            a.click();
-        } else {
-            openFile(selectedFile);
-        }
-    }
+    if (selectedFile) openFile(selectedFile);
 }
 
 async function deleteSelectedFile() {
     closeActionSheet();
     if (!selectedFile) return;
-    if (!confirm('Удалить файл из облака?')) return;
+    if (!confirm('Вы уверены, что хотите удалить этот файл? VK может ограничить это действие.')) return;
 
     showToast('Удаление...');
     try {
@@ -839,22 +936,50 @@ async function deleteSelectedFile() {
             headers: {'Content-Type':'application/json'},
             body: JSON.stringify({token, doc_id: selectedFile.doc_id})
         });
-        const d = await res.json();
-        if (d.error) {
-            alert("Не удалось удалить из облака. Возможно, VK заблокировал удаление для этого токена.");
-        } else {
-            await loadFiles();
-        }
+        const data = await res.json();
+        alert('Запрос отправлен. Обновление...');
+        await loadFiles();
     } catch(e) {}
     hideToast();
 }
 
-// Encryption keys
+// Context Menu controls
+let contextMenuFile = null;
+function showContextMenu(e, f) {
+    contextMenuFile = f;
+    let menu = document.getElementById('contextMenu');
+    if (!menu) {
+        menu = document.createElement('div');
+        menu.id = 'contextMenu';
+        menu.className = 'context-menu';
+        menu.innerHTML = `
+            <div class="context-menu-item" onclick="contextPreview()">Открыть / Воспроизвести</div>
+            <div class="context-menu-item" onclick="contextDownload()">Скачать файл</div>
+            <div class="context-menu-divider"></div>
+            <div class="context-menu-item danger" onclick="contextDelete()">Удалить файл</div>
+        `;
+        document.body.appendChild(menu);
+    }
+    menu.style.left = Math.min(e.clientX, window.innerWidth - 200) + 'px';
+    menu.style.top = Math.min(e.clientY, window.innerHeight - 200) + 'px';
+    menu.classList.add('active');
+}
+
+document.addEventListener('click', () => {
+    const menu = document.getElementById('contextMenu');
+    if (menu) menu.classList.remove('active');
+});
+
+function contextPreview() { if(contextMenuFile) openFile(contextMenuFile); }
+function contextDownload() { if(contextMenuFile) openFile(contextMenuFile); }
+function contextDelete() { selectedFile = contextMenuFile; deleteSelectedFile(); }
+
+// Key settings controls
 function openKeyModal() {
     const keyBox = document.getElementById('keyBox');
     const storedKey = localStorage.getItem('vk_cloud_key_' + myVkId);
     if (storedKey) {
-        keyBox.textContent = storedKey.substring(0, 60) + '...';
+        keyBox.textContent = storedKey;
     } else {
         keyBox.textContent = 'Ключ не найден';
     }
@@ -872,52 +997,11 @@ function exportCloudKey() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `vk_tsuyu_cloud_key_${myVkId}.json`;
+    a.download = `vk_cloud_key_${myVkId}.json`;
     a.click();
 }
 
-async function importCloudKey(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-        try {
-            const keyData = JSON.parse(evt.target.result);
-            localStorage.setItem('vk_cloud_key_' + myVkId, JSON.stringify(keyData));
-            cloudKey = await importCloudCryptoKey(keyData);
-            alert('Ключ облака импортирован!');
-            location.reload();
-        } catch(err) {
-            alert('Неверный формат ключа');
-        }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-}
-
-async function regenerateCloudKey() {
-    if (!confirm('ВНИМАНИЕ: Новый ключ НЕ сможет расшифровать старые файлы! Старые файлы станут недоступны.')) return;
-
-    cloudKey = await crypto.subtle.generateKey({name:"AES-GCM", length:256}, true, ["encrypt","decrypt"]);
-    const keyJwk = await crypto.subtle.exportKey("jwk", cloudKey);
-    localStorage.setItem('vk_cloud_key_' + myVkId, JSON.stringify(keyJwk));
-
-    const storedPass = localStorage.getItem('vk_pass');
-    if (storedPass && myVkId) {
-        const masterKey = await deriveCloudKey(storedPass, myVkId + "_cloud_salt");
-        const encBuf = await encryptAESGCM(masterKey, new TextEncoder().encode(JSON.stringify(keyJwk)));
-        await fetch('/cloud/api/key/' + myVkId, {
-            method: 'POST',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({cloud_key_enc: bufToB64(encBuf)})
-        });
-    }
-
-    alert('Новый ключ создан! Перезапуск...');
-    location.reload();
-}
-
-// Drag & drop
+// Drag & Drop Upload
 const uploadZone = document.getElementById('uploadZone');
 uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('dragover'); });
 uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
@@ -927,12 +1011,13 @@ uploadZone.addEventListener('drop', (e) => {
     const files = e.dataTransfer.files;
     if (files.length > 0) {
         for (const file of files) uploadFile(file);
-        setTimeout(loadFiles, 2000);
     }
 });
 
+// Initialization call
 initCloud();
 </script>
+
 </body>
 </html>
 """
@@ -949,9 +1034,10 @@ def cloud_init():
     if not token:
         return jsonify({'error': 'No token'}), 400
 
+    # Get authorized user ID
     params = {'access_token': token, 'v': API_VERSION}
     try:
-        resp = get_session().get(f"{VK_API}/users.get", params=params, headers=KATE_HEADERS, timeout=10)
+        resp = get_session().get(f"{VK_API}/users.get", params=params, timeout=10)
         data = resp.json()
         user = data.get('response', [{}])[0]
         vk_id = user.get('id')
@@ -961,7 +1047,7 @@ def cloud_init():
 
 
 @cloud_bp.route('/api/key/<vk_id>', methods=['GET'])
-def get_cloud_key(vk_id):
+def get_cloud_key_endpoint(vk_id):
     stored = get_cloud_key_data(vk_id)
     if stored:
         return jsonify(stored)
@@ -989,11 +1075,12 @@ def save_cloud_key(vk_id):
 
 @cloud_bp.route('/api/files', methods=['POST'])
 def cloud_files():
-    """Reads docs from VK via Kate Mobile API and decodes obfuscated names"""
+    """Синхронизирует список зашифрованных cloud файлов из ВК"""
     token = request.json.get('token')
     if not token:
         return jsonify({'error': 'No token'}), 400
 
+    # Запрашиваем документы пользователя
     result = vk_request('docs.get', token, count=2000, type=0)
 
     if isinstance(result, dict) and 'error' in result:
@@ -1002,41 +1089,16 @@ def cloud_files():
     files = []
     for item in result.get('items', []):
         title = item.get('title', '')
-
-        # Attempt to decode obfuscated cloud title metadata
-        decoded_meta = decode_cloud_title(title)
-        if decoded_meta:
-            orig_name, file_type = decoded_meta
-            files.append({
-                'doc_id': f"doc{item.get('owner_id')}_{item.get('id')}",
-                'name': orig_name,
-                'url': item.get('url', ''),
-                'size': item.get('size', 0),
-                'mime': item.get('type', 'application/octet-stream'),
-                'date': datetime.fromtimestamp(item.get('date', 0)).strftime('%d.%m.%Y') if item.get('date') else '',
-                'type': file_type
-            })
-            continue
-
-        # Backward compatibility fallback
         title_lower = title.lower()
+
+        # Фильтруем зашифрованные файлы облака по сигнатуре "cloud_"
         is_cloud = (title_lower.startswith('cloud_') and title_lower.endswith('.doc')) or \
                    title_lower.endswith('.cimg.doc') or title_lower.endswith('.cvid.doc') or \
                    title_lower.endswith('.caud.doc') or title_lower.endswith('.cld.doc')
 
         if is_cloud:
-            orig_name = title
-            if orig_name.endswith('.doc'):
-                orig_name = orig_name[:-4]  # Correct Python slice! (Replaces JS error)
-
-            # Guess visual category
-            file_type = 'doc'
-            if orig_name.endswith(('.cimg', '.png', '.jpg', '.jpeg', '.gif')):
-                file_type = 'photo'
-            elif orig_name.endswith(('.cvid', '.mp4', '.avi', '.mov')):
-                file_type = 'video'
-            elif orig_name.endswith(('.caud', '.mp3', '.ogg', '.wav')):
-                file_type = 'audio'
+            # Убираем .doc суффикс из имени файла с помощью Python среза
+            orig_name = title[:-4] if title_lower.endswith('.doc') else title
 
             files.append({
                 'doc_id': f"doc{item.get('owner_id')}_{item.get('id')}",
@@ -1045,7 +1107,7 @@ def cloud_files():
                 'size': item.get('size', 0),
                 'mime': item.get('type', 'application/octet-stream'),
                 'date': datetime.fromtimestamp(item.get('date', 0)).strftime('%d.%m.%Y') if item.get('date') else '',
-                'type': file_type
+                'thumb': item.get('preview', {}).get('photo', {}).get('sizes', [{}])[-1].get('src', '') if item.get('preview') else ''
             })
 
     return jsonify({'files': files})
@@ -1053,38 +1115,30 @@ def cloud_files():
 
 @cloud_bp.route('/api/upload', methods=['POST'])
 def cloud_upload():
-    """Uploads encrypted file using Kate Mobile signature and returns formatted target"""
+    """Загружает файл в Документы. Использует getUploadServer для отображения в docs.get"""
     token = request.form.get('token')
     file = request.files.get('file')
-    original_name = request.form.get('original_name', 'encrypted_file')
 
     if not file or not token:
         return jsonify({'error': 'Missing file or token'}), 400
 
-    # Get upload server
-    upload_server = vk_request('docs.getMessagesUploadServer', token, type='doc', peer_id=0)
+    # ПЫТАЕМСЯ ПОЛУЧИТЬ КЛАССИЧЕСКИЙ СЕРВЕР ДЛЯ docs.get (ЧТОБЫ ФАЙЛЫ ВИДЕЛИСЬ В ДОКУМЕНТАХ)
+    upload_server = vk_request('docs.getUploadServer', token)
+    
+    # Если токен ограничен (например, Kate Mobile в некоторых режимах), делаем резервный запрос к сообщениям
+    if isinstance(upload_server, dict) and ('error' in upload_server or 'upload_url' not in upload_server):
+        upload_server = vk_request('docs.getMessagesUploadServer', token, type='doc', peer_id=0)
+
     if isinstance(upload_server, dict) and 'error' in upload_server:
         return jsonify(upload_server), 400
 
     upload_url = upload_server.get('upload_url')
     file_bytes = file.read()
-    files = {'file': (secure_filename(file.filename), BytesIO(file_bytes), 'application/octet-stream')}
-    
-    upload_resp = get_session().post(upload_url, files=files, headers=KATE_HEADERS, timeout=60).json()
+    files = {'file': (file.filename, BytesIO(file_bytes), 'application/octet-stream')}
+    upload_resp = get_session().post(upload_url, files=files, timeout=60).json()
 
-    # Determine type of the file for category routing
-    file_type = 'doc'
-    original_name_lower = original_name.lower()
-    if original_name_lower.endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp')):
-        file_type = 'photo'
-    elif original_name_lower.endswith(('.mp4', '.mov', '.avi', '.mkv', '.3gp')):
-        file_type = 'video'
-    elif original_name_lower.endswith(('.mp3', '.ogg', '.wav', '.m4a')):
-        file_type = 'audio'
-
-    # Secure title with obfuscated payload format to bypass blocks
-    safe_title = encode_cloud_title(original_name, file_type)
-
+    # Сохраняем документ в ВК
+    safe_title = file.filename if file.filename.endswith('.doc') else f"{file.filename}.doc"
     save_result = vk_request('docs.save', token, 
         file=upload_resp.get('file'), 
         title=safe_title
@@ -1094,17 +1148,17 @@ def cloud_upload():
     if attachment:
         return jsonify({'ok': True, 'attachment': attachment})
 
-    return jsonify({'error': 'Upload failed', 'details': save_result}), 400
+    return jsonify({'error': 'Upload failed', 'vk_response': save_result}), 400
 
 
 @cloud_bp.route('/api/download')
 def cloud_download():
-    """Proxy file downloading through Kate Mobile User Agent to dodge restriction policies"""
+    """Потоковый прокси для скачивания бинарников с серверов ВК"""
     url = request.args.get('url')
     if not url:
         return jsonify({'error': 'No URL'}), 400
     try:
-        resp = get_session().get(url, headers=KATE_HEADERS, timeout=30, allow_redirects=True)
+        resp = get_session().get(url, timeout=30, allow_redirects=True)
         if resp.status_code != 200:
             return jsonify({'error': f'HTTP {resp.status_code}'}), resp.status_code
         return Response(resp.content, mimetype='application/octet-stream')
@@ -1114,6 +1168,7 @@ def cloud_download():
 
 @cloud_bp.route('/api/delete', methods=['POST'])
 def cloud_delete():
+    """Запрос на удаление документа"""
     token = request.json.get('token')
     doc_id = request.json.get('doc_id', '')
 
@@ -1128,9 +1183,6 @@ def cloud_delete():
     doc_id_num = match.group(2)
 
     result = vk_request('docs.delete', token, owner_id=owner_id, doc_id=doc_id_num)
-    if isinstance(result, dict) and 'error' in result:
-        return jsonify({'error': result.get('error_msg', 'VK Error')}), 400
-
     return jsonify({'result': result})
 
 
