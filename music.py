@@ -2,127 +2,109 @@ import os
 import re
 import json
 import time
-import random
 import hashlib
-import threading
 import requests
-from urllib.parse import quote, unquote, parse_qs
-from flask import Blueprint, request, jsonify, Response, render_template_string
+from urllib.parse import quote, unquote, urlparse
+from flask import Blueprint, request, jsonify, Response, render_template_string, session
 
 VK_DOMAIN = "vk.com"
 VK_AUDIO_URL = f"https://{VK_DOMAIN}/al_audio.php"
-VK_LOGIN_URL = f"https://{VK_DOMAIN}/login"
+DEFAULT_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
 
-_session_local = threading.local()
+def vk_audio_decipher(url_str, vk_id=0):
+    if not url_str or not isinstance(url_str, str):
+        return ""
+    if "index.m3u8" in url_str or ".mp3" in url_str:
+        return url_str.strip()
+    clean_url = url_str.replace("?extra=", "").replace("#", "")
+    return clean_url.strip()
 
-def get_session():
-    if not hasattr(_session_local, 'session'):
-        _session_local.session = requests.Session()
-        _session_local.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-            'Referer': f'https://{VK_DOMAIN}/',
-            'X-Requested-With': 'XMLHttpRequest',
-        })
-    return _session_local.session
+class VKSessionManager:
+    def __init__(self):
+        self._sessions = {}
 
-_auth_state = {
-    'vk_id': None,
-    'remixsid': None,
-    'remixsid6': None,
-    'logged_in': False,
-    'csrf_hash': None,
-    'last_auth': 0,
-}
+    def get_client_session(self, client_key: str) -> dict:
+        if client_key not in self._sessions:
+            sess = requests.Session()
+            sess.headers.update({
+                'User-Agent': DEFAULT_USER_AGENT,
+                'Accept': '*/*',
+                'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Referer': f'https://{VK_DOMAIN}/',
+                'X-Requested-With': 'XMLHttpRequest',
+            })
+            self._sessions[client_key] = {
+                'http': sess,
+                'csrf_hash': None,
+                'last_auth': 0,
+                'vk_id': None,
+                'logged_in': False
+            }
+        return self._sessions[client_key]
 
-def _try_vk_api_auth(login, password):
-    try:
-        import vk_api
-        vk_session = vk_api.VkApi(login=login, password=password)
-        vk_session.auth()
-        sess = get_session()
-        for cookie in vk_session.http.cookies:
-            sess.cookies.set(cookie.name, cookie.value, domain=cookie.domain, path=cookie.path)
-        _auth_state['remixsid'] = vk_session.http.cookies.get('remixsid', domain='.vk.com')
-        _auth_state['remixsid6'] = vk_session.http.cookies.get('remixsid6', domain='.vk.com')
-        _auth_state['logged_in'] = True
-        _auth_state['last_auth'] = time.time()
-        user_info = vk_session.method('users.get', {'fields': 'id'})[0]
-        _auth_state['vk_id'] = user_info['id']
-        _extract_csrf()
+    def set_auth_cookies(self, client_key: str, remixsid=None, remixsid6=None, remixnsid=None, vk_id=None):
+        data = self.get_client_session(client_key)
+        sess = data['http']
+        if remixsid:
+            sess.cookies.set('remixsid', remixsid, domain='.vk.com', path='/')
+        if remixsid6:
+            sess.cookies.set('remixsid6', remixsid6, domain='.vk.com', path='/')
+        if remixnsid:
+            sess.cookies.set('remixnsid', remixnsid, domain='.vk.com', path='/')
+        if vk_id:
+            sess.cookies.set('remixusid', str(vk_id), domain='.vk.com', path='/')
+            data['vk_id'] = str(vk_id)
+
+        data['logged_in'] = True
+        data['last_auth'] = time.time()
+        self.extract_csrf(client_key)
+        return self.check_valid(client_key)
+
+    def extract_csrf(self, client_key: str):
+        data = self.get_client_session(client_key)
+        sess = data['http']
+        try:
+            resp = sess.get(f'https://{VK_DOMAIN}/', timeout=10)
+            m = re.search(r'"vk\.csrf"\s*:\s*"([a-f0-9]+)"', resp.text)
+            if m:
+                data['csrf_hash'] = m.group(1)
+                return True
+            m2 = re.search(r'"hash":"([a-f0-9]{32,})"', resp.text)
+            if m2:
+                data['csrf_hash'] = m2.group(1)
+                return True
+        except Exception:
+            pass
+        return False
+
+    def check_valid(self, client_key: str) -> bool:
+        data = self.get_client_session(client_key)
+        if not data['logged_in']:
+            return False
+        if time.time() - data['last_auth'] > 3600:
+            try:
+                resp = data['http'].get(f'https://{VK_DOMAIN}/feed.php', timeout=8, allow_redirects=False)
+                if resp.status_code == 200:
+                    data['last_auth'] = time.time()
+                    return True
+                else:
+                    data['logged_in'] = False
+                    return False
+            except Exception:
+                return False
         return True
-    except Exception as e:
-        print(f"[VK Music] vk_api auth failed: {e}")
-        return False
 
-def _extract_csrf():
-    try:
-        sess = get_session()
-        resp = sess.get(f'https://{VK_DOMAIN}/', timeout=10)
-        m = re.search(r'"vk\.csrf"\s*:\s*"([a-f0-9]+)"', resp.text)
-        if m:
-            _auth_state['csrf_hash'] = m.group(1)
-            return True
-        m2 = re.search(r'"hash":"([a-f0-9]{32,})"', resp.text)
-        if m2:
-            _auth_state['csrf_hash'] = m2.group(1)
-            return True
-    except Exception as e:
-        print(f"[VK Music] CSRF extract error: {e}")
-    return False
+session_manager = VKSessionManager()
 
-def _check_session_valid():
-    if not _auth_state['logged_in']:
-        return False
-    if time.time() - _auth_state['last_auth'] > 3600:
-        return False
-    try:
-        sess = get_session()
-        resp = sess.get(f'https://{VK_DOMAIN}/feed.php', timeout=10, allow_redirects=False)
-        if resp.status_code == 200:
-            _auth_state['last_auth'] = time.time()
-            return True
-    except:
-        pass
-    return False
+def get_client_id():
+    if 'client_key' not in session:
+        session['client_key'] = hashlib.md5(f"{time.time()}_{os.urandom(8)}".encode()).hexdigest()
+    return session['client_key']
 
-def auth_with_cookies(remixsid=None, remixsid6=None, vk_id=None):
-    sess = get_session()
-    if remixsid:
-        sess.cookies.set('remixsid', remixsid, domain='.vk.com', path='/')
-        _auth_state['remixsid'] = remixsid
-    if remixsid6:
-        sess.cookies.set('remixsid6', remixsid6, domain='.vk.com', path='/')
-        _auth_state['remixsid6'] = remixsid6
-    if vk_id:
-        sess.cookies.set('remixusid', str(vk_id), domain='.vk.com', path='/')
-        _auth_state['vk_id'] = vk_id
-    _auth_state['logged_in'] = True
-    _auth_state['last_auth'] = time.time()
-    _extract_csrf()
-    return _check_session_valid()
-
-def auth_with_login_password(login, password):
-    return _try_vk_api_auth(login, password)
-
-def get_auth_status():
-    return {
-        'logged_in': _check_session_valid(),
-        'vk_id': _auth_state['vk_id'],
-        'last_auth': _auth_state['last_auth'],
-    }
-
-def _build_audio_payload(act, **extra):
-    payload = {
-        'act': act,
-        'al': '1',
-        'hash': _auth_state.get('csrf_hash') or '',
-    }
-    payload.update(extra)
-    return payload
-
-def _parse_audio_response(text):
+def parse_vk_json(text):
     text = text.strip()
     if text.startswith('<!--'):
         text = text[4:]
@@ -134,97 +116,67 @@ def _parse_audio_response(text):
         if isinstance(data, list) and len(data) > 1:
             return data[1]
         return data
-    except:
+    except Exception:
         return None
 
-def _extract_tracks(data, count=30):
+def fetch_vk_audio_section(client_key, act='section', **params):
+    c_data = session_manager.get_client_session(client_key)
+    sess = c_data['http']
+    payload = {
+        'act': act,
+        'al': '1',
+        'hash': c_data.get('csrf_hash') or '',
+    }
+    payload.update(params)
+    resp = sess.post(VK_AUDIO_URL, data=payload, timeout=12)
+    return parse_vk_json(resp.text)
+
+def parse_track_list(raw_data, limit=50):
     tracks = []
-    if not data or not isinstance(data, list) or len(data) < 2:
+    if not raw_data or not isinstance(raw_data, list):
         return tracks
-    json_part = data[1] if len(data) > 1 and isinstance(data[1], list) else []
-    if json_part and isinstance(json_part, list):
-        track_list = json_part[0] if isinstance(json_part[0], list) else json_part
-        for track_data in track_list[:count]:
-            if not isinstance(track_data, list) or len(track_data) < 16:
-                continue
-            track_id = f"{track_data[1]}_{track_data[0]}"
-            title = track_data[3] if len(track_data) > 3 else 'Unknown'
-            artist = track_data[4] if len(track_data) > 4 else 'Unknown'
-            duration = track_data[5] if len(track_data) > 5 else 0
+
+    target_list = []
+    for item in raw_data:
+        if isinstance(item, list) and len(item) > 0:
+            if isinstance(item[0], list):
+                target_list = item[0]
+                break
+            elif len(item) >= 10:
+                target_list = raw_data
+                break
+
+    for t in target_list:
+        if not isinstance(t, list) or len(t) < 8:
+            continue
+        try:
+            track_id = f"{t[1]}_{t[0]}"
+            url = vk_audio_decipher(t[2] if len(t) > 2 and isinstance(t[2], str) else "")
+            title = str(t[3]) if len(t) > 3 else "Неизвестный трек"
+            artist = str(t[4]) if len(t) > 4 else "Неизвестный исполнитель"
+            duration = int(t[5]) if len(t) > 5 and str(t[5]).isdigit() else 0
+
+            cover = ""
+            if len(t) > 14 and isinstance(t[14], str) and t[14].startswith("http"):
+                cover = t[14]
+            elif len(t) > 8 and isinstance(t[8], str) and t[8].startswith("http"):
+                cover = t[8]
+
             tracks.append({
                 'id': track_id,
                 'title': title,
                 'artist': artist,
-                'duration': int(duration) if duration else 0,
-                'duration_formatted': f"{int(duration)//60}:{int(duration)%60:02d}" if duration else '0:00',
+                'duration': duration,
+                'duration_formatted': f"{duration // 60}:{duration % 60:02d}",
+                'url': url,
+                'cover': cover
             })
+            if len(tracks) >= limit:
+                break
+        except Exception:
+            continue
+
     return tracks
-
-def search_audio(query, count=30):
-    if not _check_session_valid():
-        return {'error': 'Not authenticated. Provide cookies or login/password.'}
-    sess = get_session()
-    payload = _build_audio_payload('section', section='search', q=query)
-    try:
-        resp = sess.post(VK_AUDIO_URL, data=payload, timeout=15)
-        data = _parse_audio_response(resp.text)
-        if not data:
-            return {'error': 'Failed to parse response'}
-        tracks = _extract_tracks(data, count)
-        return {'tracks': tracks, 'query': query}
-    except Exception as e:
-        return {'error': str(e)}
-
-def get_audio_url(track_id):
-    if not _check_session_valid():
-        return {'error': 'Not authenticated'}
-    sess = get_session()
-    parts = track_id.split('_')
-    if len(parts) != 2:
-        return {'error': 'Invalid track ID format. Expected: owner_id_track_id'}
-    owner_id, audio_id = parts
-    payload = _build_audio_payload('reload_audio', ids=f"[{audio_id},{owner_id}]")
-    try:
-        resp = sess.post(VK_AUDIO_URL, data=payload, timeout=15)
-        data = _parse_audio_response(resp.text)
-        if data and isinstance(data, list) and len(data) > 0:
-            track_data = data[0]
-            if isinstance(track_data, list) and len(track_data) > 2:
-                audio_url = track_data[2] if len(track_data) > 2 else None
-                if audio_url and audio_url.startswith('http'):
-                    return {
-                        'track_id': track_id,
-                        'url': audio_url,
-                        'expires_in': 3600,
-                    }
-        return {'error': 'Could not extract audio URL', 'raw': str(data)[:500]}
-    except Exception as e:
-        return {'error': str(e)}
-
-def get_my_audio(count=50):
-    if not _check_session_valid():
-        return {'error': 'Not authenticated'}
-    sess = get_session()
-    payload = _build_audio_payload('section', section='all')
-    try:
-        resp = sess.post(VK_AUDIO_URL, data=payload, timeout=15)
-        data = _parse_audio_response(resp.text)
-        tracks = _extract_tracks(data, count)
-        return {'tracks': tracks}
-    except Exception as e:
-        return {'error': str(e)}
-
-def proxy_hls_segment(url):
-    try:
-        sess = get_session()
-        resp = sess.get(url, timeout=15, stream=True)
-        return Response(
-            resp.iter_content(chunk_size=8192),
-            content_type=resp.headers.get('Content-Type', 'application/octet-stream'),
-            status=resp.status_code
-        )
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 music_bp = Blueprint('music', __name__, url_prefix='/music')
 
@@ -237,373 +189,525 @@ def api_auth_cookies():
     data = request.json or {}
     remixsid = data.get('remixsid')
     remixsid6 = data.get('remixsid6')
+    remixnsid = data.get('remixnsid')
     vk_id = data.get('vk_id')
-    if not remixsid and not remixsid6:
-        return jsonify({'error': 'No cookies provided. Need remixsid or remixsid6'}), 400
-    success = auth_with_cookies(remixsid, remixsid6, vk_id)
-    return jsonify({'success': success, 'status': get_auth_status()})
+
+    if not remixsid and not remixsid6 and not remixnsid:
+        return jsonify({'error': 'Укажите хотя бы один cookie'}), 400
+
+    client_key = get_client_id()
+    valid = session_manager.set_auth_cookies(client_key, remixsid, remixsid6, remixnsid, vk_id)
+    return jsonify({
+        'success': valid,
+        'status': {
+            'logged_in': valid,
+            'vk_id': session_manager.get_client_session(client_key).get('vk_id')
+        }
+    })
 
 @music_bp.route('/api/auth/login', methods=['POST'])
 def api_auth_login():
     data = request.json or {}
     login = data.get('login')
     password = data.get('password')
+
     if not login or not password:
-        return jsonify({'error': 'Login and password required'}), 400
-    success = auth_with_login_password(login, password)
-    return jsonify({'success': success, 'status': get_auth_status()})
+        return jsonify({'error': 'Логин и пароль обязательны'}), 400
+
+    client_key = get_client_id()
+    try:
+        import vk_api
+        vk_sess = vk_api.VkApi(login=login, password=password)
+        vk_sess.auth()
+        c_data = session_manager.get_client_session(client_key)
+        sess = c_data['http']
+        for c in vk_sess.http.cookies:
+            sess.cookies.set(c.name, c.value, domain=c.domain, path=c.path)
+        c_data['logged_in'] = True
+        c_data['last_auth'] = time.time()
+        user_info = vk_sess.method('users.get', {'fields': 'id'})[0]
+        c_data['vk_id'] = user_info['id']
+        session_manager.extract_csrf(client_key)
+        return jsonify({'success': True, 'status': {'logged_in': True, 'vk_id': user_info['id']}})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
 
 @music_bp.route('/api/status')
 def api_status():
-    return jsonify(get_auth_status())
+    client_key = get_client_id()
+    c_data = session_manager.get_client_session(client_key)
+    valid = session_manager.check_valid(client_key)
+    return jsonify({
+        'logged_in': valid,
+        'vk_id': c_data.get('vk_id'),
+        'last_auth': c_data.get('last_auth')
+    })
 
 @music_bp.route('/api/search')
 def api_search():
+    client_key = get_client_id()
     query = request.args.get('q', '').strip()
-    count = request.args.get('count', 30, type=int)
-    if not query:
-        return jsonify({'error': 'Query parameter "q" is required'}), 400
-    result = search_audio(query, count)
-    return jsonify(result)
+    count = request.args.get('count', 40, type=int)
 
-@music_bp.route('/api/get_url')
-def api_get_url():
-    track_id = request.args.get('id', '').strip()
-    if not track_id:
-        return jsonify({'error': 'Track ID required'}), 400
-    result = get_audio_url(track_id)
-    return jsonify(result)
+    if not query:
+        return jsonify({'error': 'Параметр "q" обязателен'}), 400
+
+    try:
+        raw = fetch_vk_audio_section(client_key, act='section', section='search', q=query)
+        tracks = parse_track_list(raw, limit=count)
+        return jsonify({'tracks': tracks, 'query': query})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @music_bp.route('/api/my_music')
 def api_my_music():
-    count = request.args.get('count', 50, type=int)
-    result = get_my_audio(count)
-    return jsonify(result)
+    client_key = get_client_id()
+    count = request.args.get('count', 60, type=int)
+    try:
+        raw = fetch_vk_audio_section(client_key, act='section', section='all')
+        tracks = parse_track_list(raw, limit=count)
+        return jsonify({'tracks': tracks})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@music_bp.route('/api/recommendations')
+def api_recommendations():
+    client_key = get_client_id()
+    count = request.args.get('count', 40, type=int)
+    try:
+        raw = fetch_vk_audio_section(client_key, act='section', section='recoms')
+        tracks = parse_track_list(raw, limit=count)
+        return jsonify({'tracks': tracks})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@music_bp.route('/api/get_url')
+def api_get_url():
+    client_key = get_client_id()
+    track_id = request.args.get('id', '').strip()
+    if not track_id or '_' not in track_id:
+        return jsonify({'error': 'Некорректный ID трека'}), 400
+
+    owner_id, audio_id = track_id.split('_', 1)
+    try:
+        raw = fetch_vk_audio_section(client_key, act='reload_audio', ids=f"[{audio_id},{owner_id}]")
+        if raw and isinstance(raw, list) and len(raw) > 0:
+            track_data = raw[0]
+            if isinstance(track_data, list) and len(track_data) > 2:
+                url = vk_audio_decipher(track_data[2])
+                if url:
+                    return jsonify({'track_id': track_id, 'url': url})
+        return jsonify({'error': 'Не удалось извлечь URL'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @music_bp.route('/proxy')
 def proxy_audio():
     url = request.args.get('url', '').strip()
     if not url:
-        return jsonify({'error': 'URL required'}), 400
-    return proxy_hls_segment(url)
+        return jsonify({'error': 'Отсутствует URL'}), 400
 
-MUSIC_HTML = """
-<!DOCTYPE html>
+    try:
+        client_key = get_client_id()
+        c_data = session_manager.get_client_session(client_key)
+        sess = c_data['http']
+
+        req_headers = {k: v for k, v in request.headers if k.lower() in ['range', 'user-agent', 'accept']}
+        resp = sess.get(url, headers=req_headers, stream=True, timeout=15)
+
+        def generate():
+            for chunk in resp.iter_content(chunk_size=32768):
+                if chunk:
+                    yield chunk
+
+        headers = {
+            'Content-Type': resp.headers.get('Content-Type', 'audio/mpeg'),
+            'Accept-Ranges': resp.headers.get('Accept-Ranges', 'bytes'),
+            'Access-Control-Allow-Origin': '*',
+            'Cache-Control': 'public, max-age=3600'
+        }
+        if 'Content-Range' in resp.headers:
+            headers['Content-Range'] = resp.headers['Content-Range']
+        if 'Content-Length' in resp.headers:
+            headers['Content-Length'] = resp.headers['Content-Length']
+
+        return Response(generate(), status=resp.status_code, headers=headers)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+MUSIC_HTML = """<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>VK Tsuyu Music</title>
+<title>VK Music Engine</title>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <style>
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#000;color:#fff;height:100vh;overflow:hidden}
-.app{height:100vh;display:flex;flex-direction:column}
-.header{height:56px;background:#0d0d0d;display:flex;align-items:center;padding:0 16px;border-bottom:1px solid #1c1c1c;flex-shrink:0}
-.header-back{width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;background:rgba(255,255,255,0.08);color:#fff;margin-right:12px;flex-shrink:0}
-.header-back:active{background:rgba(255,255,255,0.2)}
-.header-title{font-size:18px;font-weight:700;flex:1}
-.header-subtitle{font-size:12px;color:#8e8e93}
-.auth-panel{padding:16px;background:#141416;border-bottom:1px solid #1c1c1c}
-.auth-panel h3{font-size:14px;color:#8e8e93;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px}
-.input-field{width:100%;padding:12px 14px;border:none;border-radius:12px;background:#1c1c1e;color:#fff;font-size:14px;margin-bottom:10px;outline:none;border:1px solid #2c2c2c}
-.input-field:focus{border-color:#555}
-.input-field::placeholder{color:#666}
-.btn{width:100%;padding:12px;border:none;border-radius:12px;background:#fff;color:#000;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px}
-.btn:active{opacity:.85;transform:scale(0.98)}
-.btn-secondary{background:transparent;color:#fff;border:1px solid #333}
-.btn-success{background:#34c759;color:#000}
-.status-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;margin-top:8px}
-.status-badge.online{background:rgba(52,199,89,0.15);color:#34c759}
-.status-badge.offline{background:rgba(255,59,48,0.15);color:#ff3b30}
-.search-bar{padding:12px 16px;background:#0d0d0d;border-bottom:1px solid #1c1c1c;display:flex;gap:8px}
-.search-input{flex:1;padding:10px 14px;border:none;border-radius:12px;background:#1c1c1e;color:#fff;font-size:14px;outline:none;border:1px solid #2c2c2c}
-.search-input:focus{border-color:#0a84ff}
-.search-btn{width:44px;height:44px;border-radius:12px;background:#0a84ff;color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.search-btn:active{opacity:.8}
-.tabs{display:flex;gap:4px;padding:8px 16px;overflow-x:auto;background:#0d0d0d;border-bottom:1px solid #1c1c1c}
-.tab{white-space:nowrap;padding:6px 14px;border-radius:16px;background:#1c1c1e;color:#8e8e93;font-size:13px;font-weight:500;cursor:pointer;border:1px solid transparent}
-.tab.active{background:#2c2c2e;color:#fff;border-color:#3a3a3c}
-.track-list{flex:1;overflow-y:auto;padding:8px 0}
-.track-item{display:flex;align-items:center;padding:10px 16px;cursor:pointer;border-bottom:1px solid #111;gap:12px}
-.track-item:active{background:#111}
-.track-item.playing{background:rgba(10,132,255,0.1)}
-.track-num{width:32px;text-align:center;color:#666;font-size:13px;font-weight:600;flex-shrink:0}
-.track-info{flex:1;min-width:0}
-.track-title{font-size:14px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.track-artist{font-size:12px;color:#8e8e93;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.track-duration{font-size:12px;color:#666;flex-shrink:0}
-.track-play-btn{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0}
-.track-play-btn:active{background:rgba(255,255,255,0.2)}
-.player-bar{position:fixed;bottom:0;left:0;width:100%;background:#141416;border-top:1px solid #1c1c1c;padding:10px 16px;display:flex;align-items:center;gap:12px;z-index:100;transform:translateY(100%);transition:transform 0.25s cubic-bezier(0.1,0.9,0.2,1)}
-.player-bar.active{transform:translateY(0)}
-.player-cover{width:44px;height:44px;border-radius:8px;background:#222;display:flex;align-items:center;justify-content:center;color:#666;font-size:18px}
-.player-info{flex:1;min-width:0}
-.player-title{font-size:13px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.player-artist{font-size:11px;color:#8e8e93;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.player-controls{display:flex;align-items:center;gap:12px}
-.player-btn{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;background:rgba(255,255,255,0.08)}
-.player-btn:active{background:rgba(255,255,255,0.15)}
-.player-btn.play{background:#0a84ff;color:#fff}
-.player-progress{position:absolute;top:0;left:0;height:2px;background:#0a84ff;width:0%;transition:width 0.1s linear}
-.loader{border:2px solid #333;border-top:2px solid #fff;border-radius:50%;width:16px;height:16px;animation:spin 0.6s linear infinite;display:inline-block}
-@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
-.empty-state{text-align:center;padding:60px 20px;color:#666;font-size:14px}
-.hidden{display:none!important}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', Roboto, Helvetica, Arial, sans-serif; background: #08080a; color: #fff; height: 100vh; overflow: hidden; }
+.app { height: 100vh; display: flex; flex-direction: column; background: radial-gradient(circle at top right, #1a102f, #08080a 60%); }
+.header { height: 60px; background: rgba(18, 18, 22, 0.8); backdrop-filter: blur(20px); display: flex; align-items: center; padding: 0 20px; border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink:0; justify-content: space-between; }
+.header-brand { display: flex; align-items: center; gap: 12px; }
+.header-logo { width: 34px; height: 34px; background: linear-gradient(135deg, #007aff, #5856d6); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; box-shadow: 0 4px 12px rgba(0,122,255,0.3); }
+.header-title { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+.header-subtitle { font-size: 11px; color: #8e8e93; }
+.auth-panel { padding: 18px; background: rgba(22, 22, 28, 0.95); border-bottom: 1px solid rgba(255,255,255,0.08); }
+.auth-title { font-size: 13px; color: #8e8e93; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px; }
+.input-field { width: 100%; padding: 12px 14px; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; background: rgba(0,0,0,0.4); color: #fff; font-size: 14px; margin-bottom: 10px; outline: none; transition: all 0.2s; }
+.input-field:focus { border-color: #007aff; background: rgba(0,0,0,0.6); }
+.btn { width: 100%; padding: 12px; border: none; border-radius: 12px; background: #007aff; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; transition: transform 0.1s, background 0.2s; }
+.btn:active { transform: scale(0.98); opacity: 0.9; }
+.btn-secondary { background: rgba(255,255,255,0.1); color: #fff; margin-top: 6px; }
+.search-bar { padding: 12px 16px; display: flex; gap: 10px; background: rgba(0,0,0,0.2); }
+.search-input { flex: 1; padding: 12px 16px; border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; background: rgba(255,255,255,0.06); color: #fff; font-size: 14px; outline: none; }
+.search-btn { width: 46px; height: 46px; border-radius: 14px; background: linear-gradient(135deg, #007aff, #0051a8); color: #fff; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.tabs { display: flex; gap: 8px; padding: 10px 16px; overflow-x: auto; scrollbar-width: none; }
+.tab { padding: 8px 16px; border-radius: 20px; background: rgba(255,255,255,0.06); color: #8e8e93; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.2s; border: 1px solid transparent; }
+.tab.active { background: rgba(255,255,255,0.18); color: #fff; border-color: rgba(255,255,255,0.2); }
+.track-list { flex: 1; overflow-y: auto; padding: 8px 16px 120px 16px; }
+.track-item { display: flex; align-items: center; padding: 10px 12px; border-radius: 14px; cursor: pointer; margin-bottom: 6px; background: rgba(255,255,255,0.02); transition: background 0.15s; gap: 12px; border: 1px solid rgba(255,255,255,0.03); }
+.track-item:hover, .track-item:active { background: rgba(255,255,255,0.08); }
+.track-item.playing { background: rgba(0, 122, 255, 0.15); border-color: rgba(0, 122, 255, 0.4); }
+.track-cover { width: 46px; height: 46px; border-radius: 10px; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; background-size: cover; background-position: center; }
+.track-info { flex: 1; min-width: 0; }
+.track-title { font-size: 14px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track-artist { font-size: 12px; color: #8e8e93; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track-meta { display: flex; align-items: center; gap: 8px; }
+.track-duration { font-size: 12px; color: #666; font-variant-numeric: tabular-nums; }
+.dl-btn { background: none; border: none; color: #8e8e93; cursor: pointer; padding: 6px; font-size: 16px; }
+.dl-btn:hover { color: #fff; }
+.player-bar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(20, 20, 26, 0.95); backdrop-filter: blur(25px); border-top: 1px solid rgba(255,255,255,0.1); padding: 12px 20px 20px 20px; z-index: 1000; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.1, 0.9, 0.2, 1); box-shadow: 0 -10px 30px rgba(0,0,0,0.5); }
+.player-bar.active { transform: translateY(0); }
+.progress-container { width: 100%; height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px; cursor: pointer; margin-bottom: 12px; position: relative; }
+.progress-bar { height: 100%; background: linear-gradient(90deg, #007aff, #5856d6); border-radius: 2px; width: 0%; position: relative; }
+.player-content { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.player-left { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+.player-cover { width: 48px; height: 48px; border-radius: 10px; background: #222; background-size: cover; background-position: center; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+.player-details { flex: 1; min-width: 0; }
+.player-title { font-size: 14px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.player-artist { font-size: 12px; color: #8e8e93; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.player-controls { display: flex; align-items: center; gap: 14px; }
+.p-btn { background: none; border: none; color: #fff; cursor: pointer; font-size: 20px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+.p-btn:active { background: rgba(255,255,255,0.15); }
+.p-btn.play { width: 44px; height: 44px; background: #007aff; font-size: 20px; box-shadow: 0 4px 14px rgba(0,122,255,0.4); }
+.empty-state { text-align: center; padding: 60px 20px; color: #666; font-size: 14px; }
+.loader { border: 2px solid rgba(255,255,255,0.1); border-top: 2px solid #007aff; border-radius: 50%; width: 24px; height: 24px; animation: spin 0.7s linear infinite; display: inline-block; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
 <div class="app">
+
 <div class="header">
-<a href="/" class="header-back" title="Back to VK Tsuyu">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-</a>
-<div>
-<div class="header-title">VK Music</div>
-<div class="header-subtitle" id="authStatusText">Not authenticated</div>
+    <div class="header-brand">
+        <div class="header-logo">🎵</div>
+        <div>
+            <div class="header-title">VK Music Engine</div>
+            <div class="header-subtitle" id="statusSub">Проверка авторизации...</div>
+        </div>
+    </div>
 </div>
-</div>
+
 <div class="auth-panel" id="authPanel">
-<h3>VK Auth</h3>
-<div id="cookieAuth">
-<input type="text" class="input-field" id="remixsidInput" placeholder="remixsid from browser (F12 -> Application -> Cookies)">
-<input type="text" class="input-field" id="remixsid6Input" placeholder="remixsid6 (optional)">
-<input type="text" class="input-field" id="vkIdInput" placeholder="Your VK ID (number)">
-<button class="btn" onclick="authWithCookies()">Login with Cookies</button>
+    <div class="auth-title">🔑 Авторизация в VK</div>
+    <input type="text" class="input-field" id="remixsidInput" placeholder="remixsid cookie из браузера">
+    <input type="text" class="input-field" id="remixsid6Input" placeholder="remixsid6 cookie (опционально)">
+    <input type="text" class="input-field" id="vkIdInput" placeholder="Ваш VK ID">
+    <button class="btn" onclick="authWithCookies()">Войти по Cookie</button>
+    <div style="text-align:center; margin: 10px 0; font-size: 11px; color: #666;">— ИЛИ —</div>
+    <input type="text" class="input-field" id="loginInput" placeholder="Телефон или Email">
+    <input type="password" class="input-field" id="passwordInput" placeholder="Пароль VK">
+    <button class="btn btn-secondary" onclick="authWithLogin()">Войти с логином и паролем</button>
 </div>
-<div style="text-align:center;margin:10px 0;color:#666;font-size:12px">- or -</div>
-<div id="loginAuth">
-<input type="text" class="input-field" id="loginInput" placeholder="Phone / Email / Login">
-<input type="password" class="input-field" id="passwordInput" placeholder="VK Password">
-<button class="btn btn-secondary" onclick="authWithLogin()">Login with Password</button>
-</div>
-<div id="authStatus" class="status-badge offline" style="display:none">
-<span>●</span> <span id="authStatusLabel">Offline</span>
-</div>
-</div>
+
 <div class="search-bar">
-<input type="text" class="search-input" id="searchInput" placeholder="Search tracks, artists..." onkeypress="if(event.key==='Enter')searchTracks()">
-<button class="search-btn" onclick="searchTracks()">
-<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-</button>
+    <input type="text" class="search-input" id="searchInput" placeholder="Поиск исполнителя или трека..." onkeypress="if(event.key==='Enter')searchTracks()">
+    <button class="search-btn" onclick="searchTracks()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    </button>
 </div>
+
 <div class="tabs">
-<div class="tab active" onclick="switchTab('search')" id="tabSearch">Search</div>
-<div class="tab" onclick="switchTab('my')" id="tabMy">My Music</div>
+    <div class="tab active" onclick="switchTab('my')" id="tabMy">🎵 Моя Музыка</div>
+    <div class="tab" onclick="switchTab('recoms')" id="tabRecoms">✨ Рекомендации</div>
+    <div class="tab" onclick="switchTab('search')" id="tabSearch">🔍 Поиск</div>
 </div>
+
 <div class="track-list" id="trackList">
-<div class="empty-state">
-<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1.5" style="display:block;margin:0 auto 12px"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-Login to VK and start searching for music
+    <div class="empty-state"><span class="loader"></span></div>
 </div>
-</div>
+
 <div class="player-bar" id="playerBar">
-<div class="player-progress" id="playerProgress"></div>
-<div class="player-cover">&#9836;</div>
-<div class="player-info">
-<div class="player-title" id="playerTitle">...</div>
-<div class="player-artist" id="playerArtist">...</div>
+    <div class="progress-container" onclick="seekTrack(event)">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="player-content">
+        <div class="player-left">
+            <div class="player-cover" id="playerCover">🎵</div>
+            <div class="player-details">
+                <div class="player-title" id="playerTitle">Трек не выбран</div>
+                <div class="player-artist" id="playerArtist">...</div>
+            </div>
+        </div>
+        <div class="player-controls">
+            <button class="p-btn" onclick="prevTrack()">⏮</button>
+            <button class="p-btn play" id="playBtn" onclick="togglePlay()">▶</button>
+            <button class="p-btn" onclick="nextTrack()">⏭</button>
+        </div>
+    </div>
 </div>
-<div class="player-controls">
-<button class="player-btn" onclick="prevTrack()">&#9198;</button>
-<button class="player-btn play" id="playPauseBtn" onclick="togglePlay()">&#9654;</button>
-<button class="player-btn" onclick="nextTrack()">&#9197;</button>
+
 </div>
-</div>
-</div>
+
 <script>
 let currentTracks = [];
-let currentTrackIndex = -1;
-let audioPlayer = null;
+let currentIndex = -1;
+let hlsPlayer = null;
+let audioEl = new Audio();
 let isPlaying = false;
-(async () => {
+
+window.addEventListener('DOMContentLoaded', async () => {
     try {
         const res = await fetch('/music/api/status');
         const data = await res.json();
-        updateAuthUI(data.logged_in);
-    } catch(e) {}
-})();
-function updateAuthUI(loggedIn) {
-    const panel = document.getElementById('authPanel');
-    const status = document.getElementById('authStatus');
-    const statusLabel = document.getElementById('authStatusLabel');
-    const statusText = document.getElementById('authStatusText');
-    if (loggedIn) {
-        panel.style.display = 'none';
-        statusText.textContent = 'Authenticated';
-        status.className = 'status-badge online';
-        status.style.display = 'inline-flex';
-        loadMyMusic();
-    } else {
-        statusText.textContent = 'Not authenticated';
-        status.className = 'status-badge offline';
+        if (data.logged_in) {
+            document.getElementById('authPanel').style.display = 'none';
+            document.getElementById('statusSub').textContent = 'Авторизован';
+            loadMyMusic();
+        } else {
+            document.getElementById('statusSub').textContent = 'Требуется вход';
+            document.getElementById('trackList').innerHTML = '<div class="empty-state">Авторизуйтесь выше для доступа к трекам</div>';
+        }
+    } catch(e) {
+        document.getElementById('statusSub').textContent = 'Ошибка подключения';
     }
-}
+});
+
 async function authWithCookies() {
     const remixsid = document.getElementById('remixsidInput').value.trim();
     const remixsid6 = document.getElementById('remixsid6Input').value.trim();
-    const vkId = document.getElementById('vkIdInput').value.trim();
-    if (!remixsid) { alert('Enter remixsid'); return; }
-    showLoading();
-    try {
-        const res = await fetch('/music/api/auth/cookies', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({remixsid, remixsid6, vk_id: vkId})
-        });
-        const data = await res.json();
-        if (data.success) {
-            updateAuthUI(true);
-        } else {
-            alert('Auth failed. Check cookies.');
-        }
-    } catch(e) {
-        alert('Network error');
+    const vk_id = document.getElementById('vkIdInput').value.trim();
+
+    if(!remixsid) { alert('Укажите remixsid!'); return; }
+
+    const res = await fetch('/music/api/auth/cookies', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ remixsid, remixsid6, vk_id })
+    });
+    const data = await res.json();
+    if(data.success) {
+        document.getElementById('authPanel').style.display = 'none';
+        document.getElementById('statusSub').textContent = 'Авторизован';
+        loadMyMusic();
+    } else {
+        alert('Ошибка авторизации по cookie');
     }
-    hideLoading();
 }
+
 async function authWithLogin() {
     const login = document.getElementById('loginInput').value.trim();
     const password = document.getElementById('passwordInput').value.trim();
-    if (!login || !password) { alert('Enter login and password'); return; }
-    showLoading();
-    try {
-        const res = await fetch('/music/api/auth/login', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({login, password})
-        });
-        const data = await res.json();
-        if (data.success) {
-            updateAuthUI(true);
-        } else {
-            alert('Auth failed: ' + (data.status?.error || 'Invalid credentials'));
-        }
-    } catch(e) {
-        alert('Network error. Install vk_api: pip install vk_api');
+
+    if(!login || !password) { alert('Заполните логин и пароль'); return; }
+
+    const res = await fetch('/music/api/auth/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ login, password })
+    });
+    const data = await res.json();
+    if(data.success) {
+        document.getElementById('authPanel').style.display = 'none';
+        document.getElementById('statusSub').textContent = 'Авторизован';
+        loadMyMusic();
+    } else {
+        alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
     }
-    hideLoading();
 }
-async function searchTracks() {
-    const query = document.getElementById('searchInput').value.trim();
-    if (!query) return;
-    showLoading();
-    try {
-        const res = await fetch(`/music/api/search?q=${encodeURIComponent(query)}&count=30`);
-        const data = await res.json();
-        if (data.error) { showError(data.error); return; }
-        currentTracks = data.tracks || [];
-        renderTracks(currentTracks);
-        switchTab('search');
-    } catch(e) { showError('Search error'); }
-    hideLoading();
-}
+
 async function loadMyMusic() {
-    showLoading();
-    try {
-        const res = await fetch('/music/api/my_music?count=50');
-        const data = await res.json();
-        if (data.error) { showError(data.error); return; }
-        currentTracks = data.tracks || [];
-        renderTracks(currentTracks);
-    } catch(e) { showError('Load error'); }
-    hideLoading();
+    showLoader();
+    const res = await fetch('/music/api/my_music?count=60');
+    const data = await res.json();
+    currentTracks = data.tracks || [];
+    renderTracks();
 }
-function renderTracks(tracks) {
+
+async function loadRecommendations() {
+    showLoader();
+    const res = await fetch('/music/api/recommendations?count=50');
+    const data = await res.json();
+    currentTracks = data.tracks || [];
+    renderTracks();
+}
+
+async function searchTracks() {
+    const q = document.getElementById('searchInput').value.trim();
+    if(!q) return;
+    showLoader();
+    switchTab('search');
+    const res = await fetch(`/music/api/search?q=${encodeURIComponent(q)}&count=50`);
+    const data = await res.json();
+    currentTracks = data.tracks || [];
+    renderTracks();
+}
+
+function renderTracks() {
     const list = document.getElementById('trackList');
-    if (!tracks || tracks.length === 0) {
-        list.innerHTML = '<div class="empty-state">Nothing found</div>';
+    if(!currentTracks || currentTracks.length === 0) {
+        list.innerHTML = '<div class="empty-state">Нет аудиозаписей</div>';
         return;
     }
-    list.innerHTML = tracks.map((t, i) => `
-        <div class="track-item ${i === currentTrackIndex ? 'playing' : ''}" onclick="playTrack(${i})">
-            <div class="track-num">${i + 1}</div>
+
+    list.innerHTML = currentTracks.map((t, idx) => `
+        <div class="track-item ${idx === currentIndex ? 'playing' : ''}" onclick="playTrack(${idx})">
+            <div class="track-cover" style="${t.cover ? `background-image:url('${t.cover}')` : ''}">
+                ${!t.cover ? '🎵' : ''}
+            </div>
             <div class="track-info">
                 <div class="track-title">${escapeHtml(t.title)}</div>
                 <div class="track-artist">${escapeHtml(t.artist)}</div>
             </div>
-            <div class="track-duration">${t.duration_formatted || '0:00'}</div>
-            <div class="track-play-btn">${i === currentTrackIndex && isPlaying ? '&#9208;' : '&#9654;'}</div>
+            <div class="track-meta">
+                <span class="track-duration">${t.duration_formatted}</span>
+                <button class="dl-btn" title="Скачать" onclick="downloadTrack(event, ${idx})">⬇</button>
+            </div>
         </div>
     `).join('');
 }
-async function playTrack(index) {
-    if (index < 0 || index >= currentTracks.length) return;
-    currentTrackIndex = index;
-    const track = currentTracks[index];
+
+async function playTrack(idx) {
+    if(idx < 0 || idx >= currentTracks.length) return;
+    currentIndex = idx;
+    const track = currentTracks[idx];
+
     document.getElementById('playerTitle').textContent = track.title;
     document.getElementById('playerArtist').textContent = track.artist;
+    const coverEl = document.getElementById('playerCover');
+    if(track.cover) {
+        coverEl.style.backgroundImage = `url('${track.cover}')`;
+        coverEl.textContent = '';
+    } else {
+        coverEl.style.backgroundImage = 'none';
+        coverEl.textContent = '🎵';
+    }
     document.getElementById('playerBar').classList.add('active');
-    showLoading();
-    try {
+
+    let streamUrl = track.url;
+    if(!streamUrl) {
         const res = await fetch(`/music/api/get_url?id=${encodeURIComponent(track.id)}`);
         const data = await res.json();
-        if (data.error || !data.url) {
-            alert('Failed to get track URL');
-            hideLoading();
-            return;
-        }
-        const proxyUrl = `/music/proxy?url=${encodeURIComponent(data.url)}`;
-        if (audioPlayer) {
-            audioPlayer.pause();
-            audioPlayer.src = '';
-        }
-        audioPlayer = new Audio(proxyUrl);
-        audioPlayer.play();
+        streamUrl = data.url;
+    }
+
+    if(!streamUrl) {
+        alert('Не удалось воспроизвести данный трек');
+        return;
+    }
+
+    const proxyUrl = `/music/proxy?url=${encodeURIComponent(streamUrl)}`;
+
+    if(hlsPlayer) {
+        hlsPlayer.destroy();
+        hlsPlayer = null;
+    }
+
+    if(streamUrl.includes('.m3u8') && Hls.isSupported()) {
+        hlsPlayer = new Hls();
+        hlsPlayer.loadSource(proxyUrl);
+        hlsPlayer.attachMedia(audioEl);
+        hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
+            audioEl.play();
+            isPlaying = true;
+            updatePlayBtn();
+        });
+    } else {
+        audioEl.src = proxyUrl;
+        audioEl.play();
         isPlaying = true;
-        updatePlayButton();
-        audioPlayer.ontimeupdate = () => {
-            if (audioPlayer.duration) {
-                const pct = (audioPlayer.currentTime / audioPlayer.duration) * 100;
-                document.getElementById('playerProgress').style.width = pct + '%';
-            }
-        };
-        audioPlayer.onended = () => {
-            isPlaying = false;
-            updatePlayButton();
-            nextTrack();
-        };
-        renderTracks(currentTracks);
-    } catch(e) { alert('Playback error'); }
-    hideLoading();
+        updatePlayBtn();
+    }
+
+    renderTracks();
 }
+
+audioEl.ontimeupdate = () => {
+    if(audioEl.duration) {
+        const pct = (audioEl.currentTime / audioEl.duration) * 100;
+        document.getElementById('progressBar').style.width = pct + '%';
+    }
+};
+
+audioEl.onended = () => {
+    nextTrack();
+};
+
 function togglePlay() {
-    if (!audioPlayer) return;
-    if (isPlaying) {
-        audioPlayer.pause();
+    if(!audioEl.src && !hlsPlayer) return;
+    if(isPlaying) {
+        audioEl.pause();
         isPlaying = false;
     } else {
-        audioPlayer.play();
+        audioEl.play();
         isPlaying = true;
     }
-    updatePlayButton();
-    renderTracks(currentTracks);
+    updatePlayBtn();
 }
-function updatePlayButton() {
-    document.getElementById('playPauseBtn').innerHTML = isPlaying ? '&#9208;' : '&#9654;';
+
+function updatePlayBtn() {
+    document.getElementById('playBtn').textContent = isPlaying ? '⏸' : '▶';
 }
+
 function prevTrack() {
-    if (currentTrackIndex > 0) playTrack(currentTrackIndex - 1);
+    if(currentIndex > 0) playTrack(currentIndex - 1);
 }
+
 function nextTrack() {
-    if (currentTrackIndex < currentTracks.length - 1) playTrack(currentTrackIndex + 1);
+    if(currentIndex < currentTracks.length - 1) playTrack(currentIndex + 1);
 }
+
+function seekTrack(e) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pos = (e.clientX - rect.left) / rect.width;
+    if(audioEl.duration) {
+        audioEl.currentTime = pos * audioEl.duration;
+    }
+}
+
+function downloadTrack(e, idx) {
+    e.stopPropagation();
+    const t = currentTracks[idx];
+    if(!t || !t.url) return;
+    const a = document.createElement('a');
+    a.href = `/music/proxy?url=${encodeURIComponent(t.url)}`;
+    a.download = `${t.artist} - ${t.title}.mp3`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
 function switchTab(tab) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.getElementById('tab' + (tab === 'search' ? 'Search' : 'My')).classList.add('active');
-    if (tab === 'my') loadMyMusic();
+    document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+    if(tab === 'my') {
+        document.getElementById('tabMy').classList.add('active');
+        loadMyMusic();
+    } else if(tab === 'recoms') {
+        document.getElementById('tabRecoms').classList.add('active');
+        loadRecommendations();
+    } else {
+        document.getElementById('tabSearch').classList.add('active');
+    }
 }
-function escapeHtml(t) {
-    const d = document.createElement('div');
-    d.textContent = t;
-    return d.innerHTML;
+
+function showLoader() {
+    document.getElementById('trackList').innerHTML = '<div class="empty-state"><span class="loader"></span></div>';
 }
-function showLoading() {
-    document.getElementById('trackList').innerHTML = '<div class="empty-state"><span class="loader"></span> Loading...</div>';
-}
-function hideLoading() {}
-function showError(msg) {
-    document.getElementById('trackList').innerHTML = `<div class="empty-state">&#10060; ${escapeHtml(msg)}</div>`;
+
+function escapeHtml(str) {
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 </script>
 </body>
 </html>
+"""
