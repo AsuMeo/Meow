@@ -284,8 +284,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Ro
 .preview-body audio{width:100%;max-width:400px}
 .preview-filename{color:#fff;font-size:14px;font-weight:600;flex:1;text-align:center;padding:0 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
-.hidden{display:none!important}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}\n.hidden{display:none!important}
 </style>
 </head>
 <body>
@@ -474,6 +473,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Ro
 </div>
 
 <script>
+const MAX_FILE_SIZE_JS = 200 * 1024 * 1024; // 200 MB in bytes (client-side constant)
 let token = localStorage.getItem('vk_token');
 let myVkId = null;
 let cloudKey = null;
@@ -488,8 +488,6 @@ let selectedDocIds = new Set();
 
 // Memory leak protection cache & abort controllers
 const decryptionCache = {}; // doc_id -> { blobUrl, blob }
-const thumbnailCache = {}; // doc_id -> thumbBlobUrl (Encrypted lightweight client-side downscaled JPEG preview)
-const corruptedDocIds = new Set(); // doc_ids that failed decryption (lost keys)
 let activeAbortController = null;
 let intersectionObserver = null;
 
@@ -616,29 +614,50 @@ async function encryptFilename(plainName, fileType) {
     const data = enc.encode(JSON.stringify({ n: plainName, t: fileType }));
     const encryptedBuf = await encryptAESGCM(cloudKey, data);
     const b64 = btoa(String.fromCharCode(...new Uint8Array(encryptedBuf)))
-        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        .replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
     
     let prefix = 'IMG_';
     let ext = '.jpg';
     if (fileType === 'video') { prefix = 'VID_'; ext = '.mp4'; }
     else if (fileType === 'audio') { prefix = 'AUD_'; ext = '.mp3'; }
-    else if (fileType === 'doc') { prefix = 'DOC_'; ext = '.pdf'; }
+    else if (fileType === 'doc') { prefix = 'DOC_'; ext = '.pdf'; } // Default for docs, can be overridden by actual file ext if desired
+
+    // Try to preserve original extension for docs if possible, otherwise use default .pdf
+    const originalExtMatch = plainName.match(/\\.[0-9a-z]+$/i);
+    const originalExt = originalExtMatch ? originalExtMatch[0].toLowerCase() : '';
+    if (fileType === 'doc' && originalExt && originalExt.length <= 5 && originalExt !== '.doc') { // Limit to 4 chars for safety and common extensions
+        ext = originalExt;
+    }
+
 
     return `${prefix}${b64}${ext}`;
 }
 
 async function decryptFilename(title) {
     let rawB64 = '';
-    if (title.startsWith('IMG_') && title.endsWith('.jpg')) rawB64 = title.slice(4, -4);
-    else if (title.startsWith('VID_') && title.endsWith('.mp4')) rawB64 = title.slice(4, -4);
-    else if (title.startsWith('AUD_') && title.endsWith('.mp3')) rawB64 = title.slice(4, -4);
-    else if (title.startsWith('DOC_') && title.endsWith('.pdf')) rawB64 = title.slice(4, -4);
-    else if (title.startsWith('enc_') && title.endsWith('.doc')) rawB64 = title.slice(4, -4); // legacy
-    else return null;
+    let expectedExt = ''; // To verify consistent extension after decryption
+
+    if (title.startsWith('IMG_') && title.match(/\\.jpg$/i)) { rawB64 = title.slice(4, -4); expectedExt = '.jpg'; }
+    else if (title.startsWith('VID_') && title.match(/\\.mp4$/i)) { rawB64 = title.slice(4, -4); expectedExt = '.mp4'; }
+    else if (title.startsWith('AUD_') && title.match(/\\.mp3$/i)) { rawB64 = title.slice(4, -4); expectedExt = '.mp3'; }
+    // For DOC_ type, we need to be flexible with extension
+    else if (title.startsWith('DOC_')) {
+        const lastDotIndex = title.lastIndexOf('.');
+        if (lastDotIndex > 4) { // DOC_ + min 1 char + . + min 1 char
+            rawB64 = title.slice(4, lastDotIndex);
+            expectedExt = title.slice(lastDotIndex);
+        } else {
+            return null; // Invalid DOC_ format
+        }
+    }
+    // Legacy encrypted titles
+    else if (title.startsWith('enc_') && title.endsWith('.doc')) { rawB64 = title.slice(4, -4); expectedExt = '.doc'; }
+    else return null; // Not one of our client-encrypted formats
 
     try {
         const b64 = rawB64.replace(/-/g, '+').replace(/_/g, '/');
-        const bin = atob(b64);
+        const padding = '='.repeat((4 - (b64.length % 4)) % 4);
+        const bin = atob(b64 + padding);
         const bytes = new Uint8Array(bin.length);
         for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
         
@@ -647,52 +666,45 @@ async function decryptFilename(title) {
         const parsed = JSON.parse(jsonStr);
         return { origName: parsed.n, fileType: parsed.t };
     } catch (e) {
+        // console.warn("Decryption failed for:", title, e); // For debugging decryption failures
         return null;
     }
 }
 
-// Client-side Image Downscaler for Encrypted Thumbnails
-async function generateEncryptedThumbnail(file) {
-    return new Promise((resolve) => {
-        if (!file.type.startsWith('image/')) {
-            resolve(null);
-            return;
+// Client-side decoding for old 'cl_' obfuscated titles (not truly encrypted with cloudKey)
+function decodeOldObfuscatedTitle(title) {
+    if (!(title.startsWith('cl_') && title.endsWith('.doc'))) {
+        return null;
+    }
+    try {
+        const titleWithoutPrefixSuffix = title.slice(3, -4); // Remove "cl_" and ".doc"
+        const firstUnderscoreIndex = titleWithoutPrefixSuffix.indexOf('_');
+
+        if (firstUnderscoreIndex === -1) {
+            return null; 
         }
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = new Image();
-            img.onload = async () => {
-                const canvas = document.createElement('canvas');
-                const MAX_SIZE = 180; // Small lightweight encrypted thumbnail
-                let width = img.width;
-                let height = img.height;
-                if (width > height) {
-                    if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
-                } else {
-                    if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
-                }
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-                canvas.toBlob(async (blob) => {
-                    if (!blob) { resolve(null); return; }
-                    try {
-                        const buf = await blob.arrayBuffer();
-                        const encBuf = await encryptAESGCM(cloudKey, buf);
-                        resolve(encBuf);
-                    } catch(err) {
-                        resolve(null);
-                    }
-                }, 'image/jpeg', 0.7);
-            };
-            img.onerror = () => resolve(null);
-            img.src = e.target.result;
-        };
-        reader.onerror = () => resolve(null);
-        reader.readAsDataURL(file);
-    });
+
+        const t_char = titleWithoutPrefixSuffix.substring(0, firstUnderscoreIndex);
+        let b64_name = titleWithoutPrefixSuffix.substring(firstUnderscoreIndex + 1);
+
+        const type_map = {'p': 'photo', 'v': 'video', 'a': 'audio', 'd': 'doc'};
+        const file_type = type_map[t_char] || 'doc'; 
+
+        // Restore URL-safe base64 to standard base64 and add padding
+        b64_name = b64_name.replace(/-/g, '+').replace(/_/g, '/');
+        const padding = '='.repeat((4 - (b64_name.length % 4)) % 4);
+        const orig_name_b64 = b64_name + padding;
+        
+        // Atob returns a string of bytes, then decode as UTF-8
+        const orig_name = new TextDecoder().decode(Uint8Array.from(atob(orig_name_b64), c => c.charCodeAt(0)));
+        
+        return { origName: orig_name, fileType: file_type };
+    } catch (e) {
+        console.error("Error decoding old obfuscated title:", e);
+        return null;
+    }
 }
+
 
 async function loadFiles() {
     showToastProgress('Синхронизация...', 20);
@@ -706,14 +718,15 @@ async function loadFiles() {
         const rawItems = data.items || [];
         
         const decryptedFiles = [];
-        corruptedDocIds.clear();
 
         for (const item of rawItems) {
             const title = item.title || '';
-            const meta = await decryptFilename(title);
             const docId = `doc${item.owner_id}_${item.id}`;
 
+            const meta = await decryptFilename(title);
+
             if (meta) {
+                // Successfully decrypted (either new format or old 'enc_' format)
                 decryptedFiles.push({
                     'doc_id': docId,
                     'name': meta.origName,
@@ -722,40 +735,51 @@ async function loadFiles() {
                     'mime': item.type || 'application/octet-stream',
                     'date': item.date ? new Date(item.date * 1000).toISOString().split('T')[0] : '',
                     'type': meta.fileType,
-                    'corrupted': false
                 });
             } else {
-                // Check if it's an encrypted file whose decryption failed due to lost key
-                if (title.startsWith('IMG_') || title.startsWith('VID_') || title.startsWith('AUD_') || title.startsWith('DOC_') || title.startsWith('enc_')) {
-                    corruptedDocIds.add(docId);
-                    decryptedFiles.push({
-                        'doc_id': docId,
-                        'name': '⚠️ Повреждён / Утерян ключ',
-                        'url': item.url || '',
-                        'size': item.size || 0,
-                        'mime': item.type || 'application/octet-stream',
-                        'date': item.date ? new Date(item.date * 1000).toISOString().split('T')[0] : '',
-                        'type': 'doc',
-                        'corrupted': true
-                    });
+                // Decryption failed. Now, determine if it *looks* like one of our client-encrypted files.
+                // If it does, but failed decryption, then it's corrupted and we hide it.
+                const isOurClientEncryptedFormat = title.startsWith('IMG_') || title.startsWith('VID_') ||
+                                                    title.startsWith('AUD_') || title.startsWith('DOC_') ||
+                                                    (title.startsWith('enc_') && title.endsWith('.doc'));
+                
+                if (isOurClientEncryptedFormat) {
+                    // This file was intended to be client-encrypted but couldn't be decrypted.
+                    // It's considered "corrupted" (lost key, etc.) and is hidden from the UI.
+                    // console.warn(`Hidden corrupted client-encrypted file: ${title}`); // For debugging
                 } else {
-                    // Backward compatibility fallback for unencrypted old files
-                    const titleLower = title.toLowerCase();
-                    let fileType = 'doc';
-                    if (titleLower.includes('photo') || titleLower.endsWith('.png') || titleLower.endsWith('.jpg')) fileType = 'photo';
-                    else if (titleLower.includes('video') || titleLower.endsWith('.mp4')) fileType = 'video';
-                    else if (titleLower.includes('audio') || titleLower.endsWith('.mp3')) fileType = 'audio';
+                    // This file is NOT in our recognized client-side encrypted format.
+                    // It could be an old 'cl_' obfuscated file or a plain VK document.
+                    const oldObfuscated = decodeOldObfuscatedTitle(title);
+                    if (oldObfuscated) {
+                        decryptedFiles.push({
+                            'doc_id': docId,
+                            'name': oldObfuscated.origName,
+                            'url': item.url || '',
+                            'size': item.size || 0,
+                            'mime': item.type || 'application/octet-stream',
+                            'date': item.date ? new Date(item.date * 1000).toISOString().split('T')[0] : '',
+                            'type': oldObfuscated.fileType,
+                        });
+                    } else {
+                        // Truly plain VK documents or other unrecognized formats.
+                        // Infer type from VK's MIME/extension.
+                        let fileType = 'doc';
+                        const itemMime = item.type || 'application/octet-stream';
+                        if (itemMime.startsWith('image/')) fileType = 'photo';
+                        else if (itemMime.startsWith('video/')) fileType = 'video';
+                        else if (itemMime.startsWith('audio/')) fileType = 'audio';
 
-                    decryptedFiles.push({
-                        'doc_id': docId,
-                        'name': title || 'unknown_file',
-                        'url': item.url || '',
-                        'size': item.size || 0,
-                        'mime': item.type || 'application/octet-stream',
-                        'date': item.date ? new Date(item.date * 1000).toISOString().split('T')[0] : '',
-                        'type': fileType,
-                        'corrupted': false
-                    });
+                        decryptedFiles.push({
+                            'doc_id': docId,
+                            'name': title || 'unknown_file',
+                            'url': item.url || '',
+                            'size': item.size || 0,
+                            'mime': itemMime,
+                            'date': item.date ? new Date(item.date * 1000).toISOString().split('T')[0] : '',
+                            'type': fileType,
+                        });
+                    }
                 }
             }
         }
@@ -832,7 +856,7 @@ function renderGrid(filteredFiles) {
             if (entry.isIntersecting) {
                 const docId = entry.target.dataset.id;
                 const fileObj = filteredFiles.find(f => f.doc_id === docId);
-                if (fileObj && !fileObj.corrupted) {
+                if (fileObj) { // No more corrupted check needed here, as corrupted files are filtered out
                     lazyLoadThumbnail(fileObj);
                     intersectionObserver.unobserve(entry.target);
                 }
@@ -860,16 +884,14 @@ function renderGrid(filteredFiles) {
         placeholderIcon.className = 'file-thumb';
         placeholderIcon.style.cssText = 'display:flex;align-items:center;justify-content:center';
         
-        if (f.corrupted) {
-            placeholderIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
-        } else if (f.type === 'photo') {
+        if (f.type === 'photo') {
             placeholderIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`;
         } else if (f.type === 'video') {
             placeholderIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>`;
         } else if (f.type === 'audio') {
-            placeholderIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#30d158" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
-        } else {
-            placeholderIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#af52de" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+            placeholderIcon.innerHTML = `<div class="file-thumb" style="display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="#30d158" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>`;
+        } else { // 'doc' type
+            placeholderIcon.innerHTML = `<div class="file-thumb" style="display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="#af52de" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>`;
         }
 
         thumbContainer.appendChild(placeholderIcon);
@@ -897,12 +919,6 @@ function renderGrid(filteredFiles) {
 
         // Click / Select Handlers
         itemDiv.onclick = (e) => {
-            if (f.corrupted) {
-                if (confirm('Этот файл был зашифрован другим ключом и не может быть расшифрован. Удалить его из списка?')) {
-                    deleteCorruptedFile(f.doc_id);
-                }
-                return;
-            }
             if (isMultiSelectMode) {
                 toggleItemSelection(f.doc_id, itemDiv);
             } else {
@@ -918,9 +934,9 @@ function renderGrid(filteredFiles) {
         grid.appendChild(itemDiv);
 
         // Traffic saving: Don't load audio at all, only load thumbnails for photo/video if cached
-        if (!f.corrupted && f.type !== 'audio') {
-            if (thumbnailCache[f.doc_id]) {
-                applyThumbnailPreview(f.doc_id, thumbnailCache[f.doc_id], f.type);
+        if (f.type !== 'audio') { // Audio thumbnails are just an icon
+            if (decryptionCache[f.doc_id]) { // If full file already cached, use its blobUrl for preview
+                applyThumbnailPreview(f.doc_id, decryptionCache[f.doc_id].blobUrl, f.type);
             } else {
                 intersectionObserver.observe(itemDiv);
             }
@@ -930,12 +946,8 @@ function renderGrid(filteredFiles) {
 
 // Lazy Thumbnail Downloader & Decryptor (Traffic Saving feature)
 async function lazyLoadThumbnail(f) {
-    if (thumbnailCache[f.doc_id] || decryptionCache[f.doc_id]) {
-        if (decryptionCache[f.doc_id]) {
-            applyThumbnailPreview(f.doc_id, decryptionCache[f.doc_id].blobUrl, f.type);
-        } else {
-            applyThumbnailPreview(f.doc_id, thumbnailCache[f.doc_id], f.type);
-        }
+    if (decryptionCache[f.doc_id]) { // If already fully decrypted, no need to re-fetch/decrypt
+        applyThumbnailPreview(f.doc_id, decryptionCache[f.doc_id].blobUrl, f.type);
         return;
     }
 
@@ -945,7 +957,6 @@ async function lazyLoadThumbnail(f) {
     itemEl.classList.add('decrypting');
 
     try {
-        // For photos and videos, we fetch the encrypted payload. To save traffic, we can stream or download.
         const resp = await fetch('/cloud/api/download?url=' + encodeURIComponent(f.url), {
             signal: activeAbortController ? activeAbortController.signal : null
         });
@@ -992,7 +1003,7 @@ function applyThumbnailPreview(doc_id, url, type) {
         container.appendChild(vid);
     } else if (type === 'audio') {
         container.innerHTML = `<div class="file-thumb" style="display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="#30d158" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>`;
-    } else {
+    } else { // doc
         container.innerHTML = `<div class="file-thumb" style="display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="#af52de" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>`;
     }
 }
@@ -1032,13 +1043,16 @@ async function downloadSelectedBatch() {
     if (selectedDocIds.size === 0) return;
     for (const docId of selectedDocIds) {
         const fileObj = filesData.find(f => f.doc_id === docId);
-        if (fileObj && !fileObj.corrupted) {
+        if (fileObj) {
             const cached = decryptionCache[docId];
             if (cached) {
                 const a = document.createElement('a');
                 a.href = cached.blobUrl;
                 a.download = fileObj.name;
                 a.click();
+            } else {
+                // If not cached, trigger full download
+                openFile(fileObj);
             }
         }
     }
@@ -1060,23 +1074,12 @@ async function deleteSelectedBatch() {
                 URL.revokeObjectURL(decryptionCache[docId].blobUrl);
                 delete decryptionCache[docId];
             }
-        } catch(e) {}
+        } catch(e) {
+            console.error("Failed to delete from VK:", e);
+        }
     }
     exitMultiSelectMode();
     await loadFiles();
-    hideToastProgress();
-}
-
-async function deleteCorruptedFile(docId) {
-    showToastProgress('Удаление повреждённого файла...', 50);
-    try {
-        await fetch('/cloud/api/delete', {
-            method: 'POST',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({token, doc_id: docId})
-        });
-        await loadFiles();
-    } catch(e) {}
     hideToastProgress();
 }
 
@@ -1087,7 +1090,7 @@ async function handleFiles(e) {
 
     // Check VK Document Size Limit (200MB) with strict alert
     for (const f of files) {
-        if (f.size > MAX_FILE_SIZE) {
+        if (f.size > MAX_FILE_SIZE_JS) {
             alert(`⚠️ Файл "${f.name}" превышает официальный лимит ВКонтакте (200 МБ). Загрузка невозможна.`);
             e.target.value = '';
             return;
@@ -1108,9 +1111,9 @@ async function handleFiles(e) {
 
             let fileType = 'doc';
             const lowerName = file.name.toLowerCase();
-            if (lowerName.match(/\.(png|jpg|jpeg|gif|webp|bmp)$/)) fileType = 'photo';
-            else if (lowerName.match(/\.(mp4|mov|avi|mkv|3gp)$/)) fileType = 'video';
-            else if (lowerName.match(/\.(mp3|ogg|wav|m4a)$/)) fileType = 'audio';
+            if (lowerName.match(/\\.(png|jpg|jpeg|gif|webp|bmp)$/)) fileType = 'photo';
+            else if (lowerName.match(/\\.(mp4|mov|avi|mkv|3gp)$/)) fileType = 'video';
+            else if (lowerName.match(/\\.(mp3|ogg|wav|m4a)$/)) fileType = 'audio';
 
             const encryptedTitle = await encryptFilename(file.name, fileType);
 
@@ -1143,16 +1146,16 @@ async function handleFiles(e) {
 
 // Instant Preview / Playback
 function openFile(f) {
-    if (f.corrupted) {
-        alert("Этот файл поврежден или утерян ключ шифрования.");
-        return;
-    }
-
     const cached = decryptionCache[f.doc_id];
     if (!cached) {
-        alert("Загрузка и расшифровка файла...");
+        showToastProgress("Загрузка и расшифровка файла...", 10);
         lazyLoadThumbnail(f).then(() => {
+            hideToastProgress();
             if (decryptionCache[f.doc_id]) openFile(f);
+            else alert("Не удалось загрузить или расшифровать файл.");
+        }).catch(err => {
+            hideToastProgress();
+            alert("Не удалось загрузить или расшифровать файл: " + err.message);
         });
         return;
     }
@@ -1182,7 +1185,7 @@ function openFile(f) {
         aud.controls = true;
         aud.autoplay = true;
         body.appendChild(aud);
-    } else {
+    } else { // doc
         const a = document.createElement('a');
         a.href = cached.blobUrl;
         a.download = f.name;
@@ -1233,6 +1236,7 @@ function downloadSelectedFile() {
             a.download = selectedFile.name;
             a.click();
         } else {
+            // If not cached, trigger full download by opening the file
             openFile(selectedFile);
         }
     }
@@ -1252,7 +1256,7 @@ async function deleteSelectedFile() {
         });
         const d = await res.json();
         if (d.error) {
-            alert("Не удалось удалить из облака.");
+            alert("Не удалось удалить из облака: " + d.error.error_msg);
         } else {
             if (decryptionCache[selectedFile.doc_id]) {
                 URL.revokeObjectURL(decryptionCache[selectedFile.doc_id].blobUrl);
@@ -1260,7 +1264,10 @@ async function deleteSelectedFile() {
             }
             await loadFiles();
         }
-    } catch(e) {}
+    } catch(e) {
+        console.error("Failed to delete from VK:", e);
+        alert("Не удалось удалить из облака. Проверьте подключение или повторите позже.");
+    }
     hideToastProgress();
 }
 
@@ -1497,4 +1504,4 @@ def cloud_delete():
 
 @cloud_bp.route('/api/ping', methods=['GET'])
 def cloud_ping():
-    return jsonify({'ok': True, 'time': datetime.now().isoformat()})
+    return jsonify({'ok': True, 'time': datetime.now().isoformat()}))
