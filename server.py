@@ -5834,7 +5834,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .call-signal-bar.bad{background:#ff3b30}
 .call-toast{position:fixed;top:60px;left:50%;transform:translateX(-50%) translateY(-20px);background:rgba(28,28,30,0.95);border:1px solid #3a3a3c;color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:500;z-index:100;opacity:0;transition:all 0.3s ease;pointer-events:none;white-space:nowrap;backdrop-filter:blur(8px)}
 .call-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-.call-setup-screen{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:50}
+.call-setup-screen{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:50;transition:opacity 0.3s ease,transform 0.3s ease}
+.call-setup-screen.hidden{opacity:0;pointer-events:none;transform:scale(0.95);display:none!important}
 .call-setup-title{font-size:22px;font-weight:700;margin-bottom:8px}
 .call-setup-text{font-size:14px;color:#8e8e93;margin-bottom:30px;text-align:center;max-width:300px;line-height:1.5}
 .call-setup-peer{display:flex;align-items:center;gap:14px;background:#1c1c1e;padding:14px 16px;border-radius:16px;width:100%;max-width:340px;margin-bottom:24px;border:1px solid #2c2c2e}
@@ -6073,8 +6074,22 @@ async function startCallToPeer() {
     if (peerData.photo) {
       document.getElementById('outgoingAvatar').src = peerData.photo;
       document.getElementById('outgoingBg').style.backgroundImage = `url('${peerData.photo}')`;
+    } else {
+      // Fallback: берем свою аватарку из localStorage если звоним себе
+      const myPhoto = localStorage.getItem('vk_my_photo');
+      if (myPhoto) {
+        document.getElementById('outgoingAvatar').src = myPhoto;
+        document.getElementById('outgoingBg').style.backgroundImage = `url('${myPhoto}')`;
+      }
     }
-  } catch(e) {}
+  } catch(e) {
+    // Fallback при ошибке API
+    const myPhoto = localStorage.getItem('vk_my_photo');
+    if (myPhoto) {
+      document.getElementById('outgoingAvatar').src = myPhoto;
+      document.getElementById('outgoingBg').style.backgroundImage = `url('${myPhoto}')`;
+    }
+  }
 
   const roomRef = getRoomRef();
   await roomRef.child('offer').set({
@@ -6105,7 +6120,8 @@ function listenForCaller() {
     const data = snap.val();
     if (data) {
       document.getElementById('setupPeerName').textContent = data.caller_name || 'Неизвестно';
-      document.getElementById('setupPeerImg').src = data.caller_photo || 'https://vk.com/images/camera_100.png';
+      const photo = data.caller_photo || localStorage.getItem('vk_my_photo') || 'https://vk.com/images/camera_100.png';
+      document.getElementById('setupPeerImg').src = photo;
       document.getElementById('setupPeerStatus').textContent = data.call_type === 'video' ? 'Видеозвонок' : 'Аудиозвонок';
     }
   }));
@@ -6129,7 +6145,10 @@ async function acceptCall() {
     }
   }
 
-  document.getElementById('setupScreen').classList.add('hidden');
+  // Принудительно скрываем setupScreen
+  const setupScreen = document.getElementById('setupScreen');
+  setupScreen.classList.add('hidden');
+  setupScreen.style.display = 'none';
 
   const peerName = document.getElementById('setupPeerName')?.textContent || 'Собеседник';
   await showActiveScreen({peer_id: peerId, peer_name: peerName});
@@ -6159,9 +6178,13 @@ async function showActiveScreen(data) {
   if (isCallActive) return;
   isCallActive = true;
   callStartTime = Date.now();
+  // Принудительно скрываем ВСЕ экраны кроме активного
   document.getElementById('outgoingScreen').classList.add('hidden');
   document.getElementById('setupScreen').classList.add('hidden');
   document.getElementById('activeScreen').classList.remove('hidden');
+  document.querySelectorAll('.call-screen').forEach(el => {
+    if (el.id !== 'activeScreen') el.classList.add('hidden');
+  });
 
   const grid = document.getElementById('videoGrid');
   if (isVideoEnabled) {
@@ -6173,7 +6196,14 @@ async function showActiveScreen(data) {
     document.getElementById('localVideo').classList.add('hidden');
   }
 
-  document.getElementById('activeName').textContent = data.peer_name || 'Собеседник';
+  // Берем имя и аватар из setupScreen если есть (для входящих)
+  const setupName = document.getElementById('setupPeerName')?.textContent;
+  const setupImg = document.getElementById('setupPeerImg')?.src;
+  document.getElementById('activeName').textContent = data.peer_name || setupName || 'Собеседник';
+  if (setupImg && setupImg !== window.location.href) {
+    document.getElementById('outgoingAvatar').src = setupImg;
+    document.getElementById('outgoingBg').style.backgroundImage = `url('${setupImg}')`;
+  }
   startCallTimer();
   startNetworkMonitoring();
 }
