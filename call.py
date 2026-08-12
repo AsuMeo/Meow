@@ -554,6 +554,7 @@ let pc = null;
 let localStream = null;
 let remoteStream = null;
 let currentRoomId = roomIdFromUrl;
+let incomingCallerId = null;
 let callStartTime = null;
 let callTimerInterval = null;
 let isMuted = false;
@@ -600,6 +601,7 @@ async function init() {
 
     socket.on('incoming_call', (data) => {
         currentRoomId = data.room_id;
+        incomingCallerId = data.caller_id;
         showSetupScreen(data);
     });
 
@@ -696,8 +698,18 @@ async function acceptCall() {
             return;
         }
     }
-    socket.emit('call_accept', {room_id: currentRoomId});
     document.getElementById('setupScreen').classList.add('hidden');
+
+    const peerName = document.getElementById('setupPeerName')?.textContent || 'Собеседник';
+    await showActiveScreen({peer_id: incomingCallerId || peerId, peer_name: peerName});
+    socket.emit('call_accept', {room_id: currentRoomId});
+    
+    setTimeout(() => {
+        if (!isCallActive) {
+            showToast('Повторная попытка подключения...');
+            showActiveScreen({peer_id: incomingCallerId || peerId, peer_name: peerName});
+        }
+    }, 3000);
 }
 
 function declineCall() {
@@ -706,6 +718,7 @@ function declineCall() {
 }
 
 async function showActiveScreen(data) {
+    if (isCallActive) return;
     isCallActive = true;
     callStartTime = Date.now();
     document.getElementById('outgoingScreen').classList.add('hidden');
@@ -736,6 +749,10 @@ async function showActiveScreen(data) {
 }
 
 async function createPeerConnection(targetId) {
+    if (!targetId) {
+        showToast('Ошибка: ID собеседника не определён');
+        return;
+    }
     const config = {iceServers: iceServers, iceCandidatePoolSize: 10};
     pc = new RTCPeerConnection(config);
 
