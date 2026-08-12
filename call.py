@@ -448,15 +448,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </head>
 <body>
 <div class="call-app">
+<div id="testCallBar" style="position:fixed;top:0;left:0;width:100%;background:#0a84ff;color:#fff;text-align:center;padding:8px;font-size:13px;font-weight:600;z-index:300;cursor:pointer" onclick="startTestCall()">
+🧪 РЕЖИМ ТЕСТИРОВАНИЯ: Нажмите для тестового звонка (2 вкладки = 1 ID)
+</div>
 
-<div class="call-permission-modal" id="permModal">
+<div class="call-permission-modal hidden" id="permModal">
 <div class="call-permission-content">
 <div class="call-permission-icon">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
 </div>
 <div class="call-permission-title">Разрешить доступ</div>
 <div class="call-permission-text">Для звонков необходим доступ к микрофону и камере. Все данные передаются напрямую между устройствами (P2P).</div>
-<button class="call-permission-btn" onclick="requestPermissions()">Разрешить</button>
 </div>
 </div>
 
@@ -588,6 +590,7 @@ let dataChannel = null;
 let networkQuality = 'good';
 
 async function init() {
+    await autoRequestPermissions();
     const iceRes = await fetch('/api/ice_config');
     const iceData = await iceRes.json();
     iceServers = iceData.iceServers || [];
@@ -658,6 +661,18 @@ async function requestPermissions() {
         } else {
             showOutgoingScreen();
         }
+    } catch(e) {
+        showToast('Доступ к микрофону/камере отклонен');
+    }
+}
+async function autoRequestPermissions() {
+    try {
+        const constraints = {
+            audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true},
+            video: isVideoEnabled ? {facingMode: 'user', width: {ideal: 640}, height: {ideal: 480}} : false
+        };
+        localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        document.getElementById('permModal').classList.add('hidden');
     } catch(e) {
         showToast('Доступ к микрофону/камере отклонен');
     }
