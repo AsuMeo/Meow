@@ -444,9 +444,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .profile-view-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:650;display:flex;flex-direction:column;overflow:hidden;transform:translateY(100%);transition:transform 0.25s cubic-bezier(0.1,0.9,0.2,1)}
 .profile-view-modal.active{transform:translateY(0)}
 .profile-view-header{height:56px;background:#0d0d0d;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #1c1c1c;flex-shrink:0}
-.profile-view-cover{height:150px;background:#1c1c1e;background-size:cover;background-position:center;position:relative}
-.profile-view-avatar-wrap{position:relative;margin-top:-50px;padding:0 16px;display:flex;align-items:flex-end;gap:12px}
-.profile-view-avatar{width:100px;height:100px;border-radius:50%;object-fit:cover;background:#222;border:4px solid #000;cursor:pointer}
+.profile-view-cover{background:#1c1c1e;background-size:cover;background-position:center;position:relative}
+.profile-view-avatar-wrap{position:relative;padding:0 16px;display:flex;align-items:flex-end;gap:12px}
+.profile-view-avatar{width:72px;height:72px;border-radius:50%;object-fit:cover;background:#222;border:3px solid #000;cursor:pointer}
 .profile-view-name-wrap{flex:1;padding-bottom:8px}
 .profile-view-name{font-size:20px;font-weight:700;color:#fff}
 .profile-view-status{font-size:13px;color:#8e8e93;margin-top:2px}
@@ -1377,20 +1377,22 @@ E2EE
 <polyline points="12 19 5 12 12 5"></polyline>
 </svg>
 </div>
-<div class="header-title" id="profileViewHeaderTitle">Профиль</div>
+<div class="header-title" id="profileViewHeaderTitle">Информация</div>
 </div>
-<div class="profile-view-cover" id="profileViewCover"></div>
-<div class="profile-view-avatar-wrap">
-<img class="profile-view-avatar" id="profileViewAvatar" src="" alt="" onclick="openPhotoViewer(this.src)">
-<div class="profile-view-name-wrap">
+<div class="profile-view-scroll" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch">
+<div class="profile-view-cover" id="profileViewCover" style="display:none"></div>
+<div class="profile-view-avatar-wrap" style="margin-top:16px;padding:0 16px">
+<img class="profile-view-avatar" id="profileViewAvatar" src="" alt="" onclick="openPhotoViewer(this.src)" style="width:80px;height:80px">
+<div class="profile-view-name-wrap" style="padding-bottom:0">
 <div class="profile-view-name" id="profileViewName">...</div>
 <div class="profile-view-status" id="profileViewStatus">...</div>
 </div>
 </div>
-<div class="profile-view-info" id="profileViewInfo"></div>
+<div class="profile-view-info" id="profileViewInfo" style="padding:16px"></div>
 <div class="profile-view-posts">
 <div class="profile-view-post-title">Записи на стене</div>
 <div id="profilePostsList"></div>
+</div>
 </div>
 </div>
 
@@ -4119,17 +4121,36 @@ async function openProfileView(peerId, isGroup) {
         document.getElementById('profileViewAvatar').src = data.photo || 'https://vk.com/images/camera_100.png';
         document.getElementById('profileViewName').textContent = data.name || '...';
         document.getElementById('profileViewStatus').textContent = data.status || '';
-        document.getElementById('profileViewHeaderTitle').textContent = data.name || 'Профиль';
+        document.getElementById('profileViewHeaderTitle').textContent = 'Информация';
 
+        // Cover photo now shown in info section, not header
         const coverElem = document.getElementById('profileViewCover');
         if (data.cover_photo) {
+            coverElem.style.display = 'block';
             coverElem.style.backgroundImage = `url('${data.cover_photo}')`;
+            coverElem.style.height = '180px';
+            coverElem.style.backgroundSize = 'cover';
+            coverElem.style.backgroundPosition = 'center';
+            coverElem.style.borderRadius = '0 0 16px 16px';
         } else {
-            coverElem.style.backgroundImage = 'none';
+            coverElem.style.display = 'none';
         }
 
         const infoDiv = document.getElementById('profileViewInfo');
         infoDiv.innerHTML = '';
+
+        // Description/status as main info
+        if (data.status) {
+            infoDiv.innerHTML += `<div style="font-size:14px;color:#ddd;line-height:1.5;margin-bottom:12px">${escapeHtml(data.status)}</div>`;
+        }
+
+        // Stats row for groups
+        if (data.members_count) {
+            infoDiv.innerHTML += `<div style="display:flex;gap:16px;margin-bottom:12px;padding:8px 0;border-bottom:1px solid #1c1c1c">
+                <div style="text-align:center"><div style="font-size:16px;font-weight:700;color:#fff">${data.members_count}</div><div style="font-size:11px;color:#8e8e93">подписчиков</div></div>
+            </div>`;
+        }
+
         if (data.city) infoDiv.innerHTML += `<div class="profile-view-info-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;flex-shrink:0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${escapeHtml(data.city)}</div>`;
         if (data.bdate) infoDiv.innerHTML += `<div class="profile-view-info-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;flex-shrink:0"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>${escapeHtml(data.bdate)}</div>`;
         if (data.site) infoDiv.innerHTML += `<div class="profile-view-info-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;flex-shrink:0"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>${escapeHtml(data.site)}</div>`;
@@ -5616,7 +5637,7 @@ def profile_view():
 
     if is_group or peer_id_int < 0:
         group_id = abs(peer_id_int)
-        group_info = vk_request('groups.getById', token, group_id=group_id, fields='description,status,photo_200,photo_100,cover')
+        group_info = vk_request('groups.getById', token, group_id=group_id, fields='description,status,photo_200,photo_100,cover,members_count')
 
         name = ""
         photo = ""
@@ -5634,6 +5655,7 @@ def profile_view():
             name = g.get('name', '')
             photo = g.get('photo_200') or g.get('photo_100', '')
             status = g.get('status') or g.get('description', '')
+            members_count = g.get('members_count', 0)
 
             cover_data = g.get('cover', {})
             if cover_data.get('enabled') == 1:
@@ -5666,6 +5688,7 @@ def profile_view():
             'photo': photo,
             'status': status,
             'cover_photo': cover_photo,
+            'members_count': members_count,
             'posts': posts
         })
     else:
