@@ -3296,48 +3296,29 @@ function escapeHtml(t) { const d = document.createElement('div'); d.textContent 
 
 function linkifyText(text) {
     if (!text) return '';
-    // URLs
     text = text.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#0a84ff;text-decoration:none">$1</a>');
-    // @username mentions
-    text = text.replace(/@([a-zA-Z0-9_]+)/g, '<span class="user-mention" data-user="$1" style="color:#0a84ff;cursor:pointer" onclick="showUserMentionMenu(event,'$1')">@$1</span>');
+    text = text.replace(/@([a-zA-Z0-9_]+)/g, '<span class="user-mention" style="color:#0a84ff;cursor:pointer" onclick="event.stopPropagation();showUserMentionMenu(event,this.dataset.user)" data-user="$1">@$1</span>');
     return text;
 }
 
 function showUserMentionMenu(event, username) {
-    event.stopPropagation();
     event.preventDefault();
-
-    // Remove existing menu
     const existing = document.getElementById('userMentionMenu');
     if (existing) existing.remove();
-
     const menu = document.createElement('div');
     menu.id = 'userMentionMenu';
     menu.style.cssText = 'position:fixed;z-index:900;background:#1c1c1e;border:1px solid #2c2c2e;border-radius:16px;padding:8px;display:flex;gap:8px;box-shadow:0 8px 32px rgba(0,0,0,0.6);';
-    menu.innerHTML = `
-        <a href="https://t.me/${username}" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:6px;padding:10px 14px;border-radius:12px;background:#2c2c2e;color:#fff;text-decoration:none;font-size:13px;font-weight:600;" onclick="document.getElementById('userMentionMenu')?.remove()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
-            Telegram
-        </a>
-        <div onclick="openProfileViewByUsername('${username}'); document.getElementById('userMentionMenu')?.remove();" style="display:flex;align-items:center;gap:6px;padding:10px 14px;border-radius:12px;background:#2c2c2e;color:#fff;cursor:pointer;font-size:13px;font-weight:600;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M15.684 0H8.316C1.592 0 0 1.592 0 8.316v7.368C0 22.408 1.592 24 8.316 24h7.368C22.408 24 24 22.408 24 15.684V8.316C24 1.592 22.408 0 15.684 0zm3.692 17.123h-1.744c-.66 0-.864-.525-2.05-1.727-1.033-1-1.49-1.135-1.744-1.135-.356 0-.458.102-.458.593v1.575c0 .424-.135.678-1.253.678-1.846 0-3.896-1.12-5.339-3.202C4.624 10.857 4 8.673 4 8.218c0-.254.102-.491.593-.491h1.744c.44 0 .61.203.78.678.864 2.49 2.303 4.675 2.896 4.675.22 0 .322-.102.322-.66V9.721c-.068-1.186-.695-1.287-.695-1.71 0-.203.17-.407.44-.407h2.744c.373 0 .508.203.508.643v3.473c0 .372.17.508.271.508.22 0 .407-.136.813-.542 1.254-1.406 2.151-3.574 2.151-3.574.119-.254.322-.491.763-.491h1.744c.525 0 .644.27.525.643-.22 1.017-2.354 4.031-2.354 4.031-.186.305-.254.44 0 .78.186.254.796.779 1.203 1.253.745.847 1.32 1.558 1.473 2.05.17.49-.085.745-.576.745z"/></svg>
-            VK
-        </div>
-    `;
-
+    menu.innerHTML = '<a href="https://t.me/' + username + '" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:6px;padding:10px 14px;border-radius:12px;background:#2c2c2e;color:#fff;text-decoration:none;font-size:13px;font-weight:600;" onclick="document.getElementById('userMentionMenu')?.remove()">' +
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>Telegram</a>' +
+        '<div onclick="openProfileViewByUsername('' + username + '');document.getElementById('userMentionMenu')?.remove();" style="display:flex;align-items:center;gap:6px;padding:10px 14px;border-radius:12px;background:#2c2c2e;color:#fff;cursor:pointer;font-size:13px;font-weight:600;">' +
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M15.684 0H8.316C1.592 0 0 1.592 0 8.316v7.368C0 22.408 1.592 24 8.316 24h7.368C22.408 24 24 22.408 24 15.684V8.316C24 1.592 22.408 0 15.684 0zm3.692 17.123h-1.744c-.66 0-.864-.525-2.05-1.727-1.033-1-1.49-1.135-1.744-1.135-.356 0-.458.102-.458.593v1.575c0 .424-.135.678-1.253.678-1.846 0-3.896-1.12-5.339-3.202C4.624 10.857 4 8.673 4 8.218c0-.254.102-.491.593-.491h1.744c.44 0 .61.203.78.678.864 2.49 2.303 4.675 2.896 4.675.22 0 .322-.102.322-.66V9.721c-.068-1.186-.695-1.287-.695-1.71 0-.203.17-.407.44-.407h2.744c.373 0 .508.203.508.643v3.473c0 .372.17.508.271.508.22 0 .407-.136.813-.542 1.254-1.406 2.151-3.574 2.151-3.574.119-.254.322-.491.763-.491h1.744c.525 0 .644.27.525.643-.22 1.017-2.354 4.031-2.354 4.031-.186.305-.254.44 0 .78.186.254.796.779 1.203 1.253.745.847 1.32 1.558 1.473 2.05.17.49-.085.745-.576.745z"/></svg>VK</div>';
     document.body.appendChild(menu);
-
     const rect = event.target.getBoundingClientRect();
     menu.style.left = Math.min(rect.left, window.innerWidth - 220) + 'px';
     menu.style.top = (rect.bottom + 8) + 'px';
-
-    // Close on outside click
     setTimeout(() => {
         document.addEventListener('click', function closeMenu(e) {
-            if (!menu.contains(e.target)) {
-                menu.remove();
-                document.removeEventListener('click', closeMenu);
-            }
+            if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', closeMenu); }
         });
     }, 10);
 }
@@ -3345,24 +3326,12 @@ function showUserMentionMenu(event, username) {
 async function openProfileViewByUsername(username) {
     showUploadProgress('Поиск пользователя...');
     try {
-        const res = await fetch('/api/search_username', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ token, username })
-        });
+        const res = await fetch('/api/search_username', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ token, username }) });
         const data = await res.json();
-        if (data.id) {
-            openProfileView(data.id, false);
-        } else {
-            alert('Пользователь не найден в VK');
-        }
-    } catch(e) {
-        alert('Ошибка поиска');
-    } finally {
-        hideUploadProgress();
-    }
+        if (data.id) { openProfileView(data.id, false); } else { alert('Пользователь не найден в VK'); }
+    } catch(e) { alert('Ошибка поиска'); }
+    finally { hideUploadProgress(); }
 }
-
 
 function handleInputTyping() {
     const val = document.getElementById('msgInput').value;
@@ -4090,7 +4059,7 @@ async function loadNewsFeed() {
 
                 div.innerHTML = `
                     <div class="tg-channel-header">
-                        <img class="tg-channel-avatar" src="${item.author_photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'" onclick="event.stopPropagation(); openProfileView(${item.owner_id || 0}, ${item.owner_id < 0 ? 'true' : 'false'})" style="cursor:pointer">
+                        <img class="tg-channel-avatar" src="${item.author_photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'" onclick="event.stopPropagation();openProfileView(${item.owner_id || 0}, ${item.owner_id < 0 ? 'true' : 'false'})" style="cursor:pointer">
                         <div>
                             <div class="tg-channel-title">${escapeHtml(item.author_name)}</div>
                             <div class="tg-channel-meta">${item.time || ''}</div>
@@ -4299,17 +4268,10 @@ async function openProfileView(peerId, isGroup) {
 function showFullDescription() {
     const fullText = document.getElementById('profileViewStatus').dataset.fullText || '';
     if (fullText) {
-        // Create a nice modal instead of alert
         const modal = document.createElement('div');
         modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px;';
-        modal.innerHTML = `
-            <div style="background:#161616;border-radius:20px;padding:24px;max-width:380px;width:100%;border:1px solid #282828;max-height:70vh;overflow-y:auto;">
-                <div style="font-size:18px;font-weight:600;margin-bottom:12px;color:#fff">Описание</div>
-                <div style="font-size:14px;color:#ddd;line-height:1.6;white-space:pre-wrap;">${linkifyText(escapeHtml(fullText))}</div>
-                <button class="btn" style="margin-top:16px;width:100%" onclick="this.closest('.modal').remove()">Закрыть</button>
-            </div>
-        `;
-        modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+        modal.innerHTML = '<div style="background:#161616;border-radius:20px;padding:24px;max-width:380px;width:100%;border:1px solid #282828;max-height:70vh;overflow-y:auto;"><div style="font-size:18px;font-weight:600;margin-bottom:12px;color:#fff">Описание</div><div style="font-size:14px;color:#ddd;line-height:1.6;white-space:pre-wrap;">' + linkifyText(escapeHtml(fullText)) + '</div><button class="btn" style="margin-top:16px;width:100%" onclick="this.parentElement.parentElement.remove()">Закрыть</button></div>';
+        modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
         document.body.appendChild(modal);
     }
 }
@@ -6070,26 +6032,17 @@ def ping():
 app.register_blueprint(cloud_bp, url_prefix='/cloud')
 
 
-
 @app.route('/api/search_username', methods=['POST'])
 def search_username():
     token = request.json.get('token')
     username = request.json.get('username', '').strip()
     if not username:
         return jsonify({'error': 'No username'}), 400
-
-    # Try users.get with screen_name first
     result = vk_request('users.get', token, user_ids=username, fields='photo_100')
     if isinstance(result, list) and len(result) > 0:
         u = result[0]
         if 'id' in u:
-            return jsonify({
-                'id': u.get('id'),
-                'name': f"{u.get('first_name', '')} {u.get('last_name', '')}".strip(),
-                'photo': u.get('photo_100', '')
-            })
-
-    # Fallback: try utils.resolveScreenName
+            return jsonify({'id': u.get('id'), 'name': f"{u.get('first_name', '')} {u.get('last_name', '')}".strip(), 'photo': u.get('photo_100', '')})
     resolved = vk_request('utils.resolveScreenName', token, screen_name=username)
     if isinstance(resolved, dict) and 'object_id' in resolved:
         obj_type = resolved.get('type', '')
@@ -6098,14 +6051,9 @@ def search_username():
             user_info = vk_request('users.get', token, user_ids=obj_id, fields='photo_100')
             if isinstance(user_info, list) and len(user_info) > 0:
                 u = user_info[0]
-                return jsonify({
-                    'id': u.get('id'),
-                    'name': f"{u.get('first_name', '')} {u.get('last_name', '')}".strip(),
-                    'photo': u.get('photo_100', '')
-                })
+                return jsonify({'id': u.get('id'), 'name': f"{u.get('first_name', '')} {u.get('last_name', '')}".strip(), 'photo': u.get('photo_100', '')})
         elif obj_type == 'group':
             return jsonify({'id': -obj_id, 'name': 'Group', 'photo': ''})
-
     return jsonify({'error': 'Not found'}), 404
 
 if __name__ == '__main__':
