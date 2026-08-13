@@ -457,6 +457,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .profile-view-posts{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 12px 20px}
 .profile-view-post-title{font-size:16px;font-weight:700;color:#fff;padding:12px 4px}
 .profile-view-empty{color:#666;text-align:center;padding:40px 20px;font-size:14px}
+.profile-desc-text{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis}
+.profile-desc-text a{color:#0a84ff;text-decoration:none}
+.profile-desc-text a:active{opacity:0.7}
+.user-link-menu{position:fixed;bottom:0;left:0;width:100%;background:#1c1c1e;border-top-left-radius:20px;border-top-right-radius:20px;padding:16px;z-index:800;transform:translateY(100%);transition:transform 0.25s cubic-bezier(0.1,0.9,0.2,1);display:flex;flex-direction:column;gap:10px}
+.user-link-menu.active{transform:translateY(0)}
+.user-link-item{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;background:#2c2c2e;color:#fff;font-size:15px;font-weight:500;cursor:pointer}
+.user-link-item:active{background:#3a3a3c}
+.user-link-item svg{width:22px;height:22px;flex-shrink:0}
 
 /* Photo Viewer Modal */
 .photo-viewer-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:999;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.2s ease}
@@ -1386,7 +1394,6 @@ E2EE
 <img class="profile-view-avatar" id="profileViewAvatar" src="" alt="" onclick="openPhotoViewer(this.src)" style="width:80px;height:80px">
 <div class="profile-view-name-wrap" style="padding-bottom:0">
 <div class="profile-view-name" id="profileViewName">...</div>
-<div class="profile-view-status" id="profileViewStatus">...</div>
 </div>
 </div>
 <div class="profile-view-info" id="profileViewInfo" style="padding:16px"></div>
@@ -2056,7 +2063,7 @@ function buildDialogPreviewHTML(d) {
         return `<span class="dialog-preview-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" style="vertical-align:middle;margin-right:4px;flex-shrink:0"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Музыка</span>`;
     }
 
-    return `<span class="dialog-preview-wrap">${linkifyText(escapeHtml(rawText || 'Сообщение'))}</span>`;
+    return `<span class="dialog-preview-wrap">${escapeHtml(rawText || 'Сообщение')}</span>`;
 }
 
 async function fastDecryptDialogPreviews(dialogs) {
@@ -2576,7 +2583,7 @@ async function tryDecryptMessageRealTime(msgId, encryptedText) {
             setTimeout(() => {
                 const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
                 if (textElem) {
-                    textElem.innerHTML = linkifyText(escapeHtml(plainText));
+                    textElem.innerHTML = escapeHtml(plainText);
                 }
             }, 20);
         } else {
@@ -2650,7 +2657,7 @@ function renderMessageItem(containerOrFragment, msg) {
     if (isEncrypted) {
         if (decryptedCache[msg.id]) {
             displayText = decryptedCache[msg.id];
-            html += `<div class="msg-text">${linkifyText(escapeHtml(displayText))}</div>`;
+            html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
         } else {
             html += `<div class="msg-text"><span class="decrypting-shimmer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Расшифровка...</span></div>`;
             setTimeout(() => {
@@ -2658,7 +2665,7 @@ function renderMessageItem(containerOrFragment, msg) {
             }, 50);
         }
     } else {
-        if (displayText) html += `<div class="msg-text">${linkifyText(escapeHtml(displayText))}</div>`;
+        if (displayText) html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
     }
 
     if (msg.attachments) {
@@ -3293,45 +3300,6 @@ function renderDecryptedMedia(elem, data) {
 }
 
 function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
-
-function linkifyText(text) {
-    if (!text) return '';
-    text = text.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#0a84ff;text-decoration:none">$1</a>');
-    text = text.replace(/@([a-zA-Z0-9_]+)/g, '<span class="user-mention" style="color:#0a84ff;cursor:pointer" onclick="event.stopPropagation();showUserMentionMenu(event,this.dataset.user)" data-user="$1">@$1</span>');
-    return text;
-}
-
-function showUserMentionMenu(event, username) {
-    event.preventDefault();
-    const existing = document.getElementById('userMentionMenu');
-    if (existing) existing.remove();
-    const menu = document.createElement('div');
-    menu.id = 'userMentionMenu';
-    menu.style.cssText = 'position:fixed;z-index:900;background:#1c1c1e;border:1px solid #2c2c2e;border-radius:16px;padding:8px;display:flex;gap:8px;box-shadow:0 8px 32px rgba(0,0,0,0.6);';
-    menu.innerHTML = '<a href="https://t.me/' + username + '" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:6px;padding:10px 14px;border-radius:12px;background:#2c2c2e;color:#fff;text-decoration:none;font-size:13px;font-weight:600;" onclick="document.getElementById('userMentionMenu')?.remove()">' +
-        '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>Telegram</a>' +
-        '<div onclick="openProfileViewByUsername('' + username + '');document.getElementById('userMentionMenu')?.remove();" style="display:flex;align-items:center;gap:6px;padding:10px 14px;border-radius:12px;background:#2c2c2e;color:#fff;cursor:pointer;font-size:13px;font-weight:600;">' +
-        '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M15.684 0H8.316C1.592 0 0 1.592 0 8.316v7.368C0 22.408 1.592 24 8.316 24h7.368C22.408 24 24 22.408 24 15.684V8.316C24 1.592 22.408 0 15.684 0zm3.692 17.123h-1.744c-.66 0-.864-.525-2.05-1.727-1.033-1-1.49-1.135-1.744-1.135-.356 0-.458.102-.458.593v1.575c0 .424-.135.678-1.253.678-1.846 0-3.896-1.12-5.339-3.202C4.624 10.857 4 8.673 4 8.218c0-.254.102-.491.593-.491h1.744c.44 0 .61.203.78.678.864 2.49 2.303 4.675 2.896 4.675.22 0 .322-.102.322-.66V9.721c-.068-1.186-.695-1.287-.695-1.71 0-.203.17-.407.44-.407h2.744c.373 0 .508.203.508.643v3.473c0 .372.17.508.271.508.22 0 .407-.136.813-.542 1.254-1.406 2.151-3.574 2.151-3.574.119-.254.322-.491.763-.491h1.744c.525 0 .644.27.525.643-.22 1.017-2.354 4.031-2.354 4.031-.186.305-.254.44 0 .78.186.254.796.779 1.203 1.253.745.847 1.32 1.558 1.473 2.05.17.49-.085.745-.576.745z"/></svg>VK</div>';
-    document.body.appendChild(menu);
-    const rect = event.target.getBoundingClientRect();
-    menu.style.left = Math.min(rect.left, window.innerWidth - 220) + 'px';
-    menu.style.top = (rect.bottom + 8) + 'px';
-    setTimeout(() => {
-        document.addEventListener('click', function closeMenu(e) {
-            if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', closeMenu); }
-        });
-    }, 10);
-}
-
-async function openProfileViewByUsername(username) {
-    showUploadProgress('Поиск пользователя...');
-    try {
-        const res = await fetch('/api/search_username', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ token, username }) });
-        const data = await res.json();
-        if (data.id) { openProfileView(data.id, false); } else { alert('Пользователь не найден в VK'); }
-    } catch(e) { alert('Ошибка поиска'); }
-    finally { hideUploadProgress(); }
-}
 
 function handleInputTyping() {
     const val = document.getElementById('msgInput').value;
@@ -4059,14 +4027,14 @@ async function loadNewsFeed() {
 
                 div.innerHTML = `
                     <div class="tg-channel-header">
-                        <img class="tg-channel-avatar" src="${item.author_photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'" onclick="event.stopPropagation();openProfileView(${item.owner_id || 0}, ${item.owner_id < 0 ? 'true' : 'false'})" style="cursor:pointer">
+                        <img class="tg-channel-avatar" src="${item.author_photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'" onclick="openProfileView(${item.owner_id || 0}, ${item.owner_id < 0 ? 'true' : 'false'})" style="cursor:pointer">
                         <div>
-                            <div class="tg-channel-title">${escapeHtml(item.author_name)}</div>
+                            <div class="tg-channel-title" style="cursor:pointer" onclick="openProfileView(${item.owner_id || 0}, ${item.owner_id < 0 ? 'true' : 'false'})">${escapeHtml(item.author_name)}</div>
                             <div class="tg-channel-meta">${item.time || ''}</div>
                         </div>
                     </div>
                     ${mediaHTML}
-                    <div class="tg-channel-body">${linkifyText(escapeHtml(item.text || ''))}</div>
+                    <div class="tg-channel-body">${escapeHtml(item.text || '')}</div>
                     ${reactionsHTML}
                     <div class="tg-channel-footer">
                         <div class="tg-channel-actions">
@@ -4138,7 +4106,7 @@ async function openCommentsModal(ownerId, postId) {
                     <img class="comment-avatar" src="${c.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
                     <div class="comment-body">
                         <div class="comment-author">${escapeHtml(c.name)}</div>
-                        <div class="comment-text">${linkifyText(escapeHtml(c.text))}</div>
+                        <div class="comment-text">${escapeHtml(c.text)}</div>
                         <div class="comment-time">${c.time || ''}</div>
                     </div>
                 `;
@@ -4169,17 +4137,6 @@ async function openProfileView(peerId, isGroup) {
 
         document.getElementById('profileViewAvatar').src = data.photo || 'https://vk.com/images/camera_100.png';
         document.getElementById('profileViewName').textContent = data.name || '...';
-        const statusText = data.status || '';
-        const statusElem = document.getElementById('profileViewStatus');
-        statusElem.dataset.fullText = data.status || '';
-        statusElem.style.color = '#8e8e93';
-        statusElem.style.fontSize = '13px';
-        statusElem.style.lineHeight = '1.4';
-        if (statusText.length > 120) {
-            statusElem.innerHTML = linkifyText(escapeHtml(statusText.substring(0, 120))) + '... <span style="color:#0a84ff;cursor:pointer" onclick="showFullDescription()">Ещё</span>';
-        } else {
-            statusElem.innerHTML = linkifyText(escapeHtml(statusText));
-        }
         document.getElementById('profileViewHeaderTitle').textContent = 'Информация';
 
         // Cover photo now shown in info section, not header
@@ -4197,6 +4154,11 @@ async function openProfileView(peerId, isGroup) {
 
         const infoDiv = document.getElementById('profileViewInfo');
         infoDiv.innerHTML = '';
+
+        // Description/status as main info — серый цвет, обрезка, ссылки
+        if (data.status) {
+            infoDiv.innerHTML += `<div class="profile-desc-text" style="font-size:14px;color:#8e8e93;line-height:1.5;margin-bottom:12px">${formatProfileDescription(data.status)}</div>`;
+        }
 
         // Stats row for groups
         if (data.members_count) {
@@ -4244,7 +4206,7 @@ async function openProfileView(peerId, isGroup) {
                         </div>
                     </div>
                     ${mediaHTML}
-                    <div class="tg-channel-body">${linkifyText(escapeHtml(post.text || ''))}</div>
+                    <div class="tg-channel-body">${escapeHtml(post.text || '')}</div>
                     ${postReactionsHTML}
                     <div class="tg-channel-footer">
                         <div class="tg-channel-actions">
@@ -4266,13 +4228,71 @@ async function openProfileView(peerId, isGroup) {
 }
 
 function showFullDescription() {
-    const fullText = document.getElementById('profileViewStatus').dataset.fullText || '';
+    const fullText = document.getElementById('profileViewStatus')?.dataset.fullText || '';
     if (fullText) {
-        const modal = document.createElement('div');
-        modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px;';
-        modal.innerHTML = '<div style="background:#161616;border-radius:20px;padding:24px;max-width:380px;width:100%;border:1px solid #282828;max-height:70vh;overflow-y:auto;"><div style="font-size:18px;font-weight:600;margin-bottom:12px;color:#fff">Описание</div><div style="font-size:14px;color:#ddd;line-height:1.6;white-space:pre-wrap;">' + linkifyText(escapeHtml(fullText)) + '</div><button class="btn" style="margin-top:16px;width:100%" onclick="this.parentElement.parentElement.remove()">Закрыть</button></div>';
-        modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
-        document.body.appendChild(modal);
+        alert(fullText);
+    }
+}
+
+function formatProfileDescription(text) {
+    if (!text) return '';
+    // Экранируем HTML
+    let safe = escapeHtml(text);
+    // Ссылки — синий цвет, кликабельные
+    safe = safe.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+    // @username — кликабельный с меню
+    safe = safe.replace(/@([a-zA-Z0-9_]+)/g, '<a href="#" onclick="showUserLinkMenu(event,'$1');return false;" style="color:#0a84ff">@$1</a>');
+    return safe;
+}
+
+function showUserLinkMenu(e, username) {
+    e.preventDefault();
+    e.stopPropagation();
+    let menu = document.getElementById('userLinkMenu');
+    if (!menu) {
+        menu = document.createElement('div');
+        menu.id = 'userLinkMenu';
+        menu.className = 'user-link-menu';
+        menu.innerHTML = `
+            <div style="font-size:13px;color:#8e8e93;text-align:center;margin-bottom:4px">@${username}</div>
+            <div class="user-link-item" onclick="window.open('tg://resolve?domain=${username}', '_blank')||window.open('https://t.me/${username}', '_blank')">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
+                <span>Открыть в Telegram</span>
+            </div>
+            <div class="user-link-item" onclick="closeUserLinkMenu(); openProfileViewByUsername('${username}')">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.07 2H8.93C3.33 2 2 3.33 2 8.93v6.14C2 20.67 3.33 22 8.93 22h6.14c5.6 0 6.93-1.33 6.93-6.93V8.93C22 3.33 20.67 2 15.07 2zM18.15 16.27l-1.42.02c-.54 0-.71-.42-.83-.55-.33-.38-.66-.68-1.2-.68-.54 0-.87.3-1.2.68-.12.13-.29.55-.83.55l-1.42-.02c-.42 0-.55-.21-.4-.62.62-1.62 2.21-2.72 3.85-2.72s3.23 1.1 3.85 2.72c.15.41.02.62-.4.62zM15.5 9.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"/></svg>
+                <span>Открыть профиль VK</span>
+            </div>
+            <div class="user-link-item" style="justify-content:center;color:#888" onclick="closeUserLinkMenu()">Отмена</div>
+        `;
+        document.body.appendChild(menu);
+    }
+    menu.classList.add('active');
+}
+
+function closeUserLinkMenu() {
+    const menu = document.getElementById('userLinkMenu');
+    if (menu) menu.classList.remove('active');
+}
+
+async function openProfileViewByUsername(username) {
+    showUploadProgress('Поиск пользователя...');
+    try {
+        const res = await fetch('/api/search_by_username', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({token, username})
+        });
+        const data = await res.json();
+        if (data.id) {
+            openProfileView(data.id, false);
+        } else {
+            alert('Пользователь не найден');
+        }
+    } catch(e) {
+        alert('Ошибка поиска');
+    } finally {
+        hideUploadProgress();
     }
 }
 
@@ -6002,6 +6022,27 @@ def forward_messages():
 
 
 
+@app.route('/api/search_by_username', methods=['POST'])
+def search_by_username():
+    token = request.json.get('token')
+    username = request.json.get('username', '').strip()
+    if not username:
+        return jsonify({'error': 'No username'}), 400
+
+    # Search users by screen_name
+    res = vk_request('users.search', token, q=username, count=10, fields='photo_100,screen_name')
+    if isinstance(res, dict) and 'items' in res:
+        for u in res.get('items', []):
+            if u.get('screen_name', '').lower() == username.lower():
+                return jsonify({
+                    'id': u.get('id'),
+                    'name': f"{u.get('first_name', '')} {u.get('last_name', '')}".strip(),
+                    'photo': u.get('photo_100', '')
+                })
+
+    return jsonify({'error': 'Not found'}), 404
+
+
 @app.route('/api/backup', methods=['POST'])
 def backup_data():
     vk_id = request.json.get('vk_id')
@@ -6030,31 +6071,6 @@ def ping():
 
 # Register cloud storage blueprint
 app.register_blueprint(cloud_bp, url_prefix='/cloud')
-
-
-@app.route('/api/search_username', methods=['POST'])
-def search_username():
-    token = request.json.get('token')
-    username = request.json.get('username', '').strip()
-    if not username:
-        return jsonify({'error': 'No username'}), 400
-    result = vk_request('users.get', token, user_ids=username, fields='photo_100')
-    if isinstance(result, list) and len(result) > 0:
-        u = result[0]
-        if 'id' in u:
-            return jsonify({'id': u.get('id'), 'name': f"{u.get('first_name', '')} {u.get('last_name', '')}".strip(), 'photo': u.get('photo_100', '')})
-    resolved = vk_request('utils.resolveScreenName', token, screen_name=username)
-    if isinstance(resolved, dict) and 'object_id' in resolved:
-        obj_type = resolved.get('type', '')
-        obj_id = resolved.get('object_id')
-        if obj_type == 'user':
-            user_info = vk_request('users.get', token, user_ids=obj_id, fields='photo_100')
-            if isinstance(user_info, list) and len(user_info) > 0:
-                u = user_info[0]
-                return jsonify({'id': u.get('id'), 'name': f"{u.get('first_name', '')} {u.get('last_name', '')}".strip(), 'photo': u.get('photo_100', '')})
-        elif obj_type == 'group':
-            return jsonify({'id': -obj_id, 'name': 'Group', 'photo': ''})
-    return jsonify({'error': 'Not found'}), 404
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
