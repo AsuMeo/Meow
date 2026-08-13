@@ -56,7 +56,7 @@ def firebase_get(path):
         if resp.status_code == 200:
             return resp.json()
     except Exception as e:
-        print("Firebase GET error:", e)
+        print("Cloud GET error:", e)
     return None
 
 def firebase_put(path, data):
@@ -69,7 +69,7 @@ def firebase_put(path, data):
         resp = get_session().put(url, json=data, timeout=5)
         return resp.status_code == 200
     except Exception as e:
-        print("Firebase PUT error:", e)
+        print("Cloud PUT error:", e)
     return False
 
 def get_stored_pub_key(vk_id):
@@ -355,22 +355,61 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .folder-tab.active{background:#2c2c2e;color:#fff;border-color:#3a3a3c}
 .folder-tab:active{background:#333}
 
-/* TG Channel Card Style */
+/* TG Channel Card Style - Telegram-like */
 .tg-channel-card{background:#141416;border-radius:16px;margin-bottom:12px;border:1px solid #1c1c1c;overflow:hidden}
-.tg-channel-header{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid #1c1c1c}
+.tg-channel-header{display:flex;align-items:center;gap:12px;padding:12px 14px}
 .tg-channel-avatar{width:42px;height:42px;border-radius:50%;object-fit:cover;background:#222;flex-shrink:0}
 .tg-channel-title{font-size:15px;font-weight:700;color:#fff;line-height:1.2}
 .tg-channel-meta{font-size:12px;color:#8e8e93;margin-top:2px}
-.tg-channel-body{padding:14px;font-size:14px;line-height:1.5;color:#ddd;white-space:pre-line}
-.tg-channel-media{width:100%;max-height:380px;object-fit:cover;cursor:pointer;display:block}
-.tg-channel-video-wrap{width:100%;background:#000;position:relative}
-.tg-channel-video{width:100%;max-height:380px;display:block}
+.tg-channel-body{padding:10px 14px 6px;font-size:14px;line-height:1.5;color:#ddd;white-space:pre-line}
+.tg-channel-media{width:100%;max-height:420px;object-fit:cover;cursor:pointer;display:block;background:#0a0a0a}
+.tg-channel-video-wrap{width:100%;background:#0a0a0a;position:relative;border-radius:12px;overflow:hidden;margin:8px 0}
+.tg-channel-video{width:100%;max-height:420px;display:block}
 .tg-channel-iframe{width:100%;height:260px;border:none}
-.tg-channel-footer{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid #1c1c1c;background:#101012;color:#8e8e93;font-size:13px}
-.tg-channel-actions{display:flex;gap:16px;align-items:center}
-.tg-channel-btn{display:flex;align-items:center;gap:6px;cursor:pointer;color:#8e8e93;transition:color 0.15s;font-size:13px;font-weight:500}
-.tg-channel-btn:active{color:#fff}
-.tg-channel-btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2}
+.tg-channel-footer{display:flex;align-items:center;justify-content:space-between;padding:8px 14px 12px;background:transparent;color:#8e8e93;font-size:13px}
+.tg-channel-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tg-channel-btn{display:flex;align-items:center;gap:4px;cursor:pointer;color:#8e8e93;transition:all 0.15s;font-size:12px;font-weight:500;background:#1c1c1e;border-radius:16px;padding:4px 10px;border:1px solid #2c2c2e}
+.tg-channel-btn:active{background:#2c2c2e;color:#fff}
+.tg-channel-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2}
+
+/* TG Channel Reactions */
+.tg-reactions-row{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 10px}
+.tg-reaction-chip{display:flex;align-items:center;gap:4px;background:#1c1c1e;border:1px solid #2c2c2e;border-radius:14px;padding:4px 10px;font-size:13px;color:#ddd;cursor:pointer;transition:all 0.15s}
+.tg-reaction-chip:active{background:#2c2c2e}
+.tg-reaction-chip .emoji{font-size:16px;line-height:1}
+.tg-reaction-chip .count{font-size:12px;font-weight:600;color:#aaa}
+
+/* Video Preview with Play Button */
+.tg-video-preview{position:relative;width:100%;background:#0a0a0a;border-radius:12px;overflow:hidden;margin:8px 0;cursor:pointer}
+.tg-video-preview img{width:100%;max-height:420px;object-fit:cover;display:block}
+.tg-video-play-btn{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:56px;height:56px;border-radius:50%;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,0.3);transition:all 0.2s}
+.tg-video-preview:active .tg-video-play-btn{background:rgba(0,0,0,0.8);border-color:rgba(255,255,255,0.5);transform:translate(-50%,-50%) scale(0.95)}
+.tg-video-play-btn svg{width:22px;height:22px;fill:#fff;margin-left:3px}
+.tg-video-duration{position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.7);color:#fff;font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px}
+.tg-video-size{position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.7);color:#fff;font-size:11px;font-weight:500;padding:2px 8px;border-radius:6px;display:flex;align-items:center;gap:4px}
+
+/* Photo Grid for multiple photos */
+.tg-photo-grid{display:grid;gap:2px;margin:8px 0;border-radius:12px;overflow:hidden}
+.tg-photo-grid-2{grid-template-columns:repeat(2,1fr)}
+.tg-photo-grid-3{grid-template-columns:repeat(3,1fr)}
+.tg-photo-grid-4{grid-template-columns:repeat(2,1fr)}
+.tg-photo-grid img{width:100%;height:200px;object-fit:cover;display:block;cursor:pointer}
+.tg-photo-grid-3 img:first-child{grid-column:span 2;height:200px}
+.tg-photo-grid-4 img{height:160px}
+
+/* Channel Top Info Bar */
+.tg-channel-topbar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#0d0d0d;border-bottom:1px solid #1c1c1c;position:sticky;top:0;z-index:20}
+.tg-channel-topbar-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover}
+.tg-channel-topbar-info{flex:1}
+.tg-channel-topbar-name{font-size:15px;font-weight:700;color:#fff}
+.tg-channel-topbar-sub{font-size:12px;color:#8e8e93}
+
+/* Pinned message in channel */
+.tg-pinned-bar{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#141416;border-bottom:1px solid #1c1c1c}
+.tg-pinned-bar img{width:36px;height:36px;border-radius:6px;object-fit:cover;background:#222}
+.tg-pinned-info{flex:1;min-width:0}
+.tg-pinned-label{font-size:11px;font-weight:600;color:#0a84ff;text-transform:uppercase;letter-spacing:0.5px}
+.tg-pinned-text{font-size:12px;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* Comments & Likes Modal */
 .comments-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:750;display:flex;flex-direction:column;transform:translateY(100%);transition:transform 0.25s cubic-bezier(0.1,0.9,0.2,1)}
@@ -813,10 +852,6 @@ input:checked + .slider:before{transform:translateX(20px)}
 .msg{box-shadow:0 1px 2px rgba(0,0,0,0.2)}
 .msg-out{box-shadow:0 1px 2px rgba(0,0,0,0.3)}
 
-/* Call button in header */
-.call-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;color:#34c759;background:rgba(52,199,89,0.1);border:none;outline:none;margin-right:6px}
-.call-btn:active{background:rgba(52,199,89,0.2)}
-
 /* Voice message recording animation */
 .recording-bar.recording .recording-dot{animation:pulseDot 0.8s infinite alternate}
 
@@ -913,7 +948,7 @@ input:checked + .slider:before{transform:translateX(20px)}
 <div class="drawer-item" onclick="triggerAvatarSelect()">
 <div class="drawer-item-left">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-<span>Сменить аватар (Kate Mobile)</span>
+<span>Сменить аватар</span>
 </div>
 </div>
 <div class="drawer-item" onclick="setPinCode()">
@@ -926,13 +961,13 @@ input:checked + .slider:before{transform:translateX(20px)}
 <div class="drawer-item" onclick="openEncryptModal(); closeDrawer();">
 <div class="drawer-item-left">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-<span>Облачное E2EE Шифрование</span>
+<span>E2E ключи</span>
 </div>
 </div>
 <div class="drawer-item" onclick="window.location.href='/cloud'">
 <div class="drawer-item-left">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
-<span>☁️ Облако VK Tsuyu</span>
+<span>Облако</span>
 </div>
 </div>
 <div style="flex:1"></div>
@@ -948,14 +983,14 @@ input:checked + .slider:before{transform:translateX(20px)}
 <!-- Encryption & Keys Modal -->
 <div class="modal hidden" id="encryptModal">
 <div class="encrypt-modal-content">
-<div class="modal-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Облачное E2EE шифрование</div>
+<div class="modal-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>E2E ключи</div>
 <div class="warning-box">
-<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>Ваши зашифрованные ключи надежно сохранены в <b>Firebase Realtime Database</b> и защищены вашим мастер-паролем. Вход с любого устройства восстановит доступ к вашим чатам!
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>Ваши зашифрованные ключи надежно сохранены в <b>надёжном месте</b> и защищены вашим мастер-паролем. Вход с любого устройства восстановит доступ к вашим чатам!
 </div>
 <div class="modal-text" style="margin-bottom:10px">Отпечаток устройства (Delfan Fingerprint):</div>
 <div class="delfan-box" id="delfanFingerprint">Вычисление отпечатка...</div>
 
-<div class="modal-text" style="margin-bottom:4px">Ваш публичный ключ (RTDB Cloud):</div>
+<div class="modal-text" style="margin-bottom:4px">Ваш публичный ключ:</div>
 <div class="key-box" id="modalPubKey">Загрузка...</div>
 
 <div class="modal-text" style="margin-top:10px;margin-bottom:4px">Ваш зашифрованный приватный ключ:</div>
@@ -1106,10 +1141,10 @@ input:checked + .slider:before{transform:translateX(20px)}
 <h1>VK Tsuyu</h1>
 <div class="badge-e2e">
 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-Kate Mobile API • Cloud Realtime E2EE
+E2EE
 </div>
-<p>Вход по токену Kate Mobile. Мгновенная работа, ТГ-каналы, поиск и облачное шифрование.</p>
-<button class="btn btn-secondary" onclick="getToken()">1. Получить токен Kate Mobile</button>
+<p>Вход по токену VK. Мгновенная работа, ТГ-каналы, поиск и шифрование.</p>
+<button class="btn btn-secondary" onclick="getToken()">1. Получить токен VK</button>
 <input type="text" class="token-input" id="tokenUrl" placeholder="Ссылка с токеном из строки браузера...">
 <input type="password" class="pass-input" id="password" placeholder="Пароль для защиты E2EE ключей...">
 <button class="btn" onclick="login()">Войти</button>
@@ -1139,7 +1174,7 @@ Kate Mobile API • Cloud Realtime E2EE
 </div>
 <div class="header-info" onclick="openDrawer()">
 <div class="header-title-main" id="dialogsHeaderTitle">VK Tsuyu</div>
-<div class="header-subtitle" id="dialogsHeaderSubtitle">Защищено Cloud E2EE</div>
+<div class="header-subtitle" id="dialogsHeaderSubtitle">Защищено E2EE</div>
 </div>
 <div class="header-actions">
 <button class="header-btn active" id="encryptBtn" onclick="openEncryptModal()" title="Шифрование E2EE">
@@ -1193,11 +1228,6 @@ Kate Mobile API • Cloud Realtime E2EE
 <div class="header-subtitle" id="chatEncryptStatus">в сети • <span id="msgCount">0</span> сообщений</div>
 </div>
 <div class="header-actions">
-<!-- Call Button -->
-<button class="call-btn" id="callBtn" onclick="startCall(currentPeer)" title="Позвонить">
-<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-</button>
-
 <!-- SVG Magnifying Glass Icon — clean, no gray box background -->
 <button class="header-btn" id="searchChatBtn" onclick="toggleChatSearch()" title="Поиск по сообщениям в чате" style="background:transparent;border:none">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -1552,7 +1582,7 @@ async function updateDelfanDisplay() {
     if (!localKeyPair) return;
     
     pubElem.textContent = localKeyPair.pubJwkStr;
-    privElem.textContent = "[СКРЫТ ДЛЯ БЕЗОПАСНОСТИ - ХРАНИТСЯ В FIREBASE RTDB]";
+    privElem.textContent = "[СКРЫТ ДЛЯ БЕЗОПАСНОСТИ]";
     const fp = await generateDelfanFingerprint(localKeyPair.pubJwkStr);
     elem.textContent = fp;
 }
@@ -1595,7 +1625,7 @@ async function importKeysFile(e) {
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(data)
                 });
-                alert('Ключи успешно импортированы в Firebase RTDB! Перезагрузка...');
+                alert('Ключи успешно импортированы в надёжное хранилище! Перезагрузка...');
                 location.reload();
             } else {
                 alert('Неверный формат файла ключей');
@@ -1616,7 +1646,7 @@ async function regenerateKeysPrompt() {
         password = newPass;
         localStorage.setItem('vk_pass', newPass);
         await initClientCrypto(true);
-        alert('Ключи обновлены в облаке!');
+        alert('Ключи обновлены в надёжном хранилище!');
         openEncryptModal();
     }
 }
@@ -1658,7 +1688,7 @@ async function decryptAESGCM(key, combinedBuf) {
 
 async function initClientCrypto(forceNew = false) {
     if (!myVkId || !password) return false;
-    showUploadProgress('Синхронизация ключей (Firebase RTDB)...');
+    showUploadProgress('Синхронизация ключей (надёжное хранилище)...');
 
     try {
         const masterKey = await deriveMasterKey(password, myVkId + "_vk_e2ee_salt");
@@ -1683,7 +1713,7 @@ async function initClientCrypto(forceNew = false) {
                 return true;
             } catch(e) {
                 console.error("Local Key Decryption Failed:", e);
-                alert("Неверный пароль шифрования для данного VK ID! Введенный пароль не подходит к зашифрованному ключу в облаке.");
+                alert("Неверный пароль шифрования для данного VK ID! Введенный пароль не подходит к зашифрованному ключу в надёжном хранилище.");
                 return false;
             }
         } else {
@@ -1793,7 +1823,7 @@ async function login() {
     if (!url) { alert('Вставь ссылку с токеном'); return; }
     if (!pass) { alert('Укажи пароль для E2EE'); return; }
 
-    showUploadProgress('Вход через Kate Mobile API...');
+    showUploadProgress('Вход...');
     try {
         const res = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
         const data = await res.json();
@@ -1826,7 +1856,7 @@ function showDialogsScreen() {
     document.getElementById('dialogsScreen').classList.remove('hidden');
     if (currentUser) {
         document.getElementById('dialogsHeaderTitle').textContent = 'VK Tsuyu';
-        document.getElementById('dialogsHeaderSubtitle').textContent = 'Защищено Cloud E2EE';
+        document.getElementById('dialogsHeaderSubtitle').textContent = 'Защищено E2EE';
         updateDrawerProfile();
     }
 }
@@ -1923,7 +1953,7 @@ async function saveProfileChanges() {
     const lastName = document.getElementById('editLastName').value.trim();
     const statusText = document.getElementById('editStatusInput').value.trim();
 
-    showUploadProgress('Сохранение в VK (Kate Mobile)...');
+    showUploadProgress('Сохранение в VK...');
     try {
         const res = await fetch('/api/profile/update', {
             method: 'POST',
@@ -1956,7 +1986,7 @@ async function uploadAvatarFile(e) {
     const file = e.target.files[0];
     if (!file) return;
 
-    showUploadProgress('Обновление аватара (Kate Mobile)...');
+    showUploadProgress('Обновление аватара...');
     const formData = new FormData();
     formData.append('token', token);
     formData.append('photo', file);
@@ -3877,15 +3907,80 @@ async function switchFolder(folder) {
     }
 }
 
-function buildTGPostMediaHTML(photo, video) {
-    if (video && video.player) {
-        return `<div class="tg-channel-video-wrap">
-            <iframe class="tg-channel-iframe" src="${video.player}" allowfullscreen></iframe>
-        </div>`;
-    } else if (photo) {
-        return `<img class="tg-channel-media" src="${photo}" onclick="openPhotoViewer('${photo}')" onerror="this.style.display='none'">`;
+function buildTGPostMediaHTML(photo, video, photos, videos) {
+    let html = '';
+
+    // Handle multiple photos
+    const allPhotos = photos || (photo ? [photo] : []);
+    const allVideos = videos || (video ? [video] : []);
+
+    if (allPhotos.length > 1) {
+        let gridClass = 'tg-photo-grid-' + Math.min(allPhotos.length, 4);
+        if (allPhotos.length === 3) gridClass = 'tg-photo-grid-3';
+        html += `<div class="tg-photo-grid ${gridClass}">`;
+        allPhotos.forEach((p, i) => {
+            html += `<img src="${p}" onclick="openPhotoViewer('${p}')" onerror="this.style.display='none'" loading="lazy">`;
+        });
+        html += '</div>';
+    } else if (allPhotos.length === 1) {
+        html += `<img class="tg-channel-media" src="${allPhotos[0]}" onclick="openPhotoViewer('${allPhotos[0]}')" onerror="this.style.display='none'" loading="lazy">`;
     }
-    return '';
+
+    // Handle videos with preview + play button
+    if (allVideos.length > 0) {
+        allVideos.forEach(v => {
+            const previewImg = v.image || '';
+            const duration = v.duration || 0;
+            const durStr = duration > 0 ? `${Math.floor(duration/60)}:${(duration%60).toString().padStart(2,'0')}` : '';
+
+            if (previewImg) {
+                html += `<div class="tg-video-preview" onclick="playChannelVideo(this, '${v.owner_id}', '${v.id}', '${v.access_key || ''}')">
+                    <img src="${previewImg}" onerror="this.style.display='none'" loading="lazy">
+                    <div class="tg-video-play-btn">
+                        <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    </div>
+                    ${durStr ? `<div class="tg-video-duration">${durStr}</div>` : ''}
+                </div>`;
+            } else if (v.player) {
+                html += `<div class="tg-channel-video-wrap">
+                    <iframe class="tg-channel-iframe" src="${v.player}" allowfullscreen loading="lazy"></iframe>
+                </div>`;
+            }
+        });
+    }
+
+    return html;
+}
+
+// Play channel video inline
+async function playChannelVideo(elem, ownerId, videoId, accessKey) {
+    // First try to get player URL from API
+    try {
+        const res = await fetch('/api/video_player', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ token, owner_id: ownerId, video_id: videoId, access_key: accessKey })
+        });
+        const data = await res.json();
+
+        if (data.player) {
+            // Replace preview with iframe player
+            const wrap = document.createElement('div');
+            wrap.className = 'tg-channel-video-wrap';
+            wrap.style.margin = '8px 0';
+            wrap.innerHTML = `<iframe class="tg-channel-iframe" src="${data.player}" allowfullscreen></iframe>`;
+            elem.replaceWith(wrap);
+            return;
+        }
+    } catch(e) {}
+
+    // Fallback: open VK directly
+    const videoUrl = `https://vk.com/video${ownerId}_${videoId}`;
+    if (accessKey) {
+        window.open(`https://vk.com/video${ownerId}_${videoId}_${accessKey}`, '_blank');
+    } else {
+        window.open(videoUrl, '_blank');
+    }
 }
 
 async function loadNewsFeed() {
@@ -3899,7 +3994,18 @@ async function loadNewsFeed() {
             for (const item of data.items) {
                 const div = document.createElement('div');
                 div.className = 'tg-channel-card';
-                const mediaHTML = buildTGPostMediaHTML(item.photo, item.video);
+                const mediaHTML = buildTGPostMediaHTML(item.photo, item.video, item.photos, item.videos);
+
+                // Build reactions HTML if available
+                let reactionsHTML = '';
+                if (item.reactions && item.reactions.length > 0) {
+                    reactionsHTML = '<div class="tg-reactions-row">';
+                    item.reactions.forEach(r => {
+                        reactionsHTML += `<div class="tg-reaction-chip"><span class="emoji">${r.emoji || '👍'}</span><span class="count">${r.count || 0}</span></div>`;
+                    });
+                    reactionsHTML += '</div>';
+                }
+
                 div.innerHTML = `
                     <div class="tg-channel-header">
                         <img class="tg-channel-avatar" src="${item.author_photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
@@ -3910,6 +4016,7 @@ async function loadNewsFeed() {
                     </div>
                     ${mediaHTML}
                     <div class="tg-channel-body">${escapeHtml(item.text || '')}</div>
+                    ${reactionsHTML}
                     <div class="tg-channel-footer">
                         <div class="tg-channel-actions">
                             <div class="tg-channel-btn" onclick="openLikesModal('${item.owner_id || 0}', '${item.post_id || 0}')">${SVG_LIKE} ${item.likes || 0}</div>
@@ -3926,7 +4033,7 @@ async function loadNewsFeed() {
 }
 
 async function openLikesModal(ownerId, postId) {
-    showUploadProgress('Загрузка оценок (Kate Mobile)...');
+    showUploadProgress('Загрузка оценок...');
     try {
         const res = await fetch('/api/post_likes', {
             method: 'POST',
@@ -4034,7 +4141,17 @@ async function openProfileView(peerId, isGroup) {
             for (const post of data.posts) {
                 const div = document.createElement('div');
                 div.className = 'tg-channel-card';
-                const mediaHTML = buildTGPostMediaHTML(post.photo, post.video);
+                const mediaHTML = buildTGPostMediaHTML(post.photo, post.video, post.photos, post.videos);
+
+                let postReactionsHTML = '';
+                if (post.reactions && post.reactions.length > 0) {
+                    postReactionsHTML = '<div class="tg-reactions-row">';
+                    post.reactions.forEach(r => {
+                        postReactionsHTML += `<div class="tg-reaction-chip"><span class="emoji">${r.emoji || '👍'}</span><span class="count">${r.count || 0}</span></div>`;
+                    });
+                    postReactionsHTML += '</div>';
+                }
+
                 div.innerHTML = `
                     <div class="tg-channel-header">
                         <img class="tg-channel-avatar" src="${data.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
@@ -4044,6 +4161,7 @@ async function openProfileView(peerId, isGroup) {
                     </div>
                     ${mediaHTML}
                     <div class="tg-channel-body">${escapeHtml(post.text || '')}</div>
+                    ${postReactionsHTML}
                     <div class="tg-channel-footer">
                         <div class="tg-channel-actions">
                             <div class="tg-channel-btn" onclick="openLikesModal('${post.owner_id || peerId}', '${post.id}')">${SVG_LIKE} ${post.likes || 0}</div>
@@ -4569,14 +4687,7 @@ function renderDialogsVirtual() {
     // ... existing render logic but with visibleDialogs
 }
 
-/* --- 16. CALL BUTTON (placeholder) --- */
-function startCall(peerId) {
-    if (!peerId) {
-        alert("Выберите собеседника для звонка");
-        return;
-    }
-    window.location.href = `call.py?peer=${encodeURIComponent(peerId)}`;
-}
+/* Call button removed */
 
 /* --- 17. ENHANCED FILE UPLOAD with progress --- */
 async function uploadFileWithProgress(file, onProgress) {
@@ -5322,28 +5433,60 @@ def save_folders(vk_id):
 
 
 def extract_media_from_attachments(attachments):
-    photo = None
-    video = None
+    photos = []
+    videos = []
     for a in attachments:
         a_type = a.get('type')
-        if a_type == 'photo' and not photo:
+        if a_type == 'photo':
             sizes = a.get('photo', {}).get('sizes', [])
             if sizes:
-                photo = sizes[-1].get('url', '')
-        elif a_type == 'video' and not video:
+                # Get best quality photo
+                best = sizes[-1].get('url', '')
+                # Try to get 'x' or 'y' size for better quality
+                for s in reversed(sizes):
+                    if s.get('type') in ('x', 'y', 'z', 'w'):
+                        best = s.get('url', best)
+                        break
+                photos.append(best)
+        elif a_type == 'video':
             v = a.get('video', {})
             player_url = v.get('player', '')
             image_url = ''
+
+            # Try multiple sources for preview image
             if v.get('first_frame'):
-                image_url = v.get('first_frame', [{}])[-1].get('url', '')
+                frames = v.get('first_frame', [])
+                if frames:
+                    image_url = frames[-1].get('url', '')
             elif v.get('image'):
-                image_url = v.get('image', [{}])[-1].get('url', '')
-            video = {
+                images = v.get('image', [])
+                if images:
+                    image_url = images[-1].get('url', '')
+            elif v.get('photo_800'):
+                image_url = v.get('photo_800', '')
+            elif v.get('photo_640'):
+                image_url = v.get('photo_640', '')
+            elif v.get('photo_320'):
+                image_url = v.get('photo_320', '')
+            elif v.get('photo_130'):
+                image_url = v.get('photo_130', '')
+
+            duration = v.get('duration', 0)
+
+            videos.append({
                 'player': player_url,
                 'image': image_url,
-                'title': v.get('title', '')
-            }
-    return photo, video
+                'title': v.get('title', ''),
+                'duration': duration,
+                'id': v.get('id', 0),
+                'owner_id': v.get('owner_id', 0),
+                'access_key': v.get('access_key', '')
+            })
+
+    # Backward compat: return first photo/video as single values
+    photo = photos[0] if photos else None
+    video = videos[0] if videos else None
+    return photo, video, photos, videos
 
 
 @app.route('/api/news', methods=['POST'])
@@ -5367,7 +5510,17 @@ def get_news():
             author_name = author.get('name', 'Group')
             author_photo = author.get('photo_100') or author.get('photo_50', '')
 
-        photo, video = extract_media_from_attachments(item.get('attachments', []))
+        photo, video, photos, videos = extract_media_from_attachments(item.get('attachments', []))
+
+        # Extract reactions
+        reactions = []
+        reactions_data = item.get('reactions', {})
+        if reactions_data and 'items' in reactions_data:
+            for r in reactions_data.get('items', []):
+                reactions.append({
+                    'emoji': r.get('reaction_id', '👍'),
+                    'count': r.get('count', 0)
+                })
 
         items.append({
             'owner_id': source_id,
@@ -5377,6 +5530,9 @@ def get_news():
             'text': item.get('text', ''),
             'photo': photo,
             'video': video,
+            'photos': photos,
+            'videos': videos,
+            'reactions': reactions,
             'time': datetime.fromtimestamp(item.get('date', 0)).strftime('%H:%M') if item.get('date') else '',
             'likes': item.get('likes', {}).get('count', 0),
             'comments': item.get('comments', {}).get('count', 0),
@@ -5491,13 +5647,15 @@ def profile_view():
         if isinstance(wall, dict) and 'items' in wall:
             items = wall.get('items', [])
             for p in items:
-                p_photo, p_video = extract_media_from_attachments(p.get('attachments', []))
+                p_photo, p_video, p_photos, p_videos = extract_media_from_attachments(p.get('attachments', []))
                 posts.append({
                     'id': p.get('id'),
                     'owner_id': -group_id,
                     'text': p.get('text', ''),
                     'photo': p_photo,
                     'video': p_video,
+                    'photos': p_photos,
+                    'videos': p_videos,
                     'likes': p.get('likes', {}).get('count', 0),
                     'comments': p.get('comments', {}).get('count', 0),
                     'reposts': p.get('reposts', {}).get('count', 0)
@@ -5520,13 +5678,15 @@ def profile_view():
             posts = []
             if isinstance(wall, dict) and 'items' in wall:
                 for p in wall.get('items', []):
-                    p_photo, p_video = extract_media_from_attachments(p.get('attachments', []))
+                    p_photo, p_video, p_photos, p_videos = extract_media_from_attachments(p.get('attachments', []))
                     posts.append({
                         'id': p.get('id'),
                         'owner_id': peer_id,
                         'text': p.get('text', ''),
                         'photo': p_photo,
                         'video': p_video,
+                        'photos': p_photos,
+                        'videos': p_videos,
                         'likes': p.get('likes', {}).get('count', 0),
                         'comments': p.get('comments', {}).get('count', 0),
                         'reposts': p.get('reposts', {}).get('count', 0)
@@ -5592,6 +5752,41 @@ def proxy_file():
         return jsonify({'error': str(e)}), 500
 
 
+
+
+@app.route('/api/video_player', methods=['POST'])
+def get_video_player():
+    token = request.json.get('token')
+    owner_id = request.json.get('owner_id')
+    video_id = request.json.get('video_id')
+    access_key = request.json.get('access_key', '')
+
+    if not owner_id or not video_id:
+        return jsonify({'error': 'Missing params'}), 400
+
+    videos = f"{owner_id}_{video_id}"
+    if access_key:
+        videos += f"_{access_key}"
+
+    result = vk_request('video.get', token, videos=videos, extended=0)
+
+    if isinstance(result, dict) and 'error' in result:
+        return jsonify(result), 400
+
+    items = result.get('items', []) if isinstance(result, dict) else []
+    if items and len(items) > 0:
+        v = items[0]
+        player = v.get('player', '')
+        # Also try to get direct mp4 links
+        files = v.get('files', {})
+        return jsonify({
+            'player': player,
+            'files': files,
+            'duration': v.get('duration', 0),
+            'title': v.get('title', '')
+        })
+
+    return jsonify({'error': 'Video not found'}), 404
 
 
 @app.route('/api/stickers', methods=['POST'])
@@ -5707,18 +5902,7 @@ def forward_messages():
     return jsonify({'result': result})
 
 
-@app.route('/api/call/start', methods=['POST'])
-def start_call():
-    token = request.json.get('token')
-    peer_id = request.json.get('peer_id')
 
-    # VK doesn't have direct API for calls, but we can send a message
-    result = vk_request('messages.send', token,
-        peer_id=peer_id,
-        message='📞 Предложение позвонить (используйте VK для звонка)',
-        random_id=random.randint(1, 2147483647)
-    )
-    return jsonify({'result': result})
 
 
 @app.route('/api/backup', methods=['POST'])
