@@ -451,7 +451,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .profile-view-avatar{width:72px;height:72px;border-radius:50%;object-fit:cover;background:#222;border:3px solid #000;cursor:pointer}
 .profile-view-name-wrap{flex:1;padding-bottom:8px}
 .profile-view-name{font-size:20px;font-weight:700;color:#fff}
-.profile-view-status{font-size:13px;color:#8e8e93;margin-top:2px}
+.profile-view-status{font-size:13px;color:#8e8e93;margin-top:2px;line-height:1.4}
 .profile-view-info{padding:16px;display:flex;flex-direction:column;gap:12px}
 .profile-view-info-item{display:flex;align-items:center;gap:10px;color:#aaa;font-size:14px}
 .profile-view-posts{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 12px 20px}
@@ -2576,7 +2576,7 @@ async function tryDecryptMessageRealTime(msgId, encryptedText) {
             setTimeout(() => {
                 const textElem = document.getElementById('msg-' + msgId)?.querySelector('.msg-text');
                 if (textElem) {
-                    textElem.innerHTML = escapeHtml(plainText);
+                    textElem.innerHTML = linkify(plainText);
                 }
             }, 20);
         } else {
@@ -2658,7 +2658,7 @@ function renderMessageItem(containerOrFragment, msg) {
             }, 50);
         }
     } else {
-        if (displayText) html += `<div class="msg-text">${escapeHtml(displayText)}</div>`;
+        if (displayText) html += `<div class="msg-text">${linkify(displayText)}</div>`;
     }
 
     if (msg.attachments) {
@@ -3293,6 +3293,82 @@ function renderDecryptedMedia(elem, data) {
 }
 
 function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
+// Linkify: выделяет ссылки, @username, #hashtag
+function linkify(text) {
+    if (!text) return '';
+    let html = escapeHtml(text);
+
+    // URLs → синие ссылки
+    html = html.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" style="color:#0a84ff;text-decoration:none" onclick="event.stopPropagation()">$1</a>');
+
+    // @username → кликабельный с выбором TG/VK
+    html = html.replace(/@([a-zA-Z0-9_]+)/g, '<span style="color:#0a84ff;cursor:pointer" onclick="showUserActionSheet('$1', event)">@$1</span>');
+
+    // #hashtag → синий
+    html = html.replace(/#([a-zA-Z0-9_А-Яа-я]+)/g, '<span style="color:#0a84ff">#$1</span>');
+
+    return html;
+}
+
+// Action sheet для @username (TG или VK)
+function showUserActionSheet(username, event) {
+    event.stopPropagation();
+    const sheet = document.createElement('div');
+    sheet.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:900;display:flex;align-items:flex-end;justify-content:center';
+    sheet.innerHTML = `
+        <div style="background:#1c1c1e;border-radius:20px 20px 0 0;padding:16px;width:100%;max-width:400px;animation:slideUp 0.2s ease">
+            <div style="text-align:center;color:#8e8e93;font-size:13px;margin-bottom:16px">@${username}</div>
+            <div style="display:flex;gap:12px;justify-content:center;margin-bottom:20px">
+                <div onclick="openTelegramUser('${username}')" style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;padding:12px;border-radius:16px;background:#2c2c2e">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none"><path d="M21.5 2L2 10.5l5.5 2L18 7l-8.5 8.5 2 5.5L21.5 2z" fill="#0088cc"/></svg>
+                    <span style="font-size:12px;color:#fff">Telegram</span>
+                </div>
+                <div onclick="searchVkUser('${username}')" style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;padding:12px;border-radius:16px;background:#2c2c2e">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z" fill="#4a76a8"/></svg>
+                    <span style="font-size:12px;color:#fff">VK</span>
+                </div>
+            </div>
+            <div onclick="this.parentElement.parentElement.remove()" style="text-align:center;padding:12px;color:#ff3b30;font-size:15px;cursor:pointer;border-radius:12px;background:#2c2c2e">Отмена</div>
+        </div>
+    `;
+    sheet.onclick = (e) => { if (e.target === sheet) sheet.remove(); };
+    document.body.appendChild(sheet);
+}
+
+function openTelegramUser(username) {
+    const tgUrl = `tg://resolve?domain=${username}`;
+    const webUrl = `https://t.me/${username}`;
+    // Try to open TG app first
+    window.location.href = tgUrl;
+    // Fallback to web after delay
+    setTimeout(() => { window.open(webUrl, '_blank'); }, 500);
+}
+
+async function searchVkUser(username) {
+    // Search VK user by screen_name and open profile in our app
+    try {
+        const res = await fetch('/api/search_user', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ token, screen_name: username })
+        });
+        const data = await res.json();
+        if (data.user_id) {
+            closeProfileView(); // close any open profile
+            openProfileView(data.user_id, false);
+        } else {
+            alert('Пользователь не найден в VK');
+        }
+    } catch(e) {
+        alert('Ошибка поиска');
+    }
+}
+
+// Add slideUp animation
+const slideUpStyle = document.createElement('style');
+slideUpStyle.textContent = '@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}';
+document.head.appendChild(slideUpStyle);
 
 function handleInputTyping() {
     const val = document.getElementById('msgInput').value;
@@ -4019,7 +4095,7 @@ async function loadNewsFeed() {
                 }
 
                 div.innerHTML = `
-                    <div class="tg-channel-header">
+                    <div class="tg-channel-header" onclick="openProfileView(${item.owner_id || 0}, ${item.owner_id < 0 ? 'true' : 'false'})" style="cursor:pointer">
                         <img class="tg-channel-avatar" src="${item.author_photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
                         <div>
                             <div class="tg-channel-title">${escapeHtml(item.author_name)}</div>
@@ -4027,7 +4103,7 @@ async function loadNewsFeed() {
                         </div>
                     </div>
                     ${mediaHTML}
-                    <div class="tg-channel-body">${escapeHtml(item.text || '')}</div>
+                    <div class="tg-channel-body">${linkify(item.text || '')}</div>
                     ${reactionsHTML}
                     <div class="tg-channel-footer">
                         <div class="tg-channel-actions">
@@ -4099,7 +4175,7 @@ async function openCommentsModal(ownerId, postId) {
                     <img class="comment-avatar" src="${c.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
                     <div class="comment-body">
                         <div class="comment-author">${escapeHtml(c.name)}</div>
-                        <div class="comment-text">${escapeHtml(c.text)}</div>
+                        <div class="comment-text">${linkify(c.text)}</div>
                         <div class="comment-time">${c.time || ''}</div>
                     </div>
                 `;
@@ -4133,11 +4209,15 @@ async function openProfileView(peerId, isGroup) {
         const statusText = data.status || '';
         const statusElem = document.getElementById('profileViewStatus');
         statusElem.dataset.fullText = data.status || '';
-        if (statusText.length > 120) {
-            statusElem.textContent = statusText.substring(0, 120) + '...';
-            statusElem.innerHTML = escapeHtml(statusText.substring(0, 120)) + '... <span style="color:#0a84ff;cursor:pointer" onclick="showFullDescription()">Ещё</span>';
+        // Show short version with "Ещё" link
+        if (statusText.length > 80) {
+            statusElem.innerHTML = escapeHtml(statusText.substring(0, 80)) + '... <span style="color:#0a84ff;cursor:pointer" onclick="showFullDescription()">Ещё</span>';
         } else {
-            statusElem.textContent = statusText;
+            if (statusText) {
+            statusElem.innerHTML = linkify(statusText);
+        } else {
+            statusElem.textContent = '';
+        }
         }
         document.getElementById('profileViewHeaderTitle').textContent = 'Информация';
 
@@ -4157,10 +4237,8 @@ async function openProfileView(peerId, isGroup) {
         const infoDiv = document.getElementById('profileViewInfo');
         infoDiv.innerHTML = '';
 
-        // Description/status as main info
-        if (data.status) {
-            infoDiv.innerHTML += `<div style="font-size:14px;color:#ddd;line-height:1.5;margin-bottom:12px">${escapeHtml(data.status)}</div>`;
-        }
+        // Full description shown only when "Ещё" clicked
+        // (handled by showFullDescription function)
 
         // Stats row for groups
         if (data.members_count) {
@@ -4208,7 +4286,7 @@ async function openProfileView(peerId, isGroup) {
                         </div>
                     </div>
                     ${mediaHTML}
-                    <div class="tg-channel-body">${escapeHtml(post.text || '')}</div>
+                    <div class="tg-channel-body">${linkify(post.text || '')}</div>
                     ${postReactionsHTML}
                     <div class="tg-channel-footer">
                         <div class="tg-channel-actions">
@@ -5809,6 +5887,24 @@ def proxy_file():
         return jsonify({'error': str(e)}), 500
 
 
+
+
+@app.route('/api/search_user', methods=['POST'])
+def search_user():
+    token = request.json.get('token')
+    screen_name = request.json.get('screen_name', '').strip()
+    if not screen_name:
+        return jsonify({'error': 'No screen_name'}), 400
+
+    res = vk_request('users.get', token, user_ids=screen_name, fields='photo_100')
+    if isinstance(res, list) and len(res) > 0:
+        u = res[0]
+        return jsonify({
+            'user_id': u.get('id'),
+            'name': f"{u.get('first_name', '')} {u.get('last_name', '')}".strip(),
+            'photo': u.get('photo_100', '')
+        })
+    return jsonify({'error': 'Not found'}), 404
 
 
 @app.route('/api/video_player', methods=['POST'])
