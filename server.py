@@ -361,7 +361,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .tg-channel-avatar{width:42px;height:42px;border-radius:50%;object-fit:cover;background:#222;flex-shrink:0}
 .tg-channel-title{font-size:15px;font-weight:700;color:#fff;line-height:1.2}
 .tg-channel-meta{font-size:12px;color:#8e8e93;margin-top:2px}
-.tg-channel-body{padding:10px 14px 6px;font-size:14px;line-height:1.5;color:#ddd;white-space:pre-line;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
+.tg-channel-body{padding:10px 14px 6px;font-size:14px;line-height:1.5;color:#ddd;white-space:pre-line}
 .tg-channel-media{width:100%;max-height:420px;object-fit:cover;cursor:pointer;display:block;background:#0a0a0a}
 .tg-channel-video-wrap{width:100%;background:#0a0a0a;position:relative;border-radius:12px;overflow:hidden;margin:8px 0}
 .tg-channel-video{width:100%;max-height:420px;display:block}
@@ -4000,17 +4000,24 @@ async function loadNewsFeed() {
                 const mediaHTML = buildTGPostMediaHTML(item.photo, item.video, item.photos, item.videos);
 
                 // Build reactions HTML if available
+                const REACTION_EMOJI_MAP = {
+                    1: '👍', 2: '❤️', 3: '😂', 4: '😮', 5: '😢',
+                    6: '🔥', 7: '🎉', 8: '🤔', 9: '👏', 10: '🤬',
+                    11: '🤡', 12: '🥰', 13: '😍', 14: '🤮', 15: '🖕',
+                    16: '💩', 17: '🤯', 18: '🐳', 19: '🌚', 20: '🌭',
+                    21: '💯', 22: '🍌', 23: '🖤', 24: '🤍', 25: '🤎',
+                    26: '💜', 27: '💙', 28: '💚', 29: '💛', 30: '🧡'
+                };
                 let reactionsHTML = '';
                 if (item.reactions && item.reactions.length > 0) {
                     reactionsHTML = '<div class="tg-reactions-row">';
                     item.reactions.forEach(r => {
-                        reactionsHTML += `<div class="tg-reaction-chip"><span class="emoji">${r.emoji || '👍'}</span><span class="count">${r.count || 0}</span></div>`;
+                        const emoji = REACTION_EMOJI_MAP[r.reaction_id] || '👍';
+                        reactionsHTML += `<div class="tg-reaction-chip"><span class="emoji">${emoji}</span><span class="count">${r.count || 0}</span></div>`;
                     });
                     reactionsHTML += '</div>';
                 }
 
-                const textEscaped = escapeHtml(item.text || '');
-                const hasLongText = (item.text || '').length > 200;
                 div.innerHTML = `
                     <div class="tg-channel-header">
                         <img class="tg-channel-avatar" src="${item.author_photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
@@ -4020,8 +4027,7 @@ async function loadNewsFeed() {
                         </div>
                     </div>
                     ${mediaHTML}
-                    <div class="tg-channel-body">${textEscaped}</div>
-                    ${hasLongText ? `<div class="tg-channel-more-btn" onclick="openProfileView(${item.owner_id || 0}, true)">Показать полностью...</div>` : ''}
+                    <div class="tg-channel-body">${escapeHtml(item.text || '')}</div>
                     ${reactionsHTML}
                     <div class="tg-channel-footer">
                         <div class="tg-channel-actions">
@@ -4124,7 +4130,15 @@ async function openProfileView(peerId, isGroup) {
 
         document.getElementById('profileViewAvatar').src = data.photo || 'https://vk.com/images/camera_100.png';
         document.getElementById('profileViewName').textContent = data.name || '...';
-        document.getElementById('profileViewStatus').textContent = data.status || '';
+        const statusText = data.status || '';
+        const statusElem = document.getElementById('profileViewStatus');
+        statusElem.dataset.fullText = data.status || '';
+        if (statusText.length > 120) {
+            statusElem.textContent = statusText.substring(0, 120) + '...';
+            statusElem.innerHTML = escapeHtml(statusText.substring(0, 120)) + '... <span style="color:#0a84ff;cursor:pointer" onclick="showFullDescription()">Ещё</span>';
+        } else {
+            statusElem.textContent = statusText;
+        }
         document.getElementById('profileViewHeaderTitle').textContent = 'Информация';
 
         // Cover photo now shown in info section, not header
@@ -4168,17 +4182,24 @@ async function openProfileView(peerId, isGroup) {
                 div.className = 'tg-channel-card';
                 const mediaHTML = buildTGPostMediaHTML(post.photo, post.video, post.photos, post.videos);
 
+                const POST_REACTION_MAP = {
+                    1: '👍', 2: '❤️', 3: '😂', 4: '😮', 5: '😢',
+                    6: '🔥', 7: '🎉', 8: '🤔', 9: '👏', 10: '🤬',
+                    11: '🤡', 12: '🥰', 13: '😍', 14: '🤮', 15: '🖕',
+                    16: '💩', 17: '🤯', 18: '🐳', 19: '🌚', 20: '🌭',
+                    21: '💯', 22: '🍌', 23: '🖤', 24: '🤍', 25: '🤎',
+                    26: '💜', 27: '💙', 28: '💚', 29: '💛', 30: '🧡'
+                };
                 let postReactionsHTML = '';
                 if (post.reactions && post.reactions.length > 0) {
                     postReactionsHTML = '<div class="tg-reactions-row">';
                     post.reactions.forEach(r => {
-                        postReactionsHTML += `<div class="tg-reaction-chip"><span class="emoji">${r.emoji || '👍'}</span><span class="count">${r.count || 0}</span></div>`;
+                        const emoji = POST_REACTION_MAP[r.reaction_id] || '👍';
+                        postReactionsHTML += `<div class="tg-reaction-chip"><span class="emoji">${emoji}</span><span class="count">${r.count || 0}</span></div>`;
                     });
                     postReactionsHTML += '</div>';
                 }
 
-                const postTextEscaped = escapeHtml(post.text || '');
-                const postHasLongText = (post.text || '').length > 200;
                 div.innerHTML = `
                     <div class="tg-channel-header">
                         <img class="tg-channel-avatar" src="${data.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
@@ -4187,8 +4208,7 @@ async function openProfileView(peerId, isGroup) {
                         </div>
                     </div>
                     ${mediaHTML}
-                    <div class="tg-channel-body">${postTextEscaped}</div>
-                    ${postHasLongText ? `<div class="tg-channel-more-btn" onclick="openProfileView(${post.owner_id || peerId}, true)">Показать полностью...</div>` : ''}
+                    <div class="tg-channel-body">${escapeHtml(post.text || '')}</div>
                     ${postReactionsHTML}
                     <div class="tg-channel-footer">
                         <div class="tg-channel-actions">
@@ -4207,6 +4227,13 @@ async function openProfileView(peerId, isGroup) {
         document.getElementById('profileViewModal').classList.add('active');
     } catch(e) {}
     hideUploadProgress();
+}
+
+function showFullDescription() {
+    const fullText = document.getElementById('profileViewStatus').dataset.fullText || '';
+    if (fullText) {
+        alert(fullText);
+    }
 }
 
 function closeProfileView() {
