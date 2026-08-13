@@ -4570,7 +4570,13 @@ function renderDialogsVirtual() {
 }
 
 /* --- 16. CALL BUTTON (placeholder) --- */
-
+function startCall(peerId) {
+    if (!peerId) {
+        alert("Выберите собеседника для звонка");
+        return;
+    }
+    window.location.href = `call.py?peer=${encodeURIComponent(peerId)}`;
+}
 
 /* --- 17. ENHANCED FILE UPLOAD with progress --- */
 async function uploadFileWithProgress(file, onProgress) {
@@ -4822,243 +4828,6 @@ window.pollEvents = async function() {
     }
     setTimeout(pollEvents, 100);
 };
-
-
-/* ===== IN-CALL MODAL (WebRTC via Firebase RTDB) ===== */
-let callModal = null, callPC = null, callLocal = null, callRemote = null;
-let callRoomId = null, callTimer = null, callStart = null;
-let callMuted = false, callRole = null, callUnsub = [];
-
-const CALL_ICE = [
-  {urls: "stun:stun.l.google.com:19302"},
-  {urls: "stun:stun1.l.google.com:19302"},
-  {urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject"}
-];
-
-function initCallModal() {
-  if (document.getElementById('callModal')) return;
-  const m = document.createElement('div');
-  m.id = 'callModal';
-  m.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:1000;display:none;flex-direction:column;align-items:center;justify-content:center;';
-  m.innerHTML = `<div style="position:absolute;top:0;left:0;width:100%;height:100%;background-size:cover;background-position:center;filter:blur(40px) brightness(0.3);z-index:-1;" id="callBg"></div>
-    <img id="callAvatar" src="" style="width:120px;height:120px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,0.15);margin-bottom:20px;">
-    <div id="callName" style="font-size:24px;font-weight:700;margin-bottom:6px;">...</div>
-    <div id="callStatus" style="font-size:15px;color:#8e8e93;margin-bottom:40px;">Вызов...</div>
-    <div id="callTimer" style="font-size:18px;color:#fff;font-weight:600;margin-bottom:30px;display:none;">0:00</div>
-    <div style="display:flex;gap:24px;margin-top:auto;margin-bottom:60px;">
-      <div onclick="callToggleMute()" id="callMuteBtn" style="width:64px;height:64px;border-radius:50%;background:#2c2c2e;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-      </div>
-      <div onclick="callEnd()" style="width:72px;height:72px;border-radius:50%;background:#ff3b30;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.52.37 1.02.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-      </div>
-    </div>
-    <audio id="callRemoteAudio" autoplay style="display:none;"></audio>`;
-  document.body.appendChild(m);
-  callModal = m;
-}
-
-function callRoomRef(id) { return firebase.database().ref('calls/' + id); }
-
-async function startCall(peerId) {
-  if (!peerId || !myVkId) { alert('Ошибка звонка'); return; }
-  initCallModal();
-  callRoomId = 'call_' + myVkId + '_' + peerId + '_' + Date.now();
-  callRole = 'offer';
-  const peer = dialogsData.find(d => String(d.id) === String(peerId));
-  document.getElementById('callAvatar').src = peer?.photo || 'https://vk.com/images/camera_100.png';
-  document.getElementById('callName').textContent = peer?.name || 'Собеседник';
-  document.getElementById('callBg').style.backgroundImage = `url('${peer?.photo || ''}')`;
-  callModal.style.display = 'flex';
-
-  try { callLocal = await navigator.mediaDevices.getUserMedia({audio: true}); }
-  catch(e) { alert('Микрофон недоступен'); callModal.style.display = 'none'; return; }
-
-  await callCreatePC();
-  const offer = await callPC.createOffer();
-  await callPC.setLocalDescription(offer);
-
-  const ref = callRoomRef(callRoomId);
-  await ref.child('offer').set({ sdp: {type: offer.type, sdp: offer.sdp}, caller: myVkId, callee: peerId, status: 'ringing', created: Date.now() });
-
-  callUnsub.push(ref.child('answer').on('value', async snap => {
-    const d = snap.val();
-    if (d && d.sdp && d.sdp.type === 'answer') {
-      await callPC.setRemoteDescription(new RTCSessionDescription(d.sdp));
-      document.getElementById('callStatus').textContent = 'Соединение...';
-    }
-    if (d && d.status === 'rejected') { alert('Звонок отклонён'); callCleanup(); }
-  }));
-
-  callUnsub.push(ref.child('answer/ice').on('child_added', async snap => {
-    const c = snap.val(); if (c && callPC) await callPC.addIceCandidate(new RTCIceCandidate(c));
-  }));
-
-  // Уведомление через VK
-  fetch('/api/send', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({token, peer_id: peerId, text: '📞 Входящий звонок! Откройте VK Tsuyu.', random_id: Math.floor(Math.random()*2147483647)})}).catch(()=>{});
-}
-
-async function callCreatePC() {
-  callPC = new RTCPeerConnection({iceServers: CALL_ICE});
-  callPC.onicecandidate = e => {
-    if (e.candidate) callRoomRef(callRoomId).child(callRole + '/ice').push({candidate: e.candidate.candidate, sdpMid: e.candidate.sdpMid, sdpMLineIndex: e.candidate.sdpMLineIndex});
-  };
-  callPC.ontrack = e => {
-    callRemote = e.streams[0];
-    document.getElementById('callRemoteAudio').srcObject = callRemote;
-    document.getElementById('callStatus').textContent = 'В разговоре';
-    document.getElementById('callStatus').style.color = '#34c759';
-    document.getElementById('callTimer').style.display = 'block';
-    callStart = Date.now();
-    callTimer = setInterval(() => {
-      const s = Math.floor((Date.now() - callStart) / 1000);
-      document.getElementById('callTimer').textContent = Math.floor(s/60) + ':' + (s%60).toString().padStart(2,'0');
-    }, 1000);
-  };
-  if (callLocal) callLocal.getTracks().forEach(t => callPC.addTrack(t, callLocal));
-}
-
-function callToggleMute() {
-  if (!callLocal) return;
-  callMuted = !callMuted;
-  callLocal.getAudioTracks().forEach(t => t.enabled = !callMuted);
-  document.getElementById('callMuteBtn').style.background = callMuted ? '#0a84ff' : '#2c2c2e';
-}
-
-function callEnd() {
-  if (callRoomId) callRoomRef(callRoomId).child('status').set({ended: true, by: myVkId, at: Date.now()});
-  callCleanup();
-}
-
-function callCleanup() {
-  if (callTimer) clearInterval(callTimer);
-  callUnsub.forEach(u => u && u()); callUnsub = [];
-  if (callPC) { callPC.close(); callPC = null; }
-  if (callLocal) { callLocal.getTracks().forEach(t => t.stop()); callLocal = null; }
-  callRemote = null;
-  if (callModal) callModal.style.display = 'none';
-  callRoomId = null; callRole = null;
-}
-
-// Слушаем входящие звонки
-function listenIncomingCalls() {
-  if (!myVkId) return;
-  firebase.database().ref('calls').orderByChild('offer/callee').equalTo(parseInt(myVkId)).on('child_added', async snap => {
-    const data = snap.val();
-    if (!data || !data.offer || data.offer.status !== 'ringing') return;
-    const callerId = data.offer.caller;
-    const roomId = snap.key;
-
-    // Показываем входящий звонок
-    initCallModal();
-    callRoomId = roomId;
-    callRole = 'answer';
-
-    const caller = dialogsData.find(d => String(d.id) === String(callerId));
-    document.getElementById('callAvatar').src = caller?.photo || 'https://vk.com/images/camera_100.png';
-    document.getElementById('callName').textContent = caller?.name || 'Входящий звонок';
-    document.getElementById('callStatus').textContent = 'Входящий звонок...';
-    document.getElementById('callStatus').style.color = '#0a84ff';
-    document.getElementById('callBg').style.backgroundImage = `url('${caller?.photo || ''}')`;
-    callModal.style.display = 'flex';
-
-    // Меняем кнопки на принять/отклонить
-    const controls = callModal.querySelector('div[style*="gap:24px"]');
-    controls.innerHTML = `
-      <div onclick="callReject()" style="width:64px;height:64px;border-radius:50%;background:#ff3b30;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </div>
-      <div onclick="callAccept()" style="width:72px;height:72px;border-radius:50%;background:#34c759;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.52.37 1.02.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-      </div>`;
-  });
-}
-
-async function callAccept() {
-  try { callLocal = await navigator.mediaDevices.getUserMedia({audio: true}); }
-  catch(e) { alert('Микрофон недоступен'); callCleanup(); return; }
-
-  await callCreatePC();
-
-  const ref = callRoomRef(callRoomId);
-  const offerSnap = await ref.child('offer/sdp').once('value');
-  const offerData = offerSnap.val();
-  if (offerData) {
-    await callPC.setRemoteDescription(new RTCSessionDescription(offerData));
-    const answer = await callPC.createAnswer();
-    await callPC.setLocalDescription(answer);
-    await ref.child('answer').set({ sdp: {type: answer.type, sdp: answer.sdp}, status: 'accepted', answerer: myVkId, at: Date.now() });
-  }
-
-  callUnsub.push(ref.child('offer/ice').on('child_added', async snap => {
-    const c = snap.val(); if (c && callPC) await callPC.addIceCandidate(new RTCIceCandidate(c));
-  }));
-
-  // Возвращаем кнопки управления звонком
-  const controls = callModal.querySelector('div[style*="gap:24px"]');
-  controls.innerHTML = `
-    <div onclick="callToggleMute()" id="callMuteBtn" style="width:64px;height:64px;border-radius:50%;background:#2c2c2e;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;">
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-    </div>
-    <div onclick="callEnd()" style="width:72px;height:72px;border-radius:50%;background:#ff3b30;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;">
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.52.37 1.02.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-    </div>`;
-}
-
-function callReject() {
-  if (callRoomId) {
-    callRoomRef(callRoomId).child('answer').set({status: 'rejected', answerer: myVkId, at: Date.now()});
-  }
-  callCleanup();
-}
-
-// Запускаем прослушку входящих при логине
-const originalInitClientCrypto = initClientCrypto;
-initClientCrypto = async function(forceNew) {
-  const result = await originalInitClientCrypto(forceNew);
-  if (result && typeof firebase !== 'undefined') {
-    listenIncomingCalls();
-  }
-  return result;
-};
-
-
-async function startCall(peerId) {
-  if (!peerId || !myVkId) { alert('Ошибка звонка'); return; }
-  initCallModal();
-  callRoomId = 'call_' + myVkId + '_' + peerId + '_' + Date.now();
-  callRole = 'offer';
-  const peer = dialogsData.find(d => String(d.id) === String(peerId));
-  document.getElementById('callAvatar').src = peer?.photo || 'https://vk.com/images/camera_100.png';
-  document.getElementById('callName').textContent = peer?.name || 'Собеседник';
-  document.getElementById('callBg').style.backgroundImage = `url('${peer?.photo || ''}')`;
-  callModal.style.display = 'flex';
-
-  try { callLocal = await navigator.mediaDevices.getUserMedia({audio: true}); }
-  catch(e) { alert('Микрофон недоступен'); callModal.style.display = 'none'; return; }
-
-  await callCreatePC();
-  const offer = await callPC.createOffer();
-  await callPC.setLocalDescription(offer);
-
-  const ref = firebase.database().ref('calls/' + callRoomId);
-  await ref.child('offer').set({ sdp: {type: offer.type, sdp: offer.sdp}, caller: myVkId, callee: peerId, status: 'ringing', created: Date.now() });
-
-  callUnsub.push(ref.child('answer').on('value', async snap => {
-    const d = snap.val();
-    if (d && d.sdp && d.sdp.type === 'answer') {
-      await callPC.setRemoteDescription(new RTCSessionDescription(d.sdp));
-      document.getElementById('callStatus').textContent = 'Соединение...';
-    }
-    if (d && d.status === 'rejected') { alert('Звонок отклонён'); callCleanup(); }
-  }));
-
-  callUnsub.push(ref.child('answer/ice').on('child_added', async snap => {
-    const c = snap.val(); if (c && callPC) await callPC.addIceCandidate(new RTCIceCandidate(c));
-  }));
-
-  fetch('/api/send', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({token, peer_id: peerId, text: '📞 Входящий звонок! Откройте VK Tsuyu.', random_id: Math.floor(Math.random()*2147483647)})}).catch(()=>{});
-}
 </script>
 
 <!-- Offline Banner -->
@@ -5980,12 +5749,6 @@ def ping():
 
 # Register cloud storage blueprint
 app.register_blueprint(cloud_bp, url_prefix='/cloud')
-
-
-
-
-
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
