@@ -278,12 +278,12 @@ HTML = """
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>VK Tsuyu - True E2EE Messenger</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#000;color:#fff;height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
-.app{height:100vh;display:flex;flex-direction:column;position:relative;overflow:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#000;color:#fff;height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased;overflow-x:hidden;touch-action:pan-y}
+.app{height:100vh;display:flex;flex-direction:column;position:relative;overflow:hidden;overflow-x:hidden}
 
 /* Login Screen */
 .login-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:800;animation:fadeIn 0.2s ease-out}
@@ -332,7 +332,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .search-section-header{padding:12px 14px 6px;font-size:12px;font-weight:700;color:#ffffff;text-transform:uppercase;letter-spacing:0.8px;opacity:0.9}
 
 /* Dialogs Screen */
-.dialogs-screen{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;overflow:hidden;animation:fadeIn 0.15s ease-out}
+.dialogs-screen{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;overflow:hidden;overflow-x:hidden;animation:fadeIn 0.15s ease-out}
 .dialogs-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .dialog{display:flex;align-items:center;padding:12px 14px;cursor:pointer;border-bottom:1px solid #111;position:relative}
 .dialog:active{background:#111}
@@ -361,12 +361,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .tg-channel-avatar{width:42px;height:42px;border-radius:50%;object-fit:cover;background:#222;flex-shrink:0}
 .tg-channel-title{font-size:15px;font-weight:700;color:#fff;line-height:1.2}
 .tg-channel-meta{font-size:12px;color:#8e8e93;margin-top:2px}
-.tg-channel-body{padding:10px 14px 6px;font-size:14px;line-height:1.5;color:#ddd;white-space:pre-line}
+.tg-channel-body{padding:10px 14px 6px;font-size:14px;line-height:1.5;color:#ddd;white-space:pre-line;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
 .tg-channel-media{width:100%;max-height:420px;object-fit:cover;cursor:pointer;display:block;background:#0a0a0a}
 .tg-channel-video-wrap{width:100%;background:#0a0a0a;position:relative;border-radius:12px;overflow:hidden;margin:8px 0}
 .tg-channel-video{width:100%;max-height:420px;display:block}
 .tg-channel-iframe{width:100%;height:260px;border:none}
 .tg-channel-footer{display:flex;align-items:center;justify-content:space-between;padding:8px 14px 12px;background:transparent;color:#8e8e93;font-size:13px}
+.tg-channel-more-btn{color:#0a84ff;font-size:13px;font-weight:500;cursor:pointer;padding:4px 0}
+.tg-channel-more-btn:active{opacity:0.7}
 .tg-channel-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .tg-channel-btn{display:flex;align-items:center;gap:4px;cursor:pointer;color:#8e8e93;transition:all 0.15s;font-size:12px;font-weight:500;background:#1c1c1e;border-radius:16px;padding:4px 10px;border:1px solid #2c2c2e}
 .tg-channel-btn:active{background:#2c2c2e;color:#fff}
@@ -505,7 +507,7 @@ input:checked + .slider{background-color:#34c759}
 input:checked + .slider:before{transform:translateX(20px)}
 
 /* Chat Screen */
-.chat-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;z-index:100;transform:translateX(100%);transition:transform 0.22s cubic-bezier(0.1, 0.9, 0.2, 1)}
+.chat-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;z-index:100;transform:translateX(100%);transition:transform 0.22s cubic-bezier(0.1, 0.9, 0.2, 1);overflow-x:hidden}
 .chat-screen.active{transform:translateX(0)}
 .messages-wrapper{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column}
 .messages{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch}
@@ -536,18 +538,17 @@ input:checked + .slider:before{transform:translateX(20px)}
     position: relative;
     min-height: 140px;
 }
-.msg-sticker img{
+.msg-sticker img, .msg-sticker .sticker-wrapper img{
     width: 140px;
     height: 140px;
     object-fit: contain;
     display: block;
-    border-radius: 18px;
     border: none !important;
     outline: none !important;
     box-shadow: none !important;
     filter: drop-shadow(0 4px 10px rgba(0,0,0,0.45));
 }
-.msg-sticker .msg-time {
+.msg-sticker .msg-time, .msg-sticker .media-time-badge {
     position: absolute;
     bottom: 4px;
     right: 6px;
@@ -4008,6 +4009,8 @@ async function loadNewsFeed() {
                     reactionsHTML += '</div>';
                 }
 
+                const textEscaped = escapeHtml(item.text || '');
+                const hasLongText = (item.text || '').length > 200;
                 div.innerHTML = `
                     <div class="tg-channel-header">
                         <img class="tg-channel-avatar" src="${item.author_photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
@@ -4017,7 +4020,8 @@ async function loadNewsFeed() {
                         </div>
                     </div>
                     ${mediaHTML}
-                    <div class="tg-channel-body">${escapeHtml(item.text || '')}</div>
+                    <div class="tg-channel-body">${textEscaped}</div>
+                    ${hasLongText ? `<div class="tg-channel-more-btn" onclick="openProfileView(${item.owner_id || 0}, true)">Показать полностью...</div>` : ''}
                     ${reactionsHTML}
                     <div class="tg-channel-footer">
                         <div class="tg-channel-actions">
@@ -4173,6 +4177,8 @@ async function openProfileView(peerId, isGroup) {
                     postReactionsHTML += '</div>';
                 }
 
+                const postTextEscaped = escapeHtml(post.text || '');
+                const postHasLongText = (post.text || '').length > 200;
                 div.innerHTML = `
                     <div class="tg-channel-header">
                         <img class="tg-channel-avatar" src="${data.photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
@@ -4181,7 +4187,8 @@ async function openProfileView(peerId, isGroup) {
                         </div>
                     </div>
                     ${mediaHTML}
-                    <div class="tg-channel-body">${escapeHtml(post.text || '')}</div>
+                    <div class="tg-channel-body">${postTextEscaped}</div>
+                    ${postHasLongText ? `<div class="tg-channel-more-btn" onclick="openProfileView(${post.owner_id || peerId}, true)">Показать полностью...</div>` : ''}
                     ${postReactionsHTML}
                     <div class="tg-channel-footer">
                         <div class="tg-channel-actions">
