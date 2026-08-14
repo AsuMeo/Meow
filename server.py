@@ -771,6 +771,12 @@ input:checked + .slider:before{transform:translateX(20px)}
 .dialogs-list::-webkit-scrollbar-thumb,.messages::-webkit-scrollbar-thumb,.news-feed::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
 .dialogs-list::-webkit-scrollbar-track,.messages::-webkit-scrollbar-track,.news-feed::-webkit-scrollbar-track{background:transparent}
 
+/* Mention popup menu */
+#mentionMenu{position:fixed;background:#1c1c1e;border-radius:12px;padding:8px 0;min-width:160px;box-shadow:0 8px 32px rgba(0,0,0,0.6);z-index:800;border:1px solid #2c2c2e;opacity:0;pointer-events:none;transform:scale(0.95);transition:all 0.15s ease}
+#mentionMenu.active{opacity:1;pointer-events:auto;transform:scale(1)}
+.user-mention{color:#0a84ff;cursor:pointer;text-decoration:none}
+.user-mention:active{opacity:0.7}
+
 /* Date Separator */
 .msg-date-separator{display:flex;align-items:center;justify-content:center;margin:16px 0;position:relative}
 .msg-date-separator::before{content:'';position:absolute;left:12px;right:12px;height:1px;background:#2c2c2e}
@@ -4020,14 +4026,14 @@ async function loadNewsFeed() {
 
                 div.innerHTML = `
                     <div class="tg-channel-header">
-                        <img class="tg-channel-avatar" src="${item.author_photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'" onclick="openProfileView(${item.owner_id}, ${item.owner_id < 0})" style="cursor:pointer">
+                        <img class="tg-channel-avatar" src="${item.author_photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
                         <div>
                             <div class="tg-channel-title">${escapeHtml(item.author_name)}</div>
                             <div class="tg-channel-meta">${item.time || ''}</div>
                         </div>
                     </div>
                     ${mediaHTML}
-                    <div class="tg-channel-body">${formatProfileText(item.text || '')}</div>
+                    <div class="tg-channel-body">${escapeHtml(item.text || '')}</div>
                     ${reactionsHTML}
                     <div class="tg-channel-footer">
                         <div class="tg-channel-actions">
@@ -4117,6 +4123,76 @@ function closeCommentsModal() {
     document.getElementById('commentsModal').classList.remove('active');
 }
 
+function processStatusText(text) {
+    if (!text) return '';
+    let safe = escapeHtml(text);
+    safe = safe.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:#0a84ff;text-decoration:none">$1</a>');
+    safe = safe.replace(/@([a-zA-Z0-9_]+)/g, function(match, username) {
+        return `<span class="user-mention" data-user="${username}" style="color:#0a84ff;cursor:pointer;text-decoration:none" onclick="showUserMentionMenu(event, '${username}')">${match}</span>`;
+    });
+    return safe;
+}
+
+function showUserMentionMenu(event, username) {
+    event.stopPropagation();
+    const existing = document.getElementById('mentionMenu');
+    if (existing) existing.remove();
+
+    const menu = document.createElement('div');
+    menu.id = 'mentionMenu';
+    menu.style.cssText = 'position:fixed;background:#1c1c1e;border-radius:12px;padding:8px 0;min-width:160px;box-shadow:0 8px 32px rgba(0,0,0,0.6);z-index:800;border:1px solid #2c2c2e;opacity:0;pointer-events:none;transform:scale(0.95);transition:all 0.15s ease';
+    menu.innerHTML = `
+        <div style="padding:8px 16px;font-size:13px;color:#8e8e93;border-bottom:1px solid #2c2c2e;margin-bottom:4px">@${username}</div>
+        <div style="padding:10px 16px;font-size:14px;color:#fff;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background 0.1s" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background=''" onclick="window.open('tg://resolve?domain=${username}', '_blank'); document.getElementById('mentionMenu').remove();">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.198 2.433a2.242 2.242 0 0 0-1.022.215l-16.5 6.498a2.25 2.25 0 0 0-.106 4.103l4.5 1.898 1.5 4.5a2.25 2.25 0 0 0 4.103.106l6.498-16.5a2.242 2.242 0 0 0-1.215-1.215z"/><path d="M10.5 13.5l6-6"/></svg>
+            Открыть в Telegram
+        </div>
+        <div style="padding:10px 16px;font-size:14px;color:#fff;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background 0.1s" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background=''" onclick="searchAndOpenVkProfile('${username}'); document.getElementById('mentionMenu').remove();">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15.07 2H8.93C3.33 2 2 3.33 2 8.93v6.14C2 20.67 3.33 22 8.93 22h6.14c5.6 0 6.93-1.33 6.93-6.93V8.93C22 3.33 20.67 2 15.07 2z"/><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/><path d="M17.636 7h.01"/></svg>
+            Открыть в VK
+        </div>
+    `;
+    document.body.appendChild(menu);
+
+    const rect = event.target.getBoundingClientRect();
+    menu.style.left = Math.min(rect.left, window.innerWidth - 180) + 'px';
+    menu.style.top = (rect.bottom + 8) + 'px';
+
+    requestAnimationFrame(() => {
+        menu.style.opacity = '1';
+        menu.style.pointerEvents = 'auto';
+        menu.style.transform = 'scale(1)';
+    });
+
+    setTimeout(() => {
+        document.addEventListener('click', function closeMenu(e) {
+            if (!menu.contains(e.target)) {
+                menu.remove();
+                document.removeEventListener('click', closeMenu);
+            }
+        }, { once: true });
+    }, 100);
+}
+
+async function searchAndOpenVkProfile(username) {
+    try {
+        const res = await fetch('/api/search_global', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ token, query: username })
+        });
+        const data = await res.json();
+        const users = (data.results || []).filter(r => r.type === 'user');
+        if (users.length > 0) {
+            openProfileView(users[0].id, false);
+        } else {
+            alert('Пользователь @' + username + ' не найден в VK');
+        }
+    } catch(e) {
+        alert('Ошибка поиска в VK');
+    }
+}
+
 async function openProfileView(peerId, isGroup) {
     showUploadProgress('Загрузка профиля и постов канала...');
     try {
@@ -4130,7 +4206,10 @@ async function openProfileView(peerId, isGroup) {
 
         document.getElementById('profileViewAvatar').src = data.photo || 'https://vk.com/images/camera_100.png';
         document.getElementById('profileViewName').textContent = data.name || '...';
-        document.getElementById('profileViewStatus').textContent = '';
+        const statusText = data.status || '';
+        const statusElem = document.getElementById('profileViewStatus');
+        statusElem.dataset.fullText = data.status || '';
+        statusElem.style.display = 'none';
         document.getElementById('profileViewHeaderTitle').textContent = 'Информация';
 
         // Cover photo now shown in info section, not header
@@ -4149,9 +4228,13 @@ async function openProfileView(peerId, isGroup) {
         const infoDiv = document.getElementById('profileViewInfo');
         infoDiv.innerHTML = '';
 
-        // Description/status as main info with link formatting
+        // Description/status as main info
+
+
+        // Description with links and mentions
         if (data.status) {
-            infoDiv.innerHTML += `<div style="font-size:14px;color:#8e8e93;line-height:1.5;margin-bottom:12px">${formatProfileText(data.status)}</div>`;
+            const processedStatus = processStatusText(data.status);
+            infoDiv.innerHTML += `<div style="font-size:14px;color:#8e8e93;line-height:1.5;margin-bottom:12px">${processedStatus}</div>`;
         }
 
         // Stats row for groups
@@ -4200,7 +4283,7 @@ async function openProfileView(peerId, isGroup) {
                         </div>
                     </div>
                     ${mediaHTML}
-                    <div class="tg-channel-body">${formatProfileText(post.text || '')}</div>
+                    <div class="tg-channel-body">${escapeHtml(post.text || '')}</div>
                     ${postReactionsHTML}
                     <div class="tg-channel-footer">
                         <div class="tg-channel-actions">
@@ -4219,63 +4302,6 @@ async function openProfileView(peerId, isGroup) {
         document.getElementById('profileViewModal').classList.add('active');
     } catch(e) {}
     hideUploadProgress();
-}
-
-function formatProfileText(text) {
-    if (!text) return '';
-    let html = escapeHtml(text);
-    // URLs -> blue clickable links
-    html = html.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" style="color:#0a84ff;text-decoration:none">$1</a>');
-    // @username -> clickable with menu
-    html = html.replace(/@([a-zA-Z0-9_]+)/g, '<span style="color:#0a84ff;cursor:pointer" onclick="showUserMenu(event,\'$1\')">@$1</span>');
-    return html;
-}
-
-function showUserMenu(event, username) {
-    event.stopPropagation();
-    const existing = document.getElementById('userMenu');
-    if (existing) existing.remove();
-    const menu = document.createElement('div');
-    menu.id = 'userMenu';
-    menu.style.cssText = 'position:fixed;background:#1c1c1e;border-radius:12px;padding:8px 0;min-width:160px;box-shadow:0 8px 32px rgba(0,0,0,0.6);z-index:800;border:1px solid #2c2c2e;';
-    menu.innerHTML = `
-        <div style="padding:10px 16px;font-size:14px;color:#fff;font-weight:600;border-bottom:1px solid #2c2c2e">@${username}</div>
-        <div style="padding:10px 16px;font-size:14px;color:#ddd;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background 0.1s" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background=''" onclick="window.open('https://t.me/${username}','_blank');document.getElementById('userMenu').remove()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2"><path d="M21.198 2.433a2.242 2.242 0 0 0-1.022.215l-16.5 6.498a2.25 2.25 0 0 0-.106 4.103l3.999 1.498 1.5 5.002a2.25 2.25 0 0 0 4.102.105l6.5-16.5a2.242 2.242 0 0 0-1.473-1.02z"/><path d="M9.5 14.5L14.5 9.5"/></svg>
-            <span style="color:#0a84ff">Telegram</span>
-        </div>
-        <div style="padding:10px 16px;font-size:14px;color:#ddd;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background 0.1s" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background=''" onclick="openUserProfile('${username}');document.getElementById('userMenu').remove()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            <span style="color:#0a84ff">VK (на сайте)</span>
-        </div>
-    `;
-    menu.style.left = (event.clientX || event.touches?.[0]?.clientX || 0) + 'px';
-    menu.style.top = (event.clientY || event.touches?.[0]?.clientY || 0) + 'px';
-    document.body.appendChild(menu);
-    setTimeout(() => {
-        document.addEventListener('click', function closeMenu(e) {
-            if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', closeMenu); }
-        });
-    }, 100);
-}
-
-function openUserProfile(username) {
-    // Resolve VK screen_name to user_id via API
-    fetch('/api/resolve_screen_name', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ token, screen_name: username })
-    }).then(r => r.json()).then(data => {
-        if (data.object_id && data.type === 'user') {
-            openProfileView(data.object_id, false);
-        } else {
-            alert('Пользователь @' + username + ' не найден в VK');
-        }
-    }).catch(() => alert('Ошибка поиска пользователя'));
-}
-
-function showFullDescription() {
-    // No longer needed since description is shown fully in infoDiv
 }
 
 function closeProfileView() {
@@ -6023,19 +6049,6 @@ def get_backup(vk_id, data_type):
     stored = get_stored_pub_key(f"backup_{vk_id}_{data_type}")
     if stored and 'data' in stored:
         return jsonify(stored['data'])
-    return jsonify({'error': 'Not found'}), 404
-
-
-@app.route('/api/resolve_screen_name', methods=['POST'])
-def resolve_screen_name():
-    token = request.json.get('token')
-    screen_name = request.json.get('screen_name', '').strip()
-    if not screen_name:
-        return jsonify({'error': 'No screen_name'}), 400
-    result = vk_request('users.get', token, user_ids=screen_name, fields='photo_100')
-    if isinstance(result, list) and len(result) > 0:
-        u = result[0]
-        return jsonify({'type': 'user', 'object_id': u.get('id'), 'name': u.get('first_name', '') + ' ' + u.get('last_name', '')})
     return jsonify({'error': 'Not found'}), 404
 
 
