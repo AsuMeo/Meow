@@ -4227,7 +4227,7 @@ function formatProfileText(text) {
     // URLs -> blue clickable links
     html = html.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" style="color:#0a84ff;text-decoration:none">$1</a>');
     // @username -> clickable with menu
-    html = html.replace(/@([a-zA-Z0-9_]+)/g, '<span style="color:#0a84ff;cursor:pointer" onclick="showUserMenu(event,'$1')">@$1</span>');
+    html = html.replace(/@([a-zA-Z0-9_]+)/g, '<span style="color:#0a84ff;cursor:pointer" onclick="showUserMenu(event,\'$1\')">@$1</span>');
     return html;
 }
 
@@ -4260,15 +4260,14 @@ function showUserMenu(event, username) {
 }
 
 function openUserProfile(username) {
-    // Search VK user by username and open profile view
-    fetch('/api/search_global', {
+    // Resolve VK screen_name to user_id via API
+    fetch('/api/resolve_screen_name', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ token, query: username })
+        body: JSON.stringify({ token, screen_name: username })
     }).then(r => r.json()).then(data => {
-        const users = (data.results || []).filter(x => x.type === 'user');
-        if (users.length > 0) {
-            openProfileView(users[0].id, false);
+        if (data.object_id && data.type === 'user') {
+            openProfileView(data.object_id, false);
         } else {
             alert('Пользователь @' + username + ' не найден в VK');
         }
@@ -6024,6 +6023,19 @@ def get_backup(vk_id, data_type):
     stored = get_stored_pub_key(f"backup_{vk_id}_{data_type}")
     if stored and 'data' in stored:
         return jsonify(stored['data'])
+    return jsonify({'error': 'Not found'}), 404
+
+
+@app.route('/api/resolve_screen_name', methods=['POST'])
+def resolve_screen_name():
+    token = request.json.get('token')
+    screen_name = request.json.get('screen_name', '').strip()
+    if not screen_name:
+        return jsonify({'error': 'No screen_name'}), 400
+    result = vk_request('users.get', token, user_ids=screen_name, fields='photo_100')
+    if isinstance(result, list) and len(result) > 0:
+        u = result[0]
+        return jsonify({'type': 'user', 'object_id': u.get('id'), 'name': u.get('first_name', '') + ' ' + u.get('last_name', '')})
     return jsonify({'error': 'Not found'}), 404
 
 
