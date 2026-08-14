@@ -278,12 +278,12 @@ HTML = """
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>VK Tsuyu - True E2EE Messenger</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#000;color:#fff;height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased;overflow-x:hidden;touch-action:pan-y}
-.app{height:100vh;display:flex;flex-direction:column;position:relative;overflow:hidden;overflow-x:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#000;color:#fff;height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
+.app{height:100vh;display:flex;flex-direction:column;position:relative;overflow:hidden}
 
 /* Login Screen */
 .login-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:800;animation:fadeIn 0.2s ease-out}
@@ -332,7 +332,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .search-section-header{padding:12px 14px 6px;font-size:12px;font-weight:700;color:#ffffff;text-transform:uppercase;letter-spacing:0.8px;opacity:0.9}
 
 /* Dialogs Screen */
-.dialogs-screen{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;overflow:hidden;overflow-x:hidden;animation:fadeIn 0.15s ease-out}
+.dialogs-screen{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;overflow:hidden;animation:fadeIn 0.15s ease-out}
 .dialogs-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .dialog{display:flex;align-items:center;padding:12px 14px;cursor:pointer;border-bottom:1px solid #111;position:relative}
 .dialog:active{background:#111}
@@ -367,8 +367,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .tg-channel-video{width:100%;max-height:420px;display:block}
 .tg-channel-iframe{width:100%;height:260px;border:none}
 .tg-channel-footer{display:flex;align-items:center;justify-content:space-between;padding:8px 14px 12px;background:transparent;color:#8e8e93;font-size:13px}
-.tg-channel-more-btn{color:#0a84ff;font-size:13px;font-weight:500;cursor:pointer;padding:4px 0}
-.tg-channel-more-btn:active{opacity:0.7}
 .tg-channel-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .tg-channel-btn{display:flex;align-items:center;gap:4px;cursor:pointer;color:#8e8e93;transition:all 0.15s;font-size:12px;font-weight:500;background:#1c1c1e;border-radius:16px;padding:4px 10px;border:1px solid #2c2c2e}
 .tg-channel-btn:active{background:#2c2c2e;color:#fff}
@@ -446,9 +444,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .profile-view-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:650;display:flex;flex-direction:column;overflow:hidden;transform:translateY(100%);transition:transform 0.25s cubic-bezier(0.1,0.9,0.2,1)}
 .profile-view-modal.active{transform:translateY(0)}
 .profile-view-header{height:56px;background:#0d0d0d;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #1c1c1c;flex-shrink:0}
-.profile-view-cover{background:#1c1c1e;background-size:cover;background-position:center;position:relative}
-.profile-view-avatar-wrap{position:relative;padding:0 16px;display:flex;align-items:flex-end;gap:12px}
-.profile-view-avatar{width:72px;height:72px;border-radius:50%;object-fit:cover;background:#222;border:3px solid #000;cursor:pointer}
+.profile-view-cover{height:150px;background:#1c1c1e;background-size:cover;background-position:center;position:relative}
+.profile-view-avatar-wrap{position:relative;margin-top:-50px;padding:0 16px;display:flex;align-items:flex-end;gap:12px}
+.profile-view-avatar{width:100px;height:100px;border-radius:50%;object-fit:cover;background:#222;border:4px solid #000;cursor:pointer}
 .profile-view-name-wrap{flex:1;padding-bottom:8px}
 .profile-view-name{font-size:20px;font-weight:700;color:#fff}
 .profile-view-status{font-size:13px;color:#8e8e93;margin-top:2px}
@@ -457,14 +455,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .profile-view-posts{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 12px 20px}
 .profile-view-post-title{font-size:16px;font-weight:700;color:#fff;padding:12px 4px}
 .profile-view-empty{color:#666;text-align:center;padding:40px 20px;font-size:14px}
-.profile-desc-text{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis}
-.profile-desc-text a{color:#0a84ff;text-decoration:none}
-.profile-desc-text a:active{opacity:0.7}
-.user-link-menu{position:fixed;bottom:0;left:0;width:100%;background:#1c1c1e;border-top-left-radius:20px;border-top-right-radius:20px;padding:16px;z-index:800;transform:translateY(100%);transition:transform 0.25s cubic-bezier(0.1,0.9,0.2,1);display:flex;flex-direction:column;gap:10px}
-.user-link-menu.active{transform:translateY(0)}
-.user-link-item{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;background:#2c2c2e;color:#fff;font-size:15px;font-weight:500;cursor:pointer}
-.user-link-item:active{background:#3a3a3c}
-.user-link-item svg{width:22px;height:22px;flex-shrink:0}
 
 /* Photo Viewer Modal */
 .photo-viewer-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:999;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.2s ease}
@@ -515,7 +505,7 @@ input:checked + .slider{background-color:#34c759}
 input:checked + .slider:before{transform:translateX(20px)}
 
 /* Chat Screen */
-.chat-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;z-index:100;transform:translateX(100%);transition:transform 0.22s cubic-bezier(0.1, 0.9, 0.2, 1);overflow-x:hidden}
+.chat-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;z-index:100;transform:translateX(100%);transition:transform 0.22s cubic-bezier(0.1, 0.9, 0.2, 1)}
 .chat-screen.active{transform:translateX(0)}
 .messages-wrapper{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column}
 .messages{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch}
@@ -546,17 +536,18 @@ input:checked + .slider:before{transform:translateX(20px)}
     position: relative;
     min-height: 140px;
 }
-.msg-sticker img, .msg-sticker .sticker-wrapper img{
+.msg-sticker img{
     width: 140px;
     height: 140px;
     object-fit: contain;
     display: block;
+    border-radius: 18px;
     border: none !important;
     outline: none !important;
     box-shadow: none !important;
     filter: drop-shadow(0 4px 10px rgba(0,0,0,0.45));
 }
-.msg-sticker .msg-time, .msg-sticker .media-time-badge {
+.msg-sticker .msg-time {
     position: absolute;
     bottom: 4px;
     right: 6px;
@@ -1386,21 +1377,20 @@ E2EE
 <polyline points="12 19 5 12 12 5"></polyline>
 </svg>
 </div>
-<div class="header-title" id="profileViewHeaderTitle">Информация</div>
+<div class="header-title" id="profileViewHeaderTitle">Профиль</div>
 </div>
-<div class="profile-view-scroll" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch">
-<div class="profile-view-cover" id="profileViewCover" style="display:none"></div>
-<div class="profile-view-avatar-wrap" style="margin-top:16px;padding:0 16px">
-<img class="profile-view-avatar" id="profileViewAvatar" src="" alt="" onclick="openPhotoViewer(this.src)" style="width:80px;height:80px">
-<div class="profile-view-name-wrap" style="padding-bottom:0">
+<div class="profile-view-cover" id="profileViewCover"></div>
+<div class="profile-view-avatar-wrap">
+<img class="profile-view-avatar" id="profileViewAvatar" src="" alt="" onclick="openPhotoViewer(this.src)">
+<div class="profile-view-name-wrap">
 <div class="profile-view-name" id="profileViewName">...</div>
+<div class="profile-view-status" id="profileViewStatus">...</div>
 </div>
 </div>
-<div class="profile-view-info" id="profileViewInfo" style="padding:16px"></div>
+<div class="profile-view-info" id="profileViewInfo"></div>
 <div class="profile-view-posts">
 <div class="profile-view-post-title">Записи на стене</div>
 <div id="profilePostsList"></div>
-</div>
 </div>
 </div>
 
@@ -4007,29 +3997,20 @@ async function loadNewsFeed() {
                 const mediaHTML = buildTGPostMediaHTML(item.photo, item.video, item.photos, item.videos);
 
                 // Build reactions HTML if available
-                const REACTION_EMOJI_MAP = {
-                    1: '👍', 2: '❤️', 3: '😂', 4: '😮', 5: '😢',
-                    6: '🔥', 7: '🎉', 8: '🤔', 9: '👏', 10: '🤬',
-                    11: '🤡', 12: '🥰', 13: '😍', 14: '🤮', 15: '🖕',
-                    16: '💩', 17: '🤯', 18: '🐳', 19: '🌚', 20: '🌭',
-                    21: '💯', 22: '🍌', 23: '🖤', 24: '🤍', 25: '🤎',
-                    26: '💜', 27: '💙', 28: '💚', 29: '💛', 30: '🧡'
-                };
                 let reactionsHTML = '';
                 if (item.reactions && item.reactions.length > 0) {
                     reactionsHTML = '<div class="tg-reactions-row">';
                     item.reactions.forEach(r => {
-                        const emoji = REACTION_EMOJI_MAP[r.reaction_id] || '👍';
-                        reactionsHTML += `<div class="tg-reaction-chip"><span class="emoji">${emoji}</span><span class="count">${r.count || 0}</span></div>`;
+                        reactionsHTML += `<div class="tg-reaction-chip"><span class="emoji">${r.emoji || '👍'}</span><span class="count">${r.count || 0}</span></div>`;
                     });
                     reactionsHTML += '</div>';
                 }
 
                 div.innerHTML = `
                     <div class="tg-channel-header">
-                        <img class="tg-channel-avatar" src="${item.author_photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'" onclick="openProfileView(${item.owner_id || 0}, ${item.owner_id < 0 ? 'true' : 'false'})" style="cursor:pointer">
+                        <img class="tg-channel-avatar" src="${item.author_photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
                         <div>
-                            <div class="tg-channel-title" style="cursor:pointer" onclick="openProfileView(${item.owner_id || 0}, ${item.owner_id < 0 ? 'true' : 'false'})">${escapeHtml(item.author_name)}</div>
+                            <div class="tg-channel-title">${escapeHtml(item.author_name)}</div>
                             <div class="tg-channel-meta">${item.time || ''}</div>
                         </div>
                     </div>
@@ -4137,36 +4118,18 @@ async function openProfileView(peerId, isGroup) {
 
         document.getElementById('profileViewAvatar').src = data.photo || 'https://vk.com/images/camera_100.png';
         document.getElementById('profileViewName').textContent = data.name || '...';
-        document.getElementById('profileViewHeaderTitle').textContent = 'Информация';
+        document.getElementById('profileViewStatus').textContent = data.status || '';
+        document.getElementById('profileViewHeaderTitle').textContent = data.name || 'Профиль';
 
-        // Cover photo now shown in info section, not header
         const coverElem = document.getElementById('profileViewCover');
         if (data.cover_photo) {
-            coverElem.style.display = 'block';
             coverElem.style.backgroundImage = `url('${data.cover_photo}')`;
-            coverElem.style.height = '180px';
-            coverElem.style.backgroundSize = 'cover';
-            coverElem.style.backgroundPosition = 'center';
-            coverElem.style.borderRadius = '0 0 16px 16px';
         } else {
-            coverElem.style.display = 'none';
+            coverElem.style.backgroundImage = 'none';
         }
 
         const infoDiv = document.getElementById('profileViewInfo');
         infoDiv.innerHTML = '';
-
-        // Description/status as main info — серый цвет, обрезка, ссылки
-        if (data.status) {
-            infoDiv.innerHTML += `<div class="profile-desc-text" style="font-size:14px;color:#8e8e93;line-height:1.5;margin-bottom:12px">${formatProfileDescription(data.status)}</div>`;
-        }
-
-        // Stats row for groups
-        if (data.members_count) {
-            infoDiv.innerHTML += `<div style="display:flex;gap:16px;margin-bottom:12px;padding:8px 0;border-bottom:1px solid #1c1c1c">
-                <div style="text-align:center"><div style="font-size:16px;font-weight:700;color:#fff">${data.members_count}</div><div style="font-size:11px;color:#8e8e93">подписчиков</div></div>
-            </div>`;
-        }
-
         if (data.city) infoDiv.innerHTML += `<div class="profile-view-info-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;flex-shrink:0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${escapeHtml(data.city)}</div>`;
         if (data.bdate) infoDiv.innerHTML += `<div class="profile-view-info-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;flex-shrink:0"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>${escapeHtml(data.bdate)}</div>`;
         if (data.site) infoDiv.innerHTML += `<div class="profile-view-info-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;flex-shrink:0"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>${escapeHtml(data.site)}</div>`;
@@ -4180,20 +4143,11 @@ async function openProfileView(peerId, isGroup) {
                 div.className = 'tg-channel-card';
                 const mediaHTML = buildTGPostMediaHTML(post.photo, post.video, post.photos, post.videos);
 
-                const POST_REACTION_MAP = {
-                    1: '👍', 2: '❤️', 3: '😂', 4: '😮', 5: '😢',
-                    6: '🔥', 7: '🎉', 8: '🤔', 9: '👏', 10: '🤬',
-                    11: '🤡', 12: '🥰', 13: '😍', 14: '🤮', 15: '🖕',
-                    16: '💩', 17: '🤯', 18: '🐳', 19: '🌚', 20: '🌭',
-                    21: '💯', 22: '🍌', 23: '🖤', 24: '🤍', 25: '🤎',
-                    26: '💜', 27: '💙', 28: '💚', 29: '💛', 30: '🧡'
-                };
                 let postReactionsHTML = '';
                 if (post.reactions && post.reactions.length > 0) {
                     postReactionsHTML = '<div class="tg-reactions-row">';
                     post.reactions.forEach(r => {
-                        const emoji = POST_REACTION_MAP[r.reaction_id] || '👍';
-                        postReactionsHTML += `<div class="tg-reaction-chip"><span class="emoji">${emoji}</span><span class="count">${r.count || 0}</span></div>`;
+                        postReactionsHTML += `<div class="tg-reaction-chip"><span class="emoji">${r.emoji || '👍'}</span><span class="count">${r.count || 0}</span></div>`;
                     });
                     postReactionsHTML += '</div>';
                 }
@@ -4225,75 +4179,6 @@ async function openProfileView(peerId, isGroup) {
         document.getElementById('profileViewModal').classList.add('active');
     } catch(e) {}
     hideUploadProgress();
-}
-
-function showFullDescription() {
-    const fullText = document.getElementById('profileViewStatus')?.dataset.fullText || '';
-    if (fullText) {
-        alert(fullText);
-    }
-}
-
-function formatProfileDescription(text) {
-    if (!text) return '';
-    // Экранируем HTML
-    let safe = escapeHtml(text);
-    // Ссылки — синий цвет, кликабельные
-    safe = safe.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
-    // @username — кликабельный с меню
-    safe = safe.replace(/@([a-zA-Z0-9_]+)/g, '<a href="#" onclick="showUserLinkMenu(event,'$1');return false;" style="color:#0a84ff">@$1</a>');
-    return safe;
-}
-
-function showUserLinkMenu(e, username) {
-    e.preventDefault();
-    e.stopPropagation();
-    let menu = document.getElementById('userLinkMenu');
-    if (!menu) {
-        menu = document.createElement('div');
-        menu.id = 'userLinkMenu';
-        menu.className = 'user-link-menu';
-        menu.innerHTML = `
-            <div style="font-size:13px;color:#8e8e93;text-align:center;margin-bottom:4px">@${username}</div>
-            <div class="user-link-item" onclick="window.open('tg://resolve?domain=${username}', '_blank')||window.open('https://t.me/${username}', '_blank')">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
-                <span>Открыть в Telegram</span>
-            </div>
-            <div class="user-link-item" onclick="closeUserLinkMenu(); openProfileViewByUsername('${username}')">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.07 2H8.93C3.33 2 2 3.33 2 8.93v6.14C2 20.67 3.33 22 8.93 22h6.14c5.6 0 6.93-1.33 6.93-6.93V8.93C22 3.33 20.67 2 15.07 2zM18.15 16.27l-1.42.02c-.54 0-.71-.42-.83-.55-.33-.38-.66-.68-1.2-.68-.54 0-.87.3-1.2.68-.12.13-.29.55-.83.55l-1.42-.02c-.42 0-.55-.21-.4-.62.62-1.62 2.21-2.72 3.85-2.72s3.23 1.1 3.85 2.72c.15.41.02.62-.4.62zM15.5 9.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"/></svg>
-                <span>Открыть профиль VK</span>
-            </div>
-            <div class="user-link-item" style="justify-content:center;color:#888" onclick="closeUserLinkMenu()">Отмена</div>
-        `;
-        document.body.appendChild(menu);
-    }
-    menu.classList.add('active');
-}
-
-function closeUserLinkMenu() {
-    const menu = document.getElementById('userLinkMenu');
-    if (menu) menu.classList.remove('active');
-}
-
-async function openProfileViewByUsername(username) {
-    showUploadProgress('Поиск пользователя...');
-    try {
-        const res = await fetch('/api/search_by_username', {
-            method: 'POST',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({token, username})
-        });
-        const data = await res.json();
-        if (data.id) {
-            openProfileView(data.id, false);
-        } else {
-            alert('Пользователь не найден');
-        }
-    } catch(e) {
-        alert('Ошибка поиска');
-    } finally {
-        hideUploadProgress();
-    }
 }
 
 function closeProfileView() {
@@ -5731,7 +5616,7 @@ def profile_view():
 
     if is_group or peer_id_int < 0:
         group_id = abs(peer_id_int)
-        group_info = vk_request('groups.getById', token, group_id=group_id, fields='description,status,photo_200,photo_100,cover,members_count')
+        group_info = vk_request('groups.getById', token, group_id=group_id, fields='description,status,photo_200,photo_100,cover')
 
         name = ""
         photo = ""
@@ -5749,7 +5634,6 @@ def profile_view():
             name = g.get('name', '')
             photo = g.get('photo_200') or g.get('photo_100', '')
             status = g.get('status') or g.get('description', '')
-            members_count = g.get('members_count', 0)
 
             cover_data = g.get('cover', {})
             if cover_data.get('enabled') == 1:
@@ -5782,7 +5666,6 @@ def profile_view():
             'photo': photo,
             'status': status,
             'cover_photo': cover_photo,
-            'members_count': members_count,
             'posts': posts
         })
     else:
@@ -6020,27 +5903,6 @@ def forward_messages():
 
 
 
-
-
-@app.route('/api/search_by_username', methods=['POST'])
-def search_by_username():
-    token = request.json.get('token')
-    username = request.json.get('username', '').strip()
-    if not username:
-        return jsonify({'error': 'No username'}), 400
-
-    # Search users by screen_name
-    res = vk_request('users.search', token, q=username, count=10, fields='photo_100,screen_name')
-    if isinstance(res, dict) and 'items' in res:
-        for u in res.get('items', []):
-            if u.get('screen_name', '').lower() == username.lower():
-                return jsonify({
-                    'id': u.get('id'),
-                    'name': f"{u.get('first_name', '')} {u.get('last_name', '')}".strip(),
-                    'photo': u.get('photo_100', '')
-                })
-
-    return jsonify({'error': 'Not found'}), 404
 
 
 @app.route('/api/backup', methods=['POST'])
