@@ -278,12 +278,12 @@ HTML = """
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>VK Tsuyu - True E2EE Messenger</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#000;color:#fff;height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
-.app{height:100vh;display:flex;flex-direction:column;position:relative;overflow:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#000;color:#fff;height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased;overflow-x:hidden;touch-action:pan-y}
+.app{height:100vh;display:flex;flex-direction:column;position:relative;overflow:hidden;overflow-x:hidden}
 
 /* Login Screen */
 .login-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:800;animation:fadeIn 0.2s ease-out}
@@ -332,7 +332,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .search-section-header{padding:12px 14px 6px;font-size:12px;font-weight:700;color:#ffffff;text-transform:uppercase;letter-spacing:0.8px;opacity:0.9}
 
 /* Dialogs Screen */
-.dialogs-screen{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;overflow:hidden;animation:fadeIn 0.15s ease-out}
+.dialogs-screen{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;overflow:hidden;overflow-x:hidden;animation:fadeIn 0.15s ease-out}
 .dialogs-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .dialog{display:flex;align-items:center;padding:12px 14px;cursor:pointer;border-bottom:1px solid #111;position:relative}
 .dialog:active{background:#111}
@@ -367,6 +367,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .tg-channel-video{width:100%;max-height:420px;display:block}
 .tg-channel-iframe{width:100%;height:260px;border:none}
 .tg-channel-footer{display:flex;align-items:center;justify-content:space-between;padding:8px 14px 12px;background:transparent;color:#8e8e93;font-size:13px}
+.tg-channel-more-btn{color:#0a84ff;font-size:13px;font-weight:500;cursor:pointer;padding:4px 0}
+.tg-channel-more-btn:active{opacity:0.7}
 .tg-channel-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .tg-channel-btn{display:flex;align-items:center;gap:4px;cursor:pointer;color:#8e8e93;transition:all 0.15s;font-size:12px;font-weight:500;background:#1c1c1e;border-radius:16px;padding:4px 10px;border:1px solid #2c2c2e}
 .tg-channel-btn:active{background:#2c2c2e;color:#fff}
@@ -444,9 +446,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .profile-view-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:650;display:flex;flex-direction:column;overflow:hidden;transform:translateY(100%);transition:transform 0.25s cubic-bezier(0.1,0.9,0.2,1)}
 .profile-view-modal.active{transform:translateY(0)}
 .profile-view-header{height:56px;background:#0d0d0d;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #1c1c1c;flex-shrink:0}
-.profile-view-cover{height:150px;background:#1c1c1e;background-size:cover;background-position:center;position:relative}
-.profile-view-avatar-wrap{position:relative;margin-top:-50px;padding:0 16px;display:flex;align-items:flex-end;gap:12px}
-.profile-view-avatar{width:100px;height:100px;border-radius:50%;object-fit:cover;background:#222;border:4px solid #000;cursor:pointer}
+.profile-view-cover{background:#1c1c1e;background-size:cover;background-position:center;position:relative}
+.profile-view-avatar-wrap{position:relative;padding:0 16px;display:flex;align-items:flex-end;gap:12px}
+.profile-view-avatar{width:72px;height:72px;border-radius:50%;object-fit:cover;background:#222;border:3px solid #000;cursor:pointer}
 .profile-view-name-wrap{flex:1;padding-bottom:8px}
 .profile-view-name{font-size:20px;font-weight:700;color:#fff}
 .profile-view-status{font-size:13px;color:#8e8e93;margin-top:2px}
@@ -505,7 +507,7 @@ input:checked + .slider{background-color:#34c759}
 input:checked + .slider:before{transform:translateX(20px)}
 
 /* Chat Screen */
-.chat-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;z-index:100;transform:translateX(100%);transition:transform 0.22s cubic-bezier(0.1, 0.9, 0.2, 1)}
+.chat-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;z-index:100;transform:translateX(100%);transition:transform 0.22s cubic-bezier(0.1, 0.9, 0.2, 1);overflow-x:hidden}
 .chat-screen.active{transform:translateX(0)}
 .messages-wrapper{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column}
 .messages{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch}
@@ -536,18 +538,17 @@ input:checked + .slider:before{transform:translateX(20px)}
     position: relative;
     min-height: 140px;
 }
-.msg-sticker img{
+.msg-sticker img, .msg-sticker .sticker-wrapper img{
     width: 140px;
     height: 140px;
     object-fit: contain;
     display: block;
-    border-radius: 18px;
     border: none !important;
     outline: none !important;
     box-shadow: none !important;
     filter: drop-shadow(0 4px 10px rgba(0,0,0,0.45));
 }
-.msg-sticker .msg-time {
+.msg-sticker .msg-time, .msg-sticker .media-time-badge {
     position: absolute;
     bottom: 4px;
     right: 6px;
@@ -1377,20 +1378,22 @@ E2EE
 <polyline points="12 19 5 12 12 5"></polyline>
 </svg>
 </div>
-<div class="header-title" id="profileViewHeaderTitle">Профиль</div>
+<div class="header-title" id="profileViewHeaderTitle">Информация</div>
 </div>
-<div class="profile-view-cover" id="profileViewCover"></div>
-<div class="profile-view-avatar-wrap">
-<img class="profile-view-avatar" id="profileViewAvatar" src="" alt="" onclick="openPhotoViewer(this.src)">
-<div class="profile-view-name-wrap">
+<div class="profile-view-scroll" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch">
+<div class="profile-view-cover" id="profileViewCover" style="display:none"></div>
+<div class="profile-view-avatar-wrap" style="margin-top:16px;padding:0 16px">
+<img class="profile-view-avatar" id="profileViewAvatar" src="" alt="" onclick="openPhotoViewer(this.src)" style="width:80px;height:80px">
+<div class="profile-view-name-wrap" style="padding-bottom:0">
 <div class="profile-view-name" id="profileViewName">...</div>
 <div class="profile-view-status" id="profileViewStatus">...</div>
 </div>
 </div>
-<div class="profile-view-info" id="profileViewInfo"></div>
+<div class="profile-view-info" id="profileViewInfo" style="padding:16px"></div>
 <div class="profile-view-posts">
 <div class="profile-view-post-title">Записи на стене</div>
 <div id="profilePostsList"></div>
+</div>
 </div>
 </div>
 
@@ -3997,25 +4000,34 @@ async function loadNewsFeed() {
                 const mediaHTML = buildTGPostMediaHTML(item.photo, item.video, item.photos, item.videos);
 
                 // Build reactions HTML if available
+                const REACTION_EMOJI_MAP = {
+                    1: '👍', 2: '❤️', 3: '😂', 4: '😮', 5: '😢',
+                    6: '🔥', 7: '🎉', 8: '🤔', 9: '👏', 10: '🤬',
+                    11: '🤡', 12: '🥰', 13: '😍', 14: '🤮', 15: '🖕',
+                    16: '💩', 17: '🤯', 18: '🐳', 19: '🌚', 20: '🌭',
+                    21: '💯', 22: '🍌', 23: '🖤', 24: '🤍', 25: '🤎',
+                    26: '💜', 27: '💙', 28: '💚', 29: '💛', 30: '🧡'
+                };
                 let reactionsHTML = '';
                 if (item.reactions && item.reactions.length > 0) {
                     reactionsHTML = '<div class="tg-reactions-row">';
                     item.reactions.forEach(r => {
-                        reactionsHTML += `<div class="tg-reaction-chip"><span class="emoji">${r.emoji || '👍'}</span><span class="count">${r.count || 0}</span></div>`;
+                        const emoji = REACTION_EMOJI_MAP[r.reaction_id] || '👍';
+                        reactionsHTML += `<div class="tg-reaction-chip"><span class="emoji">${emoji}</span><span class="count">${r.count || 0}</span></div>`;
                     });
                     reactionsHTML += '</div>';
                 }
 
                 div.innerHTML = `
                     <div class="tg-channel-header">
-                        <img class="tg-channel-avatar" src="${item.author_photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'">
+                        <img class="tg-channel-avatar" src="${item.author_photo || 'https://vk.com/images/camera_100.png'}" onerror="this.src='https://vk.com/images/camera_100.png'" onclick="openProfileView(${item.owner_id}, ${item.owner_id < 0})" style="cursor:pointer">
                         <div>
                             <div class="tg-channel-title">${escapeHtml(item.author_name)}</div>
                             <div class="tg-channel-meta">${item.time || ''}</div>
                         </div>
                     </div>
                     ${mediaHTML}
-                    <div class="tg-channel-body">${escapeHtml(item.text || '')}</div>
+                    <div class="tg-channel-body">${formatProfileText(item.text || '')}</div>
                     ${reactionsHTML}
                     <div class="tg-channel-footer">
                         <div class="tg-channel-actions">
@@ -4118,18 +4130,37 @@ async function openProfileView(peerId, isGroup) {
 
         document.getElementById('profileViewAvatar').src = data.photo || 'https://vk.com/images/camera_100.png';
         document.getElementById('profileViewName').textContent = data.name || '...';
-        document.getElementById('profileViewStatus').textContent = data.status || '';
-        document.getElementById('profileViewHeaderTitle').textContent = data.name || 'Профиль';
+        document.getElementById('profileViewStatus').textContent = '';
+        document.getElementById('profileViewHeaderTitle').textContent = 'Информация';
 
+        // Cover photo now shown in info section, not header
         const coverElem = document.getElementById('profileViewCover');
         if (data.cover_photo) {
+            coverElem.style.display = 'block';
             coverElem.style.backgroundImage = `url('${data.cover_photo}')`;
+            coverElem.style.height = '180px';
+            coverElem.style.backgroundSize = 'cover';
+            coverElem.style.backgroundPosition = 'center';
+            coverElem.style.borderRadius = '0 0 16px 16px';
         } else {
-            coverElem.style.backgroundImage = 'none';
+            coverElem.style.display = 'none';
         }
 
         const infoDiv = document.getElementById('profileViewInfo');
         infoDiv.innerHTML = '';
+
+        // Description/status as main info with link formatting
+        if (data.status) {
+            infoDiv.innerHTML += `<div style="font-size:14px;color:#8e8e93;line-height:1.5;margin-bottom:12px">${formatProfileText(data.status)}</div>`;
+        }
+
+        // Stats row for groups
+        if (data.members_count) {
+            infoDiv.innerHTML += `<div style="display:flex;gap:16px;margin-bottom:12px;padding:8px 0;border-bottom:1px solid #1c1c1c">
+                <div style="text-align:center"><div style="font-size:16px;font-weight:700;color:#fff">${data.members_count}</div><div style="font-size:11px;color:#8e8e93">подписчиков</div></div>
+            </div>`;
+        }
+
         if (data.city) infoDiv.innerHTML += `<div class="profile-view-info-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;flex-shrink:0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${escapeHtml(data.city)}</div>`;
         if (data.bdate) infoDiv.innerHTML += `<div class="profile-view-info-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;flex-shrink:0"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>${escapeHtml(data.bdate)}</div>`;
         if (data.site) infoDiv.innerHTML += `<div class="profile-view-info-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;flex-shrink:0"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>${escapeHtml(data.site)}</div>`;
@@ -4143,11 +4174,20 @@ async function openProfileView(peerId, isGroup) {
                 div.className = 'tg-channel-card';
                 const mediaHTML = buildTGPostMediaHTML(post.photo, post.video, post.photos, post.videos);
 
+                const POST_REACTION_MAP = {
+                    1: '👍', 2: '❤️', 3: '😂', 4: '😮', 5: '😢',
+                    6: '🔥', 7: '🎉', 8: '🤔', 9: '👏', 10: '🤬',
+                    11: '🤡', 12: '🥰', 13: '😍', 14: '🤮', 15: '🖕',
+                    16: '💩', 17: '🤯', 18: '🐳', 19: '🌚', 20: '🌭',
+                    21: '💯', 22: '🍌', 23: '🖤', 24: '🤍', 25: '🤎',
+                    26: '💜', 27: '💙', 28: '💚', 29: '💛', 30: '🧡'
+                };
                 let postReactionsHTML = '';
                 if (post.reactions && post.reactions.length > 0) {
                     postReactionsHTML = '<div class="tg-reactions-row">';
                     post.reactions.forEach(r => {
-                        postReactionsHTML += `<div class="tg-reaction-chip"><span class="emoji">${r.emoji || '👍'}</span><span class="count">${r.count || 0}</span></div>`;
+                        const emoji = POST_REACTION_MAP[r.reaction_id] || '👍';
+                        postReactionsHTML += `<div class="tg-reaction-chip"><span class="emoji">${emoji}</span><span class="count">${r.count || 0}</span></div>`;
                     });
                     postReactionsHTML += '</div>';
                 }
@@ -4160,7 +4200,7 @@ async function openProfileView(peerId, isGroup) {
                         </div>
                     </div>
                     ${mediaHTML}
-                    <div class="tg-channel-body">${escapeHtml(post.text || '')}</div>
+                    <div class="tg-channel-body">${formatProfileText(post.text || '')}</div>
                     ${postReactionsHTML}
                     <div class="tg-channel-footer">
                         <div class="tg-channel-actions">
@@ -4179,6 +4219,64 @@ async function openProfileView(peerId, isGroup) {
         document.getElementById('profileViewModal').classList.add('active');
     } catch(e) {}
     hideUploadProgress();
+}
+
+function formatProfileText(text) {
+    if (!text) return '';
+    let html = escapeHtml(text);
+    // URLs -> blue clickable links
+    html = html.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" style="color:#0a84ff;text-decoration:none">$1</a>');
+    // @username -> clickable with menu
+    html = html.replace(/@([a-zA-Z0-9_]+)/g, '<span style="color:#0a84ff;cursor:pointer" onclick="showUserMenu(event,'$1')">@$1</span>');
+    return html;
+}
+
+function showUserMenu(event, username) {
+    event.stopPropagation();
+    const existing = document.getElementById('userMenu');
+    if (existing) existing.remove();
+    const menu = document.createElement('div');
+    menu.id = 'userMenu';
+    menu.style.cssText = 'position:fixed;background:#1c1c1e;border-radius:12px;padding:8px 0;min-width:160px;box-shadow:0 8px 32px rgba(0,0,0,0.6);z-index:800;border:1px solid #2c2c2e;';
+    menu.innerHTML = `
+        <div style="padding:10px 16px;font-size:14px;color:#fff;font-weight:600;border-bottom:1px solid #2c2c2e">@${username}</div>
+        <div style="padding:10px 16px;font-size:14px;color:#ddd;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background 0.1s" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background=''" onclick="window.open('https://t.me/${username}','_blank');document.getElementById('userMenu').remove()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2"><path d="M21.198 2.433a2.242 2.242 0 0 0-1.022.215l-16.5 6.498a2.25 2.25 0 0 0-.106 4.103l3.999 1.498 1.5 5.002a2.25 2.25 0 0 0 4.102.105l6.5-16.5a2.242 2.242 0 0 0-1.473-1.02z"/><path d="M9.5 14.5L14.5 9.5"/></svg>
+            <span style="color:#0a84ff">Telegram</span>
+        </div>
+        <div style="padding:10px 16px;font-size:14px;color:#ddd;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background 0.1s" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background=''" onclick="openUserProfile('${username}');document.getElementById('userMenu').remove()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span style="color:#0a84ff">VK (на сайте)</span>
+        </div>
+    `;
+    menu.style.left = (event.clientX || event.touches?.[0]?.clientX || 0) + 'px';
+    menu.style.top = (event.clientY || event.touches?.[0]?.clientY || 0) + 'px';
+    document.body.appendChild(menu);
+    setTimeout(() => {
+        document.addEventListener('click', function closeMenu(e) {
+            if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', closeMenu); }
+        });
+    }, 100);
+}
+
+function openUserProfile(username) {
+    // Search VK user by username and open profile view
+    fetch('/api/search_global', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ token, query: username })
+    }).then(r => r.json()).then(data => {
+        const users = (data.results || []).filter(x => x.type === 'user');
+        if (users.length > 0) {
+            openProfileView(users[0].id, false);
+        } else {
+            alert('Пользователь @' + username + ' не найден в VK');
+        }
+    }).catch(() => alert('Ошибка поиска пользователя'));
+}
+
+function showFullDescription() {
+    // No longer needed since description is shown fully in infoDiv
 }
 
 function closeProfileView() {
@@ -5616,7 +5714,7 @@ def profile_view():
 
     if is_group or peer_id_int < 0:
         group_id = abs(peer_id_int)
-        group_info = vk_request('groups.getById', token, group_id=group_id, fields='description,status,photo_200,photo_100,cover')
+        group_info = vk_request('groups.getById', token, group_id=group_id, fields='description,status,photo_200,photo_100,cover,members_count')
 
         name = ""
         photo = ""
@@ -5634,6 +5732,7 @@ def profile_view():
             name = g.get('name', '')
             photo = g.get('photo_200') or g.get('photo_100', '')
             status = g.get('status') or g.get('description', '')
+            members_count = g.get('members_count', 0)
 
             cover_data = g.get('cover', {})
             if cover_data.get('enabled') == 1:
@@ -5666,6 +5765,7 @@ def profile_view():
             'photo': photo,
             'status': status,
             'cover_photo': cover_photo,
+            'members_count': members_count,
             'posts': posts
         })
     else:
